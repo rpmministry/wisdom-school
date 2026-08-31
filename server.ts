@@ -3,7 +3,6 @@ import path from 'path';
 import fs from 'fs';
 import dotenv from 'dotenv';
 import { GoogleGenAI } from '@google/genai';
-import { createServer as createViteServer } from 'vite';
 
 dotenv.config();
 
@@ -245,6 +244,7 @@ async function executeResilientAIPipeline(params: {
   conversationHistory: Array<{ role: 'user' | 'model'; content: string }>;
 }): Promise<{ reply: string; providerUsed: string }> {
   const { systemPrompt, userMessage, conversationHistory } = params;
+  const deadline = Date.now() + 9000;
 
   // --------------------------------------------------------------------------
   // FASE 1 & FASE 2: Búsqueda dinámica de modelos gratuitos e Iteración (OpenRouter)
@@ -256,13 +256,17 @@ async function executeResilientAIPipeline(params: {
       let freeModels: string[] = [];
 
       try {
+        const catalogController = new AbortController();
+        const catalogTimeoutId = setTimeout(() => catalogController.abort(), 1500);
         const modelsRes = await fetch('https://openrouter.ai/api/v1/models', {
           method: 'GET',
           headers: {
             'Authorization': `Bearer ${openRouterKey.trim()}`,
             'Content-Type': 'application/json',
           },
+          signal: catalogController.signal,
         });
+        clearTimeout(catalogTimeoutId);
 
         if (modelsRes.ok) {
           const modelsData = await modelsRes.json();
@@ -291,6 +295,8 @@ async function executeResilientAIPipeline(params: {
         ];
       }
 
+      freeModels = freeModels.slice(0, 2);
+
       console.log(`[Resilience Engine] Fase 1: Se utilizarán ${freeModels.length} modelos gratuitos:`, freeModels);
 
       const messages = [
@@ -304,9 +310,12 @@ async function executeResilientAIPipeline(params: {
 
       // Fase 2: Iteración sobre modelos gratuitos con timeout de 15s y delay de 2-3s
       for (const modelId of freeModels) {
+        const remainingMs = deadline - Date.now();
+        if (remainingMs <= 500) break;
+
         console.log(`[Resilience Engine] Fase 2: Intentando modelo gratuito OpenRouter: ${modelId}...`);
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 15000);
+        const timeoutId = setTimeout(() => controller.abort(), Math.min(7000, remainingMs));
 
         try {
           const openRouterRes = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -343,8 +352,8 @@ async function executeResilientAIPipeline(params: {
           throw new Error(`OpenRouter respondió sin contenido válido para ${modelId}`);
         } catch (attemptErr: any) {
           console.warn(`[Resilience Engine] Fallo o timeout de 15s en modelo ${modelId}:`, attemptErr?.message || attemptErr);
-          const delayMs = 2000 + Math.floor(Math.random() * 1000);
-          await wait(delayMs);
+          const delayMs = Math.min(250, Math.max(0, deadline - Date.now()));
+          if (delayMs > 0) await wait(delayMs);
         } finally {
           clearTimeout(timeoutId);
         }
@@ -358,7 +367,7 @@ async function executeResilientAIPipeline(params: {
   // FASE 3: Fallback de Seguridad de Alta Capacidad (Gemini 3.7 / 1.5 / 2.5)
   // --------------------------------------------------------------------------
   const ai = getGeminiClient();
-  if (ai) {
+  if (ai && Date.now() < deadline) {
     try {
       console.log('[Resilience Engine] Fase 3: Activando Fallback de Seguridad con Gemini...');
       const sanitizedContents = buildGeminiContents(conversationHistory, userMessage);
@@ -622,6 +631,7 @@ async function start() {
   const isVercelRuntime = Boolean(process.env.VERCEL);
 
   if (!isVercelRuntime && process.env.NODE_ENV !== 'production') {
+    const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: {
         middlewareMode: true,
