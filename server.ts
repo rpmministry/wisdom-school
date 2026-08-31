@@ -634,7 +634,16 @@ IMPORTANTE: Responde ÚNICAMENTE en formato JSON válido.
   }
 });
 
-// Paso 17: el servidor decide si ejecuta Vite en desarrollo o sirve archivos estáticos en producción, según el entorno actual.
+// Paso 17: dejamos un fallback estático para que la función también pueda responder la página principal si Vercel la enruta aquí.
+if (process.env.VERCEL) {
+  const distPath = path.join(appRoot, 'dist');
+  app.use(express.static(distPath));
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(distPath, 'index.html'));
+  });
+}
+
+// Paso 18: el servidor decide si ejecuta Vite en desarrollo o sirve archivos estáticos en producción, según el entorno actual.
 async function start() {
   const isVercelRuntime = Boolean(process.env.VERCEL);
 
