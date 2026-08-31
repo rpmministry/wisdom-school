@@ -1,0 +1,166 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="100%" height="100%">
+  <defs>
+    <!-- Background Gradient -->
+    <linearGradient id="gaelBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F8FAFC" />
+      <stop offset="100%" stop-color="#F1F5F9" />
+    </linearGradient>
+
+    <!-- Skin Tone Gradients -->
+    <linearGradient id="gaelSkin" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#F6CEAC" />
+      <stop offset="50%" stop-color="#EDB894" />
+      <stop offset="100%" stop-color="#E2A67D" />
+    </linearGradient>
+
+    <linearGradient id="gaelShadow" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#D4946D" />
+      <stop offset="100%" stop-color="#C07E57" />
+    </linearGradient>
+
+    <!-- Hair Gradients -->
+    <linearGradient id="gaelHair" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#241E1F" />
+      <stop offset="50%" stop-color="#141112" />
+      <stop offset="100%" stop-color="#1E191A" />
+    </linearGradient>
+
+    <linearGradient id="gaelHairSheen" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#4A3D3F" />
+      <stop offset="100%" stop-color="#211A1C" />
+    </linearGradient>
+
+    <!-- Denim Overalls Gradients -->
+    <linearGradient id="denimBlue" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2D3B48" />
+      <stop offset="50%" stop-color="#1F2937" />
+      <stop offset="100%" stop-color="#111827" />
+    </linearGradient>
+
+    <!-- Heather Gray Shirt -->
+    <linearGradient id="heatherGray" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#4B5563" />
+      <stop offset="100%" stop-color="#374151" />
+    </linearGradient>
+
+    <!-- Metal Buckle Silver -->
+    <linearGradient id="silverMetal" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#E2E8F0" />
+      <stop offset="50%" stop-color="#94A3B8" />
+      <stop offset="100%" stop-color="#CBD5E1" />
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="400" height="400" fill="url(#gaelBg)" />
+  <circle cx="200" cy="200" r="190" fill="#FFFFFF" opacity="0.8" />
+
+  <!-- T-Shirt & Shoulders (Heather Gray) -->
+  <g id="shirt">
+    <path d="M90 340 C110 315 140 305 165 300 L200 310 L235 300 C260 305 290 315 310 340 L350 400 L50 400 Z" fill="url(#heatherGray)" />
+    <!-- Collar Line -->
+    <path d="M165 300 C175 315 225 315 235 300" fill="none" stroke="#1F2937" stroke-width="3" />
+  </g>
+
+  <!-- Denim Overalls / Dungarees with Straps & Buckles -->
+  <g id="overalls">
+    <!-- Center Bib -->
+    <path d="M125 350 L275 350 L285 400 L115 400 Z" fill="url(#denimBlue)" stroke="#111827" stroke-width="1.5" />
+    
+    <!-- Left Strap -->
+    <path d="M125 330 L155 330 L155 400 L125 400 Z" fill="url(#denimBlue)" stroke="#374151" stroke-width="1.5" />
+    <!-- Left Metal Buckle -->
+    <rect x="123" y="342" width="34" height="12" rx="3" fill="url(#silverMetal)" stroke="#64748B" stroke-width="1.5" />
+    <circle cx="140" cy="375" r="7" fill="url(#silverMetal)" stroke="#475569" stroke-width="1" />
+    <circle cx="140" cy="375" r="3.5" fill="#334155" />
+
+    <!-- Right Strap -->
+    <path d="M245 330 L275 330 L275 400 L245 400 Z" fill="url(#denimBlue)" stroke="#374151" stroke-width="1.5" />
+    <!-- Right Metal Buckle -->
+    <rect x="243" y="342" width="34" height="12" rx="3" fill="url(#silverMetal)" stroke="#64748B" stroke-width="1.5" />
+    <circle cx="260" cy="375" r="7" fill="url(#silverMetal)" stroke="#475569" stroke-width="1" />
+    <circle cx="260" cy="375" r="3.5" fill="#334155" />
+
+    <!-- Denim Stitching Lines (Gold-Orange thread) -->
+    <path d="M127 330 L127 400" stroke="#D97706" stroke-width="1" stroke-dasharray="3,2" opacity="0.7" />
+    <path d="M153 330 L153 400" stroke="#D97706" stroke-width="1" stroke-dasharray="3,2" opacity="0.7" />
+    <path d="M247 330 L247 400" stroke="#D97706" stroke-width="1" stroke-dasharray="3,2" opacity="0.7" />
+    <path d="M273 330 L273 400" stroke="#D97706" stroke-width="1" stroke-dasharray="3,2" opacity="0.7" />
+  </g>
+
+  <!-- Neck -->
+  <path d="M174 240 L174 308 C185 314 215 314 226 308 L226 240 Z" fill="url(#gaelSkin)" />
+  <path d="M174 240 C185 260 215 260 226 240 C220 262 180 262 174 240 Z" fill="url(#gaelShadow)" opacity="0.5" />
+
+  <!-- Head Base -->
+  <g id="head">
+    <!-- Ears -->
+    <ellipse cx="128" cy="202" rx="12" ry="18" fill="url(#gaelSkin)" />
+    <ellipse cx="128" cy="202" rx="6" ry="10" fill="#D4946D" opacity="0.5" />
+    <ellipse cx="272" cy="202" rx="12" ry="18" fill="url(#gaelSkin)" />
+    <ellipse cx="272" cy="202" rx="6" ry="10" fill="#D4946D" opacity="0.5" />
+
+    <!-- Face Shape (Round, friendly young face) -->
+    <path d="M136 155 C136 95 264 95 264 155 C264 218 245 255 200 255 C155 255 136 218 136 155 Z" fill="url(#gaelSkin)" />
+
+    <!-- Rosy Cheeks -->
+    <ellipse cx="158" cy="202" rx="16" ry="10" fill="#F43F5E" opacity="0.14" />
+    <ellipse cx="242" cy="202" rx="16" ry="10" fill="#F43F5E" opacity="0.14" />
+
+    <!-- Charming Dimples -->
+    <path d="M152 214 C150 218 152 222 154 225" fill="none" stroke="#BA7751" stroke-width="2.2" stroke-linecap="round" />
+    <path d="M248 214 C250 218 248 222 246 225" fill="none" stroke="#BA7751" stroke-width="2.2" stroke-linecap="round" />
+
+    <!-- Nose -->
+    <path d="M198 174 L196 196 C194 200 197 203 200 203 C203 203 206 200 204 196 L202 174" fill="none" stroke="#C58560" stroke-width="1.8" stroke-linecap="round" />
+    <ellipse cx="193" cy="200" rx="3" ry="1.5" fill="#B37350" opacity="0.5" />
+    <ellipse cx="207" cy="200" rx="3" ry="1.5" fill="#B37350" opacity="0.5" />
+
+    <!-- Cheerful Eyes -->
+    <!-- Left Eye -->
+    <g id="leftEye">
+      <path d="M154 168 C163 159 176 160 184 169 C175 174 163 174 154 168 Z" fill="#FFFFFF" />
+      <circle cx="169" cy="167" r="6" fill="#291811" />
+      <circle cx="169" cy="167" r="3.2" fill="#0F0906" />
+      <circle cx="167" cy="165" r="1.8" fill="#FFFFFF" />
+      <path d="M152 166 C163 156 177 157 186 167" fill="none" stroke="#1A1516" stroke-width="2.5" stroke-linecap="round" />
+      <!-- Eyebrow -->
+      <path d="M150 152 C162 144 176 146 186 153" fill="none" stroke="#251E1F" stroke-width="3" stroke-linecap="round" />
+    </g>
+
+    <!-- Right Eye -->
+    <g id="rightEye">
+      <path d="M216 169 C224 160 237 159 246 168 C237 174 225 174 216 169 Z" fill="#FFFFFF" />
+      <circle cx="231" cy="167" r="6" fill="#291811" />
+      <circle cx="231" cy="167" r="3.2" fill="#0F0906" />
+      <circle cx="229" cy="165" r="1.8" fill="#FFFFFF" />
+      <path d="M214 167 C223 157 237 156 248 166" fill="none" stroke="#1A1516" stroke-width="2.5" stroke-linecap="round" />
+      <!-- Eyebrow -->
+      <path d="M214 153 C224 146 238 144 250 152" fill="none" stroke="#251E1F" stroke-width="3" stroke-linecap="round" />
+    </g>
+
+    <!-- Big Bright Smile (Showing White Teeth) -->
+    <g id="smile">
+      <!-- Mouth cavity -->
+      <path d="M168 214 C175 240 225 240 232 214 Z" fill="#881337" />
+      <!-- White Teeth -->
+      <path d="M172 215 C176 226 224 226 228 215 Z" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="0.8" />
+      <line x1="193" y1="215" x2="193" y2="223" stroke="#CBD5E1" stroke-width="1" />
+      <line x1="200" y1="215" x2="200" y2="224" stroke="#CBD5E1" stroke-width="1" />
+      <line x1="207" y1="215" x2="207" y2="223" stroke="#CBD5E1" stroke-width="1" />
+      <!-- Upper & Lower Lip Outline -->
+      <path d="M164 214 C180 211 220 211 236 214" fill="none" stroke="#E11D48" stroke-width="2.2" stroke-linecap="round" />
+      <path d="M168 214 C176 242 224 242 232 214" fill="none" stroke="#BE123C" stroke-width="2.2" stroke-linecap="round" />
+    </g>
+  </g>
+
+  <!-- Hair (Neat, classic boy hairstyle with side-swept shine) -->
+  <g id="hair">
+    <!-- Top & Side Volume -->
+    <path d="M132 165 C124 110 160 80 200 78 C240 76 274 100 268 165 C255 130 220 120 190 125 C155 130 142 145 132 165 Z" fill="url(#gaelHair)" />
+    <!-- Front Sweep -->
+    <path d="M136 140 C145 105 185 95 215 102 C245 110 260 130 262 145 C240 120 205 115 170 124 C150 130 140 135 136 140 Z" fill="url(#gaelHair)" />
+    <!-- Hair Highlights -->
+    <path d="M165 95 C185 88 220 90 240 102" fill="none" stroke="url(#gaelHairSheen)" stroke-width="3" stroke-linecap="round" opacity="0.6" />
+  </g>
+</svg>

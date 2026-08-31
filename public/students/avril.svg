@@ -1,0 +1,161 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="100%" height="100%">
+  <defs>
+    <!-- Background Gradient -->
+    <linearGradient id="avrilBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F8FAFC" />
+      <stop offset="100%" stop-color="#EEF2F6" />
+    </linearGradient>
+
+    <!-- Skin Tone Gradients -->
+    <linearGradient id="avrilSkin" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#F2C7A7" />
+      <stop offset="50%" stop-color="#E9B491" />
+      <stop offset="100%" stop-color="#DC9F7A" />
+    </linearGradient>
+
+    <linearGradient id="avrilShadow" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#D18F69" />
+      <stop offset="100%" stop-color="#BE7B56" />
+    </linearGradient>
+
+    <!-- Hair Gradients -->
+    <linearGradient id="avrilHair" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#231F20" />
+      <stop offset="40%" stop-color="#181516" />
+      <stop offset="70%" stop-color="#2A2426" />
+      <stop offset="100%" stop-color="#141112" />
+    </linearGradient>
+
+    <linearGradient id="hairHighlight" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#4A3E40" />
+      <stop offset="100%" stop-color="#282224" />
+    </linearGradient>
+
+    <!-- Lip Gradient -->
+    <linearGradient id="avrilLips" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#D66874" />
+      <stop offset="60%" stop-color="#B84856" />
+      <stop offset="100%" stop-color="#8F303C" />
+    </linearGradient>
+
+    <linearGradient id="goldChain" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#F59E0B" />
+      <stop offset="50%" stop-color="#FDE68A" />
+      <stop offset="100%" stop-color="#D97706" />
+    </linearGradient>
+  </defs>
+
+  <!-- Canvas Background -->
+  <rect width="400" height="400" fill="url(#avrilBg)" />
+  <circle cx="200" cy="200" r="190" fill="#FFFFFF" opacity="0.8" />
+
+  <!-- Back Hair Waves (Layer 1) -->
+  <path d="M120 180 C100 240 80 300 100 360 C110 390 140 400 160 400 L240 400 C260 400 290 390 300 360 C320 300 300 240 280 180 Z" fill="url(#avrilHair)" />
+  
+  <!-- White Embroidered Blouse (Shoulders & Chest) -->
+  <g id="blouse">
+    <!-- Main Blouse Body -->
+    <path d="M100 340 C110 320 135 310 160 305 L200 315 L240 305 C265 310 290 320 300 340 L340 400 L60 400 Z" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="1.5" />
+    
+    <!-- Sleeves & Pleats -->
+    <path d="M80 360 C70 380 60 400 60 400 L120 400 L110 350 Z" fill="#F1F5F9" opacity="0.8" />
+    <path d="M320 360 C330 380 340 400 340 400 L280 400 L290 350 Z" fill="#F1F5F9" opacity="0.8" />
+
+    <!-- Embroidered Floral Chest Panel -->
+    <rect x="155" y="325" width="90" height="75" rx="6" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.5" stroke-dasharray="3,2" />
+    <circle cx="200" cy="355" r="14" fill="none" stroke="#CBD5E1" stroke-width="1.5" stroke-dasharray="4,2" />
+    <path d="M200 345 C195 355 195 355 200 365 C205 355 205 355 200 345 Z" fill="none" stroke="#94A3B8" stroke-width="1.5" />
+    <path d="M190 355 C200 350 200 350 210 355 C200 360 200 360 190 355 Z" fill="none" stroke="#94A3B8" stroke-width="1.5" />
+  </g>
+
+  <!-- Neck and Collarbones -->
+  <path d="M172 245 L172 310 C180 315 200 318 228 310 L228 245 Z" fill="url(#avrilSkin)" />
+  <path d="M172 245 C185 265 215 265 228 245 C220 270 180 270 172 245 Z" fill="url(#avrilShadow)" opacity="0.6" />
+
+  <!-- Gold Necklace with Small Pendant -->
+  <path d="M178 285 C190 302 210 302 222 285" fill="none" stroke="url(#goldChain)" stroke-width="2" />
+  <polygon points="200,298 204,304 200,310 196,304" fill="url(#goldChain)" />
+
+  <!-- Head Base -->
+  <g id="head">
+    <!-- Ears -->
+    <ellipse cx="140" cy="205" rx="9" ry="16" fill="url(#avrilSkin)" />
+    <ellipse cx="260" cy="205" rx="9" ry="16" fill="url(#avrilSkin)" />
+    <!-- Pearl Earring Left & Right -->
+    <circle cx="140" cy="216" r="3.5" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1" />
+    <circle cx="260" cy="216" r="3.5" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1" />
+
+    <!-- Face Shape -->
+    <path d="M142 165 C142 110 258 110 258 165 C258 215 240 255 200 255 C160 255 142 215 142 165 Z" fill="url(#avrilSkin)" />
+    
+    <!-- Cheek Blush -->
+    <ellipse cx="162" cy="205" rx="14" ry="8" fill="#F472B6" opacity="0.18" />
+    <ellipse cx="238" cy="205" rx="14" ry="8" fill="#F472B6" opacity="0.18" />
+
+    <!-- Delicate Nose -->
+    <path d="M198 175 L196 200 C194 205 198 208 200 208 C202 208 206 205 204 200 L202 175" fill="none" stroke="#C98B68" stroke-width="1.8" stroke-linecap="round" />
+    <ellipse cx="194" cy="206" rx="2.5" ry="1.5" fill="#B37350" opacity="0.6" />
+    <ellipse cx="206" cy="206" rx="2.5" ry="1.5" fill="#B37350" opacity="0.6" />
+
+    <!-- Beautiful Almond Eyes -->
+    <!-- Left Eye -->
+    <g id="leftEye">
+      <path d="M160 172 C168 165 180 166 186 173 C178 178 168 177 160 172 Z" fill="#FFFFFF" />
+      <circle cx="173" cy="172" r="5.5" fill="#2E1C14" />
+      <circle cx="173" cy="172" r="3" fill="#120A07" />
+      <circle cx="171.5" cy="170" r="1.5" fill="#FFFFFF" />
+      <path d="M158 171 C167 163 181 164 188 172" fill="none" stroke="#1A1516" stroke-width="2.2" stroke-linecap="round" />
+      <!-- Eyebrow -->
+      <path d="M157 158 C166 151 178 152 187 157" fill="none" stroke="#251E1F" stroke-width="2.5" stroke-linecap="round" />
+    </g>
+
+    <!-- Right Eye -->
+    <g id="rightEye">
+      <path d="M214 173 C220 166 232 165 240 172 C232 177 222 178 214 173 Z" fill="#FFFFFF" />
+      <circle cx="227" cy="172" r="5.5" fill="#2E1C14" />
+      <circle cx="227" cy="172" r="3" fill="#120A07" />
+      <circle cx="225.5" cy="170" r="1.5" fill="#FFFFFF" />
+      <path d="M212 172 C219 164 233 163 242 171" fill="none" stroke="#1A1516" stroke-width="2.2" stroke-linecap="round" />
+      <!-- Eyebrow -->
+      <path d="M213 157 C222 152 234 151 243 158" fill="none" stroke="#251E1F" stroke-width="2.5" stroke-linecap="round" />
+    </g>
+
+    <!-- Expressive Lips & Smile -->
+    <g id="lips">
+      <!-- Upper Lip -->
+      <path d="M184 225 C192 222 197 223 200 225 C203 223 208 222 216 225 C208 229 192 229 184 225 Z" fill="url(#avrilLips)" />
+      <!-- Lower Lip -->
+      <path d="M185 226 C193 234 207 234 215 226 C207 230 193 230 185 226 Z" fill="#D66874" />
+      <path d="M183 225 C193 227 207 227 217 225" fill="none" stroke="#7A1D28" stroke-width="1.2" />
+    </g>
+  </g>
+
+  <!-- Front Hair & Wavy Locks -->
+  <g id="hairFront">
+    <!-- Middle Parting & Forehead Waves -->
+    <path d="M142 160 C140 90 260 90 258 160 C240 120 215 130 200 142 C185 130 160 120 142 160 Z" fill="url(#avrilHair)" />
+    
+    <!-- Left Wavy Cascades -->
+    <path d="M148 145 C125 180 115 230 132 275 C140 295 130 320 125 340 C118 365 145 365 148 335 C152 295 138 250 152 205 C156 190 154 165 148 145 Z" fill="url(#avrilHair)" />
+    
+    <!-- Right Wavy Cascades -->
+    <path d="M252 145 C275 180 285 230 268 275 C260 295 270 320 275 340 C282 365 255 365 252 335 C248 295 262 250 248 205 C244 190 246 165 252 145 Z" fill="url(#avrilHair)" />
+
+    <!-- Hair Highlights -->
+    <path d="M165 125 C180 132 192 138 198 142" fill="none" stroke="url(#hairHighlight)" stroke-width="3" stroke-linecap="round" opacity="0.6" />
+    <path d="M235 125 C220 132 208 138 202 142" fill="none" stroke="url(#hairHighlight)" stroke-width="3" stroke-linecap="round" opacity="0.6" />
+  </g>
+
+  <!-- White Lace Headband / Bandeau (Characteristic Accessory) -->
+  <g id="headband">
+    <path d="M148 115 C160 95 240 95 252 115 C240 102 160 102 148 115 Z" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1.5" />
+    <!-- Lace Ruffles -->
+    <circle cx="160" cy="106" r="4" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1" />
+    <circle cx="173" cy="101" r="4.5" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1" />
+    <circle cx="187" cy="98" r="5" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1" />
+    <circle cx="200" cy="97" r="5" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1" />
+    <circle cx="213" cy="98" r="5" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1" />
+    <circle cx="227" cy="101" r="4.5" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1" />
+    <circle cx="240" cy="106" r="4" fill="#FFFFFF" stroke="#E2E8F0" stroke-width="1" />
+  </g>
+</svg>

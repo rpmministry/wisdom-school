@@ -1,0 +1,6 @@
+{
+  "name": "Wisdom School",
+  "description": "Plataforma pedagógica integral y colegio virtual adaptativo para homeschooling y escuelas con microcurrículo estructurado por nivel, profesores IA socráticos y evaluación por evidencias.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
