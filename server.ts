@@ -8,12 +8,14 @@ import { createServer as createViteServer } from 'vite';
 
 dotenv.config();
 
+// Paso 1: configuramos el entorno de ejecución del backend y definimos la aplicación Express principal.
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = 3000;
 
+// Paso 2: desactivamos el ETag para evitar caché agresivo y forzamos una recarga más limpia en frontend durante desarrollo.
 app.disable('etag');
 app.use((req, res, next) => {
   const isHtml = req.path === '/' || req.path.endsWith('.html');
@@ -39,16 +41,17 @@ app.use((req, res, next) => {
   next();
 });
 
+// Paso 3: habilitamos JSON y formularios extensos porque la app genera fotos, textos largos y payloads de IA.
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
-// Ensure public/students directory exists
+// Paso 4: aseguramos que exista la carpeta pública de imágenes de estudiantes para guardar fotos y archivos visuales.
 const publicStudentsDir = path.join(process.cwd(), 'public', 'students');
 if (!fs.existsSync(publicStudentsDir)) {
   fs.mkdirSync(publicStudentsDir, { recursive: true });
 }
 
-// Case-insensitive & extension-flexible student image resolver
+// Paso 5: este endpoint resuelve imágenes de estudiantes sin depender del nombre exacto o la extensión exacta.
 app.get('/students/:filename', (req: Request, res: Response, next) => {
   const reqName = req.params.filename.toLowerCase();
   const searchDirs = [
@@ -78,11 +81,11 @@ app.get('/students/:filename', (req: Request, res: Response, next) => {
   next();
 });
 
-// Serve public static folder early
+// Paso 6: servimos la carpeta pública y la ruta de estudiantes para que el frontend pueda cargar fotos y avatares sin problema.
 app.use('/students', express.static(publicStudentsDir));
 app.use(express.static(path.join(process.cwd(), 'public')));
 
-// Upload real student photo endpoint
+// Paso 7: este endpoint guarda la foto real del estudiante en el servidor para que se use en la interfaz y quede persistida.
 app.post('/api/students/upload-avatar', (req: Request, res: Response) => {
   try {
     const { studentId, imageBase64 } = req.body;
@@ -110,7 +113,7 @@ app.post('/api/students/upload-avatar', (req: Request, res: Response) => {
   }
 });
 
-// Check available student avatar files
+// Paso 8: verificamos qué avatares existen para decidir si ya hay una imagen real del estudiante cargada o se usa una predeterminada.
 app.get('/api/students/avatars-status', (req: Request, res: Response) => {
   const results: Record<string, string | null> = { avril: null, gael: null };
   for (const id of ['avril', 'gael']) {
@@ -125,7 +128,7 @@ app.get('/api/students/avatars-status', (req: Request, res: Response) => {
   res.json({ results });
 });
 
-// Lazy initialization of Gemini client
+// Paso 9: inicializamos el cliente de Gemini solo cuando se necesita, con validación de la clave de entorno para no fallar en runtime.
 function getGeminiClient(): GoogleGenAI | null {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
@@ -142,7 +145,7 @@ function getGeminiClient(): GoogleGenAI | null {
   });
 }
 
-// Health Check
+// Paso 10: el health check sirve como verificación de que el backend está vivo antes de pedir servicios de IA o autenticación.
 app.get('/api/health', (req: Request, res: Response) => {
   res.json({ status: 'ok', service: 'Wisdom School Backend', time: new Date().toISOString() });
 });
@@ -151,7 +154,7 @@ function wait(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-// Resilient Gemini model caller with multi-model fallback and retry
+// Paso 11: esta función intenta varios modelos de Gemini en orden de prioridad y reintenta ante caídas temporales o alta demanda.
 async function callGeminiWithModelFallback(
   ai: GoogleGenAI,
   requestParams: {
@@ -199,7 +202,7 @@ async function callGeminiWithModelFallback(
   throw lastError;
 }
 
-// Helper to build strictly alternating Gemini content structure
+// Paso 12: construimos el historial de mensajes en formato alternado para que Gemini reciba conversaciones válidas y coherentes.
 function buildGeminiContents(
   history: Array<{ role: 'user' | 'model'; content: string }>,
   currentMessage: string
@@ -230,12 +233,12 @@ function buildGeminiContents(
 }
 
 /**
- * Arquitectura de Resiliencia Dinámica en Cascada (Cascading Resilience Engine)
+ * Paso 13: Motor de Resiliencia en Cascada.
  *
- * Fase 1: Búsqueda dinámica de modelos gratuitos en OpenRouter (id ends with :free or cost is 0).
- * Fase 2: Iteración estratégica con AbortController de 15s y delay de 2-3s entre fallos.
- * Fase 3: Fallback de Seguridad a Gemini (gemini-3.7-flash / gemini-1.5-flash / gemini-2.5-flash).
- * Manejo de Errores Final: Retorno de error 503 pedagógico amigable.
+ * Fase 1: consulta modelos gratuitos de OpenRouter para intentar la opción más económica.
+ * Fase 2: prueba cada modelo con timeout y reasignación de tiempo antes de fallar.
+ * Fase 3: usa Gemini como respaldo seguro si OpenRouter no responde.
+ * Fase final: devuelve un mensaje educativo amable cuando todo falla.
  */
 async function executeResilientAIPipeline(params: {
   systemPrompt: string;
@@ -384,7 +387,7 @@ async function executeResilientAIPipeline(params: {
   throw new Error('Disculpa, estoy organizando mis apuntes. ¿Podrías repetirme tu pregunta en unos segundos?');
 }
 
-// Endpoint de la especificación /api/profesor
+// Paso 14: este endpoint recibe preguntas del estudiante y responde como un profesor socrático con contexto académico y metódico.
 app.post('/api/profesor', async (req: Request, res: Response) => {
   try {
     const { preguntaEstudiante, asignatura, nivelEducativo, historialConversacion, message, subject, student } = req.body;
@@ -422,7 +425,7 @@ REGLAS PEDAGÓGICAS ESTRICTAS:
   }
 });
 
-// Socratic AI Teacher Chat Endpoint (/api/ai/teacher-chat)
+// Paso 15: el chat del profesor IA mantiene contexto por conversación, materia, nivel y clase para guiar la respuesta del estudiante.
 app.post('/api/ai/teacher-chat', async (req: Request, res: Response) => {
   try {
     const {
@@ -488,7 +491,7 @@ REGLAS PEDAGÓGICAS ESTRICTAS (MÉTODO SOCRÁTICO):
   }
 });
 
-// AI Homework / Work Analysis Endpoint
+// Paso 16: esta ruta analiza tareas, trabajos o dibujos enviados por el estudiante y devuelve retroalimentación formativa y motivadora.
 app.post('/api/ai/analyze-work', async (req: Request, res: Response) => {
   try {
     const {
@@ -615,7 +618,7 @@ IMPORTANTE: Responde ÚNICAMENTE en formato JSON válido.
   }
 });
 
-// Vite Development or Production Static Server
+// Paso 17: el servidor decide si ejecuta Vite en desarrollo o sirve archivos estáticos en producción, según el entorno actual.
 async function start() {
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
