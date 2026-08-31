@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 
 const MainContent: React.FC = () => {
+  // Paso 1: leemos el estado global que administra la escuela, el alumno activo y los modales de autenticación.
   const {
     activeTab,
     setActiveTab,
@@ -35,8 +36,10 @@ const MainContent: React.FC = () => {
     closeAuthModal,
   } = useSchool();
 
+  // Paso 2: manejamos el modal de registro de alumnos nuevos desde la vista pública.
   const [registerModalOpen, setRegisterModalOpen] = useState(false);
 
+  // Paso 3: esta función decide cuál vista mostrar según la pestaña activa del usuario.
   const renderActiveView = () => {
     switch (activeTab) {
       case 'home':
@@ -62,23 +65,23 @@ const MainContent: React.FC = () => {
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-950 text-slate-100 selection:bg-indigo-500 selection:text-white">
-      {/* Top Navigation */}
+      {/* Paso 4: la navegación global permanece visible en todas las pantallas para guiar al usuario. */}
       <Navbar />
 
       <div className="flex-1 flex max-w-7xl w-full mx-auto">
-        {/* Desktop Sidebar (Hidden on landing if desired, or persistent) */}
+        {/* Paso 5: en el espacio privado aparece el sidebar; en la landing no se muestra para mantener la vista pública limpia. */}
         {activeTab !== 'home' && <Sidebar />}
 
-        {/* Main Content Area */}
+        {/* Paso 6: el contenido principal cambia dinámicamente según el tab activo. */}
         <main className="flex-1 px-0 pt-0 pb-24 md:pb-8 overflow-y-auto">
           {renderActiveView()}
         </main>
       </div>
 
-      {/* Socratic AI Teacher Interactive Drawer */}
+      {/* Paso 7: el profesor IA se presenta como panel flotante para apoyar aprendizaje y tutoría, sin romper la navegación. */}
       <AITeacherDrawer />
 
-      {/* Student Authentication Modal */}
+      {/* Paso 8: el modal de acceso del estudiante permite autenticarse con correo o PIN y luego navegar al espacio privado. */}
       <StudentLoginModal
         isOpen={isAuthModalOpen}
         onClose={closeAuthModal}
@@ -86,13 +89,13 @@ const MainContent: React.FC = () => {
         onOpenRegister={() => setRegisterModalOpen(true)}
       />
 
-      {/* New Student Registration Modal */}
+      {/* Paso 9: el registro de alumnos nuevos se mantiene en un flujo separado y protegido dentro del mismo flujo principal. */}
       <NewStudentModal
         isOpen={registerModalOpen}
         onClose={() => setRegisterModalOpen(false)}
       />
 
-      {/* Mobile Bottom Navigation Bar */}
+      {/* Paso 10: la navegación móvil conserva la experiencia en dispositivos pequeños con acceso rápido a las secciones clave. */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-slate-900/95 backdrop-blur-md border-t border-slate-800 px-3 py-2 flex items-center justify-around">
         {[
           { id: 'home', label: 'Inicio', icon: Home },

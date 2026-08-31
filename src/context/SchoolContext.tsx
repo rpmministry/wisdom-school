@@ -77,7 +77,7 @@ const getInitialDayOfWeek = (): DayOfWeekName => {
 };
 
 export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // 👥 REGISTERED STUDENTS LIST PERSISTENCE
+  // Paso 1: persistimos la lista de estudiantes para que las credenciales y perfiles queden disponibles aunque se recargue la app.
   const [studentsList, setStudentsList] = useState<Student[]>(() => {
     try {
       const saved = localStorage.getItem('wisdom_students_list_v3');
@@ -97,7 +97,7 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return STUDENTS_DATA;
   });
 
-  // 🔐 AUTHENTICATION STATE
+  // Paso 2: guardamos quién ha iniciado sesión para que el sistema recuerde al alumno autenticado y muestre su espacio privado.
   const [authenticatedStudentId, setAuthenticatedStudentId] = useState<StudentId | null>(() => {
     try {
       const saved = localStorage.getItem('wisdom_auth_student_id_v2');
@@ -126,6 +126,7 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setTargetLoginStudentId(undefined);
   };
 
+  // Paso 3: definimos los estados globales de navegación, calendario y sesiones del estudiante dentro del ecosistema escolar.
   const [selectedDayOfWeek, setSelectedDayOfWeek] = useState<DayOfWeekName>(getInitialDayOfWeek);
   const [activeTab, setActiveTab] = useState<NavigationTab>('home');
   const [activeSubject, setActiveSubject] = useState<Subject | null>(null);
@@ -272,7 +273,7 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     });
   };
 
-  // 🔑 LOGIN FUNCTION
+  // Paso 4: la autenticación valida correo, código PIN o identificador personal para entrar al espacio del estudiante.
   const loginStudent = (identifier: string, passOrPin: string) => {
     const cleanId = identifier.trim().toLowerCase();
     const cleanSecret = passOrPin.trim().toLowerCase();
@@ -352,13 +353,13 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return { success: true };
   };
 
-  // 🔒 LOGOUT FUNCTION
+  // Paso 5: cerrar sesión limpia el acceso privado y vuelve a la vista pública del colegio.
   const logoutStudent = () => {
     setAuthenticatedStudentId(null);
     setActiveTab('home');
   };
 
-  // 🎓 REGISTER NEW STUDENT FUNCTION
+  // Paso 6: el registro crea un nuevo estudiante, asigna materias, horarios y lo autentica automáticamente para comenzar su experiencia.
   const registerNewStudent = (input: NewStudentInput) => {
     const created = createNewStudentProfile(input);
 

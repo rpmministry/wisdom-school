@@ -30,6 +30,7 @@ export const Navbar: React.FC = () => {
     activeSubject,
   } = useSchool();
 
+  // Paso 1: detectamos qué perfil está activo para aplicar el tema visual correcto (Avril o Gael).
   const isAvril = currentStudentId === 'avril';
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
 
@@ -42,7 +43,7 @@ export const Navbar: React.FC = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-2">
 
         
-        {/* Brand & Logo */}
+        {/* Paso 2: la marca del colegio y el logo se mantienen visibles para reforzar identidad institucional. */}
         <div className="flex items-center gap-3 cursor-pointer group" onClick={() => setActiveTab('home')}>
           <div className={`w-10 h-10 rounded-xl bg-slate-800/90 border p-1.5 shadow-md shadow-black/30 flex items-center justify-center group-hover:scale-105 transition-all duration-300 ${
             isAvril ? 'border-indigo-500/40 group-hover:border-indigo-400' : 'border-amber-500/40 group-hover:border-amber-400'
@@ -68,7 +69,7 @@ export const Navbar: React.FC = () => {
           </div>
         </div>
 
-        {/* Center / Right Action Buttons */}
+        {/* Paso 3: el lado derecho reúne acciones clave del usuario: profesor IA, perfil, seguridad y cierre de sesión. */}
         <div className="flex items-center gap-2.5">
 
           {/* Quick AI Teacher Summon */}

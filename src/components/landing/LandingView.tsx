@@ -31,25 +31,27 @@ import {
 } from 'lucide-react';
 
 export const LandingView: React.FC = () => {
+  // Paso 1: leemos el estado de autenticación para decidir si el usuario ya está dentro de su espacio privado.
   const {
     authenticatedStudentId,
     openAuthModal,
     setActiveTab,
   } = useSchool();
 
+  // Paso 2: controlamos el modal de inscripción para nuevos estudiantes desde la landing page pública.
   const [admissionModalOpen, setAdmissionModalOpen] = useState(false);
 
   return (
     <div className="max-w-7xl mx-auto space-y-10 pt-0 pb-8">
       
-      {/* 🌟 HERO WELCOME BANNER - GLOBAL PEDAGOGICAL PLATFORM */}
+      {/* Paso 3: el hero principal presenta la marca del colegio y el valor educativo de la plataforma en una sola primera vista. */}
       <section className="relative overflow-hidden rounded-[1.75rem] bg-gradient-to-br from-indigo-950 via-slate-900 to-purple-950 border border-indigo-500/20 px-6 py-6 sm:px-10 sm:py-8 shadow-2xl">
         <div className="absolute top-0 right-0 -mt-10 -mr-10 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute bottom-0 left-0 -mb-10 -ml-10 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl pointer-events-none" />
 
         <div className="relative z-10 space-y-4">
           
-          {/* Top Badge & Logo */}
+          {/* Paso 4: la primera fila incluye identidad institucional y acceso rápido a ingresar o registrar. */}
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <div className="p-3 rounded-2xl bg-slate-900/90 border border-slate-700/80 shadow-lg shadow-black/40 flex items-center justify-center">
@@ -82,7 +84,7 @@ export const LandingView: React.FC = () => {
             </div>
           </div>
 
-          {/* Hero Headline & Subtitle */}
+          {/* Paso 5: aquí se define el mensaje principal de la marca: ¿qué es Wisdom School y para quién está pensado? */}
           <div className="max-w-5xl space-y-4">
             <div className="inline-flex items-center gap-3 rounded-full border border-indigo-400/30 bg-indigo-500/10 px-4 py-2 shadow-[0_0_25px_rgba(99,102,241,0.12)] backdrop-blur-sm">
               <SchoolLogo size="sm" className="w-8 h-8 object-contain" />
@@ -118,7 +120,7 @@ export const LandingView: React.FC = () => {
             </div>
           </div>
 
-          {/* Platform Stat Pills */}
+          {/* Paso 6: estas cuatro tarjetas resumen de un vistazo el valor de la plataforma y su alcance curricular. */}
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 pt-1">
             {[
               { label: 'Currículo Adaptativo', value: '3 a 18 años', icon: GraduationCap, color: 'text-indigo-400' },
@@ -141,7 +143,7 @@ export const LandingView: React.FC = () => {
             })}
           </div>
 
-          {/* 🎓 PRIVATE STUDENT LOGIN PORTAL (NO PUBLIC PROFILES DISPLAYED) */}
+          {/* Paso 7: la zona privada se presenta con acceso protegido, sin mostrar perfiles estudiantiles de manera pública. */}
           <div className="pt-6 border-t border-slate-800/80">
             {authenticatedStudentId ? (
               /* Active Session Banner */
