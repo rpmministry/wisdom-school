@@ -169,7 +169,7 @@ async function callGeminiWithModelFallback(
   }
 ) {
   // Valid modern Gemini models in prioritized order (Gemini 3.7 / 1.5 / 2.5 / 2.0 fallback)
-  const modelsToTry = ['gemini-2.5-flash', 'gemini-2.0-flash'];
+  const modelsToTry = ['gemini-3.7-flash', 'gemini-3.6-flash'];
 
   let lastError: any = null;
 
