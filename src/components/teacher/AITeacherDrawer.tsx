@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useSchool } from '../../context/SchoolContext';
-import { askAITeacher, ChatMessage } from '../../services/aiService';
+import { askAITeacher, ChatMessage, renderMarkdownToHtml } from '../../services/aiService';
 import {
   Bot,
   X,
@@ -29,6 +29,60 @@ export const AITeacherDrawer: React.FC = () => {
   const subject = activeSubject || studentSubjects[0];
   const dailyClass = activeClass || todayClasses[0];
   const teacher = subject?.teacher;
+
+  const studentTheme = (() => {
+    const base = currentStudent?.colorTheme || {
+      accent: '#6366f1',
+      primary: 'indigo',
+      secondary: 'violet',
+      gradient: 'from-indigo-600 via-violet-600 to-purple-600',
+      badge: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30',
+    };
+
+    if (currentStudent?.id === 'avril') {
+      return {
+        ...base,
+        accent: '#7c9cff',
+        secondary: '#facc15',
+        softBg: '#f6f3ff',
+        softPanel: '#eef4ff',
+        chip: '#fff8d6',
+        textStrong: '#1f2937',
+        textMuted: '#4b5563',
+        aura: '#c7d2fe',
+        glow: 'rgba(124, 156, 255, 0.35)',
+        label: 'Peanuts',
+      };
+    }
+
+    if (currentStudent?.id === 'gael') {
+      return {
+        ...base,
+        accent: '#e11d48',
+        secondary: '#fbbf24',
+        softBg: '#fffaf0',
+        softPanel: '#fff1f2',
+        chip: '#fef3c7',
+        textStrong: '#111827',
+        textMuted: '#374151',
+        aura: '#f9a8d4',
+        glow: 'rgba(225, 29, 72, 0.30)',
+        label: 'Super Mario Bros',
+      };
+    }
+
+    return {
+      ...base,
+      softBg: '#0f172a',
+      softPanel: '#111827',
+      chip: '#1f2937',
+      textStrong: '#f8fafc',
+      textMuted: '#cbd5e1',
+      aura: base.accent || '#6366f1',
+      glow: 'rgba(99, 102, 241, 0.22)',
+      label: 'Original',
+    };
+  })();
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState('');
@@ -109,27 +163,57 @@ export const AITeacherDrawer: React.FC = () => {
 
   return (
     <div className="fixed inset-0 z-50 overflow-hidden flex justify-end bg-black/60 backdrop-blur-sm animate-fade-in">
-      <div className="w-full max-w-lg bg-slate-900 border-l border-slate-700 shadow-2xl flex flex-col h-full animate-slide-left">
+      <div className="w-full max-w-lg border-l shadow-2xl flex flex-col h-full animate-slide-left"
+        style={{
+          background: 'linear-gradient(180deg, rgba(15,23,42,0.98), rgba(15,23,42,0.94))',
+          borderColor: `${studentTheme.accent}55`,
+          boxShadow: `0 0 0 1px ${studentTheme.accent}33`,
+        }}
+      >
         
         {/* Drawer Header */}
-        <div className="p-4 sm:p-5 border-b border-slate-800 bg-slate-900/90 flex items-center justify-between">
+        <div
+          className="p-4 sm:p-5 border-b flex items-center justify-between"
+          style={{
+            background: `linear-gradient(135deg, ${studentTheme.accent}22, rgba(15,23,42,0.92) 60%, rgba(2,6,23,0.96))`,
+            borderColor: `${studentTheme.accent}44`,
+          }}
+        >
           <div className="flex items-center gap-3">
             <div className="relative">
               <img
                 src={teacher.avatar}
                 alt={teacher.name}
-                className="w-12 h-12 rounded-2xl object-cover ring-2 ring-indigo-500/40 shadow"
+                className="w-12 h-12 rounded-2xl object-cover ring-2 shadow"
+                style={{ boxShadow: `0 0 0 2px ${studentTheme.accent}55` }}
               />
               <span className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-emerald-500 border-2 border-slate-900" title="Activo" />
             </div>
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="text-sm font-bold text-white">{teacher.name}</h3>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                <span
+                  className="text-[10px] font-bold px-2 py-0.5 rounded-full border"
+                  style={{
+                    background: `${studentTheme.accent}22`,
+                    borderColor: `${studentTheme.accent}66`,
+                    color: '#f8fafc',
+                  }}
+                >
                   Tutor IA
                 </span>
               </div>
-              <p className="text-xs text-indigo-400 font-medium">{subject.name}</p>
+              <div
+                className="mt-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[9px] font-bold uppercase tracking-wide"
+                style={{
+                  background: studentTheme.chip,
+                  borderColor: `${studentTheme.accent}55`,
+                  color: studentTheme.textStrong,
+                }}
+              >
+                {studentTheme.label}
+              </div>
+              <p className="text-xs font-medium" style={{ color: studentTheme.accent }}>{subject.name}</p>
               <p className="text-[11px] text-slate-400 truncate max-w-xs">{dailyClass?.theme}</p>
             </div>
           </div>
@@ -144,12 +228,19 @@ export const AITeacherDrawer: React.FC = () => {
         </div>
 
         {/* Academic Context Badge */}
-        <div className="px-4 py-2 bg-indigo-950/40 border-b border-indigo-900/30 flex items-center justify-between text-xs text-indigo-300">
+        <div
+          className="px-4 py-2 border-b flex items-center justify-between text-xs"
+          style={{
+            background: `${studentTheme.accent}10`,
+            borderColor: `${studentTheme.accent}22`,
+            color: '#dbeafe',
+          }}
+        >
           <div className="flex items-center gap-1.5 truncate">
-            <BookOpen className="w-3.5 h-3.5 shrink-0 text-indigo-400" />
+            <BookOpen className="w-3.5 h-3.5 shrink-0" style={{ color: studentTheme.accent }} />
             <span className="truncate">Contexto: {dailyClass?.theme}</span>
           </div>
-          <span className="text-[10px] uppercase font-bold text-amber-400 shrink-0 ml-2">
+          <span className="text-[10px] uppercase font-bold shrink-0 ml-2" style={{ color: '#fbbf24' }}>
             Método Socrático
           </span>
         </div>
@@ -172,13 +263,30 @@ export const AITeacherDrawer: React.FC = () => {
                 )}
                 
                 <div
-                  className={`max-w-[85%] p-3.5 rounded-2xl text-xs sm:text-sm leading-relaxed ${
+                  className="max-w-[85%] p-3.5 rounded-2xl text-xs sm:text-sm leading-relaxed shadow-md"
+                  style={
                     isUser
-                      ? 'bg-indigo-600 text-white rounded-br-none shadow-md'
-                      : 'bg-slate-800 border border-slate-700/80 text-slate-200 rounded-bl-none shadow'
-                  }`}
+                      ? {
+                          background: `linear-gradient(135deg, ${studentTheme.accent}, ${studentTheme.accent}cc)`,
+                          color: '#fff',
+                          borderBottomRightRadius: 0,
+                        }
+                      : {
+                          background: 'rgba(15, 23, 42, 0.9)',
+                          border: `1px solid ${studentTheme.accent}44`,
+                          color: '#e2e8f0',
+                          borderBottomLeftRadius: 0,
+                        }
+                  }
                 >
-                  <div className="whitespace-pre-line">{msg.content}</div>
+                  {isUser ? (
+                    <div className="whitespace-pre-line">{msg.content}</div>
+                  ) : (
+                    <div
+                      className="markdown-body"
+                      dangerouslySetInnerHTML={{ __html: renderMarkdownToHtml(msg.content) }}
+                    />
+                  )}
                   <span
                     className={`block text-[9px] mt-1 text-right ${
                       isUser ? 'text-indigo-200' : 'text-slate-400'
@@ -209,7 +317,13 @@ export const AITeacherDrawer: React.FC = () => {
         </div>
 
         {/* Socratic Quick Prompts Pills */}
-        <div className="p-2.5 bg-slate-900 border-t border-slate-800 overflow-x-auto flex items-center gap-1.5 scrollbar-none">
+        <div
+          className="p-2.5 border-t overflow-x-auto flex items-center gap-1.5 scrollbar-none"
+          style={{
+            background: `linear-gradient(180deg, rgba(15, 23, 42, 0.85), rgba(15, 23, 42, 0.96))`,
+            borderColor: `${studentTheme.accent}22`,
+          }}
+        >
           <span className="text-[10px] text-slate-400 font-bold uppercase shrink-0 pl-1">
             Pistas:
           </span>
@@ -223,7 +337,12 @@ export const AITeacherDrawer: React.FC = () => {
               key={idx}
               onClick={() => handleSendMessage(promptText)}
               disabled={isLoading}
-              className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-[11px] text-indigo-300 border border-slate-700 whitespace-nowrap transition-all disabled:opacity-50"
+              className="px-2.5 py-1 rounded-lg border whitespace-nowrap transition-all disabled:opacity-50 text-[11px]"
+              style={{
+                background: `${studentTheme.accent}12`,
+                borderColor: `${studentTheme.accent}44`,
+                color: '#dbeafe',
+              }}
             >
               {promptText}
             </button>
@@ -246,13 +365,22 @@ export const AITeacherDrawer: React.FC = () => {
               onChange={(e) => setInputValue(e.target.value)}
               placeholder={`Pregúntale a ${teacher.name} sobre ${dailyClass?.theme}...`}
               disabled={isLoading}
-              className="flex-1 bg-slate-800 border border-slate-700 focus:border-indigo-500 rounded-xl px-4 py-2.5 text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none transition-colors"
+              className="flex-1 rounded-xl px-4 py-2.5 text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none transition-colors border"
+              style={{
+                background: 'rgba(15, 23, 42, 0.9)',
+                borderColor: `${studentTheme.accent}55`,
+                boxShadow: `0 0 0 1px ${studentTheme.accent}22 inset`,
+              }}
             />
             <button
               id="btn-send-teacher-chat"
               type="submit"
               disabled={!inputValue.trim() || isLoading}
-              className="p-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white transition-all shadow-md"
+              className="p-2.5 rounded-xl disabled:opacity-50 text-white transition-all shadow-md"
+              style={{
+                background: `linear-gradient(135deg, ${studentTheme.accent}, ${studentTheme.accent}dd)`,
+                boxShadow: `0 8px 18px ${studentTheme.accent}33`,
+              }}
               title="Enviar mensaje"
             >
               <Send className="w-4 h-4" />

@@ -27,6 +27,68 @@ export interface AnalyzeWorkRequest {
   studentNotes?: string;
 }
 
+export function renderMarkdownToHtml(content: string): string {
+  if (!content || typeof content !== 'string') return '';
+
+  const escapeHtml = (value: string) =>
+    value
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+
+  const normalize = (value: string) => value.replace(/\r\n/g, '\n');
+  const withInline = (value: string) => {
+    let html = escapeHtml(value);
+    html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+    html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    html = html.replace(/__(.+?)__/g, '<strong>$1</strong>');
+    html = html.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+    html = html.replace(/_([^_]+)_/g, '<em>$1</em>');
+    return html;
+  };
+
+  const blocks = normalize(content).split(/\n{2,}/);
+  const rendered = blocks.map((block) => {
+    const trimmed = block.trim();
+    if (!trimmed) return '';
+
+    if (/^(-|\*)\s+/m.test(trimmed)) {
+      const items = trimmed
+        .split(/\n/)
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .map((line) => `<li>${withInline(line.replace(/^[-*]\s*/, ''))}</li>`)
+        .join('');
+      return `<ul>${items}</ul>`;
+    }
+
+    if (/^\d+\.\s+/m.test(trimmed)) {
+      const items = trimmed
+        .split(/\n/)
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .map((line) => `<li>${withInline(line.replace(/^\d+\.\s*/, ''))}</li>`)
+        .join('');
+      return `<ol>${items}</ol>`;
+    }
+
+    if (/^#{1,3}\s+/.test(trimmed)) {
+      const headingMatch = trimmed.match(/^(#{1,3})\s+(.*)$/);
+      if (headingMatch) {
+        const level = headingMatch[1].length;
+        const text = withInline(headingMatch[2]);
+        return `<h${level}>${text}</h${level}>`;
+      }
+    }
+
+    return `<p>${withInline(trimmed).replace(/\n/g, '<br />')}</p>`;
+  });
+
+  return rendered.filter(Boolean).join('');
+}
+
 export async function askAITeacher(req: TeacherChatRequest): Promise<string> {
   try {
     const response = await fetch('/api/ai/teacher-chat', {

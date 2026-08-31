@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { askAITeacher } from '../../services/aiService';
+import { askAITeacher, renderMarkdownToHtml } from '../../services/aiService';
 import { Bot, Send, Sparkles, User, RefreshCw, MessageSquare, AlertCircle } from 'lucide-react';
 
 export const AITeacherTryoutWidget: React.FC = () => {
@@ -95,7 +95,14 @@ export const AITeacherTryoutWidget: React.FC = () => {
                   : 'bg-slate-900 border border-slate-800 text-slate-200 rounded-bl-none'
               }`}
             >
-              {msg.text}
+              {msg.role === 'user' ? (
+                msg.text
+              ) : (
+                <div
+                  className="markdown-body"
+                  dangerouslySetInnerHTML={{ __html: renderMarkdownToHtml(msg.text) }}
+                />
+              )}
             </div>
             {msg.role === 'user' && (
               <div className="w-7 h-7 rounded-lg bg-slate-800 text-slate-300 flex items-center justify-center shrink-0">

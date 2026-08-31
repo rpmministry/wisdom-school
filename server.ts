@@ -14,6 +14,31 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = 3000;
 
+app.disable('etag');
+app.use((req, res, next) => {
+  const isHtml = req.path === '/' || req.path.endsWith('.html');
+  const isFrontendAsset =
+    req.path.startsWith('/src/') ||
+    req.path.startsWith('/@vite/') ||
+    req.path.startsWith('/assets/') ||
+    req.path.endsWith('.js') ||
+    req.path.endsWith('.css') ||
+    req.path.endsWith('.svg') ||
+    req.path.endsWith('.png') ||
+    req.path.endsWith('.jpg') ||
+    req.path.endsWith('.jpeg') ||
+    req.path.endsWith('.webp') ||
+    req.path.endsWith('.ico');
+
+  if (isHtml || isFrontendAsset) {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+  }
+
+  next();
+});
+
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
@@ -594,7 +619,17 @@ IMPORTANTE: Responde ÚNICAMENTE en formato JSON válido.
 async function start() {
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: {
+        middlewareMode: true,
+        host: '0.0.0.0',
+        port: 3000,
+        strictPort: true,
+        hmr: {
+          host: 'localhost',
+          port: 24678,
+          clientPort: 24678,
+        },
+      },
       appType: 'spa',
     });
     app.use(vite.middlewares);

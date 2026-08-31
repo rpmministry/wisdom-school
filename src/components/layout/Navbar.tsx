@@ -34,10 +34,10 @@ export const Navbar: React.FC = () => {
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
 
   return (
-    <header className={`sticky top-0 z-30 backdrop-blur-md border-b text-slate-100 transition-colors duration-300 ${
+    <header className={`sticky top-0 z-30 backdrop-blur-md text-slate-100 transition-colors duration-300 ${
       isAvril
-        ? 'bg-gradient-to-r from-slate-900 via-indigo-950/40 to-slate-900 border-indigo-500/30'
-        : 'bg-gradient-to-r from-slate-900 via-amber-950/40 to-slate-900 border-amber-500/30'
+        ? 'bg-gradient-to-r from-slate-900 via-indigo-950/40 to-slate-900'
+        : 'bg-gradient-to-r from-slate-900 via-amber-950/40 to-slate-900'
     }`}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-2">
 

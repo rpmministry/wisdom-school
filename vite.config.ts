@@ -12,9 +12,16 @@ export default defineConfig(() => {
       },
     },
     server: {
-      // HMR is disabled in AI Studio via DISABLE_HMR env var.
-      // Do not modifyâfile watching is disabled to prevent flickering during agent edits.
-      hmr: process.env.DISABLE_HMR !== 'true',
+      host: '0.0.0.0',
+      port: 3000,
+      strictPort: true,
+      hmr: process.env.DISABLE_HMR !== 'true'
+        ? {
+            host: 'localhost',
+            port: 24678,
+            clientPort: 24678,
+          }
+        : false,
       // Disable file watching when DISABLE_HMR is true to save CPU during agent edits.
       watch: process.env.DISABLE_HMR === 'true' ? null : {},
     },

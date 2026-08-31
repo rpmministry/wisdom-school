@@ -40,14 +40,14 @@ export const LandingView: React.FC = () => {
   const [admissionModalOpen, setAdmissionModalOpen] = useState(false);
 
   return (
-    <div className="max-w-7xl mx-auto space-y-16 py-4">
+    <div className="max-w-7xl mx-auto space-y-10 pt-0 pb-8">
       
       {/* 🌟 HERO WELCOME BANNER - GLOBAL PEDAGOGICAL PLATFORM */}
-      <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-950 via-slate-900 to-purple-950 border border-indigo-500/20 p-8 sm:p-14 shadow-2xl">
+      <section className="relative overflow-hidden rounded-[1.75rem] bg-gradient-to-br from-indigo-950 via-slate-900 to-purple-950 border border-indigo-500/20 px-6 py-6 sm:px-10 sm:py-8 shadow-2xl">
         <div className="absolute top-0 right-0 -mt-10 -mr-10 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute bottom-0 left-0 -mb-10 -ml-10 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl pointer-events-none" />
 
-        <div className="relative z-10 space-y-8">
+        <div className="relative z-10 space-y-4">
           
           {/* Top Badge & Logo */}
           <div className="flex flex-wrap items-center justify-between gap-4">
@@ -64,28 +64,62 @@ export const LandingView: React.FC = () => {
               </div>
             </div>
 
-            <button
-              onClick={() => setAdmissionModalOpen(true)}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold text-xs shadow-lg shadow-amber-950/40 transition-all transform hover:scale-105"
-            >
-              <UserPlus className="w-4 h-4" />
-              <span>Inscribir / Registrar Nuevo Estudiante</span>
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => openAuthModal()}
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl border border-indigo-400/40 bg-slate-900/70 text-indigo-100 font-bold text-xs shadow-lg shadow-indigo-950/40 transition-all transform hover:scale-105"
+              >
+                <ShieldCheck className="w-4 h-4 text-indigo-300" />
+                <span>Ingresar al Aula</span>
+              </button>
+              <button
+                onClick={() => setAdmissionModalOpen(true)}
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold text-xs shadow-lg shadow-amber-950/40 transition-all transform hover:scale-105"
+              >
+                <UserPlus className="w-4 h-4" />
+                <span>Inscribir Estudiante</span>
+              </button>
+            </div>
           </div>
 
           {/* Hero Headline & Subtitle */}
-          <div className="max-w-4xl space-y-4">
-            <h1 className="text-4xl sm:text-6xl font-extrabold tracking-tight text-white leading-tight">
-              Una plataforma pedagógica <span className="bg-clip-text text-transparent bg-gradient-to-r from-indigo-300 via-purple-300 to-amber-300">inteligente y adaptativa</span> para cada año lectivo
-            </h1>
+          <div className="max-w-5xl space-y-4">
+            <div className="inline-flex items-center gap-3 rounded-full border border-indigo-400/30 bg-indigo-500/10 px-4 py-2 shadow-[0_0_25px_rgba(99,102,241,0.12)] backdrop-blur-sm">
+              <SchoolLogo size="sm" className="w-8 h-8 object-contain" />
+              <span className="text-sm sm:text-base font-black uppercase tracking-[0.28em] text-indigo-100">WISDOM SCHOOL</span>
+            </div>
 
-            <p className="text-base sm:text-xl text-slate-300 leading-relaxed font-normal">
+            <div className="space-y-2">
+              <p className="text-xs sm:text-sm font-semibold uppercase tracking-[0.32em] text-indigo-300/80">Colegio Virtual • Plataforma Pedagógica</p>
+              <h1 className="max-w-4xl text-4xl sm:text-5xl lg:text-6xl font-black tracking-[-0.06em] text-white leading-[0.9]">
+                Una plataforma pedagógica <span className="bg-clip-text text-transparent bg-gradient-to-r from-indigo-300 via-purple-300 to-amber-300">inteligente y adaptativa</span>
+              </h1>
+            </div>
+
+            <p className="max-w-3xl text-base sm:text-xl text-slate-300 leading-relaxed font-normal">
               Diseñada para la formación integral en homeschooling y aulas virtuales. Acompaña a cada estudiante desde la educación inicial hasta el bachillerato con microcurrículo estructurado día a día, profesores virtuales socráticos y evaluación por evidencias sin exámenes memorísticos.
             </p>
+
+            <div className="flex flex-wrap items-center gap-3 pt-1">
+              <button
+                onClick={() => openAuthModal()}
+                className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-indigo-500 to-purple-600 px-5 py-3 text-sm font-bold text-white shadow-xl shadow-indigo-950/60 transition-all hover:scale-[1.02]"
+              >
+                <ArrowRight className="w-4 h-4" />
+                Entrar al Aula
+              </button>
+              <button
+                onClick={() => setAdmissionModalOpen(true)}
+                className="inline-flex items-center gap-2 rounded-2xl border border-slate-700 bg-slate-900/80 px-5 py-3 text-sm font-bold text-slate-200 transition-colors hover:border-slate-500 hover:bg-slate-800"
+              >
+                <UserPlus className="w-4 h-4 text-amber-300" />
+                Registrar Nuevo Estudiante
+              </button>
+            </div>
           </div>
 
           {/* Platform Stat Pills */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 pt-1">
             {[
               { label: 'Currículo Adaptativo', value: '3 a 18 años', icon: GraduationCap, color: 'text-indigo-400' },
               { label: 'Microcurrículo Diario', value: '200 Días Lectivos', icon: CalendarCheck, color: 'text-amber-400' },
@@ -94,12 +128,14 @@ export const LandingView: React.FC = () => {
             ].map((stat, idx) => {
               const Icon = stat.icon;
               return (
-                <div key={idx} className="p-3.5 rounded-2xl bg-slate-900/80 border border-slate-800/80 space-y-1">
-                  <div className="flex items-center gap-2">
-                    <Icon className={`w-4 h-4 ${stat.color}`} />
-                    <span className="text-xs text-slate-400 font-medium">{stat.label}</span>
+                <div key={idx} className="rounded-2xl border border-slate-700/80 bg-slate-900/80 p-3.5 shadow-[0_10px_30px_rgba(15,23,42,0.22)]">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-slate-800/90 border border-slate-700">
+                      <Icon className={`w-4 h-4 ${stat.color}`} />
+                    </div>
+                    <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-300">{stat.label}</span>
                   </div>
-                  <p className="text-sm font-extrabold text-white">{stat.value}</p>
+                  <p className="text-base font-extrabold text-white leading-tight">{stat.value}</p>
                 </div>
               );
             })}
