@@ -1,19 +1,18 @@
 import express, { Request, Response } from 'express';
 import path from 'path';
 import fs from 'fs';
-import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import { GoogleGenAI } from '@google/genai';
 import { createServer as createViteServer } from 'vite';
 
 dotenv.config();
 
-// Paso 1: configuramos el entorno de ejecución del backend y definimos la aplicación Express principal.
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+// Vercel serverless runtime no soporta import.meta.url en el build CJS generado por esbuild.
+// Usamos process.cwd() como base del proyecto para mantener compatibilidad tanto en local como en Vercel.
+const appRoot = process.cwd();
 
 const app = express();
-const PORT = 3000;
+const PORT = Number(process.env.PORT || 3000);
 
 // Paso 2: desactivamos el ETag para evitar caché agresivo y forzamos una recarga más limpia en frontend durante desarrollo.
 app.disable('etag');
@@ -46,7 +45,7 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Paso 4: aseguramos que exista la carpeta pública de imágenes de estudiantes para guardar fotos y archivos visuales.
-const publicStudentsDir = path.join(process.cwd(), 'public', 'students');
+const publicStudentsDir = path.join(appRoot, 'public', 'students');
 if (!fs.existsSync(publicStudentsDir)) {
   fs.mkdirSync(publicStudentsDir, { recursive: true });
 }
@@ -56,9 +55,9 @@ app.get('/students/:filename', (req: Request, res: Response, next) => {
   const reqName = req.params.filename.toLowerCase();
   const searchDirs = [
     publicStudentsDir,
-    path.join(process.cwd(), 'public'),
-    path.join(process.cwd(), 'dist', 'students'),
-    path.join(process.cwd(), 'dist'),
+    path.join(appRoot, 'public'),
+    path.join(appRoot, 'dist', 'students'),
+    path.join(appRoot, 'dist'),
   ];
 
   for (const dir of searchDirs) {
@@ -83,7 +82,7 @@ app.get('/students/:filename', (req: Request, res: Response, next) => {
 
 // Paso 6: servimos la carpeta pública y la ruta de estudiantes para que el frontend pueda cargar fotos y avatares sin problema.
 app.use('/students', express.static(publicStudentsDir));
-app.use(express.static(path.join(process.cwd(), 'public')));
+app.use(express.static(path.join(appRoot, 'public')));
 
 // Paso 7: este endpoint guarda la foto real del estudiante en el servidor para que se use en la interfaz y quede persistida.
 app.post('/api/students/upload-avatar', (req: Request, res: Response) => {
@@ -99,7 +98,7 @@ app.post('/api/students/upload-avatar', (req: Request, res: Response) => {
     fs.writeFileSync(targetFile, buffer);
 
     // Also write to dist/students if dist exists
-    const distStudentsDir = path.join(process.cwd(), 'dist', 'students');
+    const distStudentsDir = path.join(appRoot, 'dist', 'students');
     if (!fs.existsSync(distStudentsDir)) {
       fs.mkdirSync(distStudentsDir, { recursive: true });
     }
@@ -620,7 +619,9 @@ IMPORTANTE: Responde ÚNICAMENTE en formato JSON válido.
 
 // Paso 17: el servidor decide si ejecuta Vite en desarrollo o sirve archivos estáticos en producción, según el entorno actual.
 async function start() {
-  if (process.env.NODE_ENV !== 'production') {
+  const isVercelRuntime = Boolean(process.env.VERCEL);
+
+  if (!isVercelRuntime && process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
       server: {
         middlewareMode: true,
@@ -636,17 +637,23 @@ async function start() {
       appType: 'spa',
     });
     app.use(vite.middlewares);
-  } else {
-    const distPath = path.join(process.cwd(), 'dist');
+  } else if (!isVercelRuntime) {
+    const distPath = path.join(appRoot, 'dist');
     app.use(express.static(distPath));
     app.get('*', (req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Wisdom School Server running on http://0.0.0.0:${PORT}`);
-  });
+  if (!isVercelRuntime) {
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`Wisdom School Server running on http://0.0.0.0:${PORT}`);
+    });
+  }
 }
 
-start();
+if (!process.env.VERCEL) {
+  start();
+}
+
+export default app;
