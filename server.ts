@@ -145,7 +145,15 @@ function getGeminiClient(): GoogleGenAI | null {
 
 // Paso 10: el health check sirve como verificación de que el backend está vivo antes de pedir servicios de IA o autenticación.
 app.get('/api/health', (req: Request, res: Response) => {
-  res.json({ status: 'ok', service: 'Wisdom School Backend', time: new Date().toISOString() });
+  res.json({
+    status: 'ok',
+    service: 'Wisdom School Backend',
+    ai: {
+      geminiConfigured: Boolean(process.env.GEMINI_API_KEY?.trim()),
+      openRouterConfigured: Boolean(process.env.OPENROUTER_API_KEY?.trim()),
+    },
+    time: new Date().toISOString(),
+  });
 });
 
 function wait(ms: number) {
