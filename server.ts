@@ -122,6 +122,10 @@ app.get('/api/health', (req: Request, res: Response) => {
   res.json({ status: 'ok', service: 'Wisdom School Backend', time: new Date().toISOString() });
 });
 
+function wait(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 // Resilient Gemini model caller with multi-model fallback and retry
 async function callGeminiWithModelFallback(
   ai: GoogleGenAI,
@@ -130,13 +134,13 @@ async function callGeminiWithModelFallback(
     config?: any;
   }
 ) {
-  // Valid modern Gemini models in prioritized order (Gemini 2.5/2.0/3.7/1.5 Flash fallback)
+  // Valid modern Gemini models in prioritized order (Gemini 3.7 / 1.5 / 2.5 / 2.0 fallback)
   const modelsToTry = [
+    'gemini-3.7-flash',
+    'gemini-1.5-flash',
     'gemini-2.5-flash',
     'gemini-2.0-flash',
-    'gemini-1.5-flash',
     'gemini-flash-latest',
-    'gemini-3.7-flash',
     'gemini-3.1-flash-lite',
   ];
 
@@ -157,9 +161,9 @@ async function callGeminiWithModelFallback(
         lastError = err;
         const statusCode = err?.status || err?.code || '';
         const isTemporary = statusCode === 503 || statusCode === 429 || `${err?.message || ''}`.includes('high demand');
-        
+
         if (isTemporary && attempt === 0) {
-          await new Promise((resolve) => setTimeout(resolve, 600));
+          await wait(600);
           continue;
         }
         break;
@@ -202,10 +206,10 @@ function buildGeminiContents(
 
 /**
  * Arquitectura de Resiliencia Dinámica en Cascada (Cascading Resilience Engine)
- * 
+ *
  * Fase 1: Búsqueda dinámica de modelos gratuitos en OpenRouter (id ends with :free or cost is 0).
- * Fase 2: Iteración rápida con AbortController de 8s y retardo de 1s entre intentos.
- * Fase 3: Fallback de Seguridad a Gemini (gemini-3.7-flash / gemini-2.5-flash / gemini-2.0-flash).
+ * Fase 2: Iteración estratégica con AbortController de 15s y delay de 2-3s entre fallos.
+ * Fase 3: Fallback de Seguridad a Gemini (gemini-3.7-flash / gemini-1.5-flash / gemini-2.5-flash).
  * Manejo de Errores Final: Retorno de error 503 pedagógico amigable.
  */
 async function executeResilientAIPipeline(params: {
@@ -226,31 +230,32 @@ async function executeResilientAIPipeline(params: {
 
       try {
         const modelsRes = await fetch('https://openrouter.ai/api/v1/models', {
+          method: 'GET',
           headers: {
             'Authorization': `Bearer ${openRouterKey.trim()}`,
+            'Content-Type': 'application/json',
           },
         });
-        
+
         if (modelsRes.ok) {
           const modelsData = await modelsRes.json();
           const allModels: any[] = modelsData?.data || [];
-          
-          // Filter free models (ends with :free or 0 cost)
+
           freeModels = allModels
             .filter((m: any) => {
-              const id = m?.id || '';
-              const promptCost = parseFloat(m?.pricing?.prompt ?? '1');
-              const completionCost = parseFloat(m?.pricing?.completion ?? '1');
+              const id = String(m?.id || '');
+              const promptCost = Number(m?.pricing?.prompt ?? 1);
+              const completionCost = Number(m?.pricing?.completion ?? 1);
               return id.endsWith(':free') || (promptCost === 0 && completionCost === 0);
             })
-            .slice(0, 3)
-            .map((m: any) => m.id);
+            .map((m: any) => String(m?.id || ''))
+            .filter(Boolean)
+            .slice(0, 3);
         }
       } catch (catErr: any) {
-        console.warn('[Resilience Engine] Error obteniendo catálogo de OpenRouter, usando lista gratuita de respaldo:', catErr?.message);
+        console.warn('[Resilience Engine] Error obteniendo catálogo de OpenRouter, usando lista gratuita de respaldo:', catErr?.message || catErr);
       }
 
-      // Si la búsqueda no arrojó resultados, usar modelos gratuitos conocidos de OpenRouter
       if (freeModels.length === 0) {
         freeModels = [
           'google/gemini-2.0-flash-exp:free',
@@ -270,11 +275,11 @@ async function executeResilientAIPipeline(params: {
         { role: 'user', content: userMessage },
       ];
 
-      // Fase 2: Iteración sobre modelos gratuitos
+      // Fase 2: Iteración sobre modelos gratuitos con timeout de 15s y delay de 2-3s
       for (const modelId of freeModels) {
         console.log(`[Resilience Engine] Fase 2: Intentando modelo gratuito OpenRouter: ${modelId}...`);
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 8000);
+        const timeoutId = setTimeout(() => controller.abort(), 15000);
 
         try {
           const openRouterRes = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -292,23 +297,30 @@ async function executeResilientAIPipeline(params: {
               temperature: 0.7,
             }),
           });
-          clearTimeout(timeoutId);
 
-          if (openRouterRes.ok) {
-            const data = await openRouterRes.json();
-            const text = data?.choices?.[0]?.message?.content;
-            if (text && typeof text === 'string' && text.trim()) {
-              console.log(`[Resilience Engine] ¡Éxito en Fase 2 con modelo OpenRouter ${modelId}!`);
-              return { reply: text.trim(), providerUsed: `OpenRouter Free (${modelId})` };
-            }
+          if (!openRouterRes.ok) {
+            const errorBody = await openRouterRes.text().catch(() => '');
+            const descr = errorBody ? ` ${errorBody.slice(0, 200)}` : '';
+            console.warn(`[Resilience Engine] OpenRouter ${modelId} respondió con ${openRouterRes.status}${descr}`);
+            throw new Error(`OpenRouter status ${openRouterRes.status}${descr}`);
           }
-        } catch (attemptErr: any) {
-          clearTimeout(timeoutId);
-          console.warn(`[Resilience Engine] Fallo o Timeout (8s) en modelo ${modelId}:`, attemptErr?.message || attemptErr);
-        }
 
-        // Delay de 1 segundo entre iteraciones
-        await new Promise((resolve) => setTimeout(resolve, 1000));
+          const data = await openRouterRes.json();
+          const text = data?.choices?.[0]?.message?.content;
+
+          if (text && typeof text === 'string' && text.trim()) {
+            console.log(`[Resilience Engine] ¡Éxito en Fase 2 con modelo OpenRouter ${modelId}!`);
+            return { reply: text.trim(), providerUsed: `OpenRouter Free (${modelId})` };
+          }
+
+          throw new Error(`OpenRouter respondió sin contenido válido para ${modelId}`);
+        } catch (attemptErr: any) {
+          console.warn(`[Resilience Engine] Fallo o timeout de 15s en modelo ${modelId}:`, attemptErr?.message || attemptErr);
+          const delayMs = 2000 + Math.floor(Math.random() * 1000);
+          await wait(delayMs);
+        } finally {
+          clearTimeout(timeoutId);
+        }
       }
     } catch (openRouterErr: any) {
       console.warn('[Resilience Engine] Excepción en Fase 1/2 de OpenRouter:', openRouterErr?.message || openRouterErr);
@@ -316,7 +328,7 @@ async function executeResilientAIPipeline(params: {
   }
 
   // --------------------------------------------------------------------------
-  // FASE 3: Fallback de Seguridad de Alta Capacidad (Gemini 3.7 / 2.5 / 2.0 / 1.5)
+  // FASE 3: Fallback de Seguridad de Alta Capacidad (Gemini 3.7 / 1.5 / 2.5)
   // --------------------------------------------------------------------------
   const ai = getGeminiClient();
   if (ai) {

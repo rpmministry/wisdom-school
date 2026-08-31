@@ -31,7 +31,14 @@ export const StudentLoginModal: React.FC<StudentLoginModalProps> = ({
   targetStudentId,
   onOpenRegister,
 }) => {
-  const { studentsList, loginStudent, currentStudentId, setCurrentStudentId, resetPasswordWithPin } = useSchool();
+  const {
+    studentsList,
+    loginStudent,
+    currentStudentId,
+    setCurrentStudentId,
+    resetPasswordWithPin,
+    setActiveTab,
+  } = useSchool();
 
   const initialTarget = targetStudentId || currentStudentId || 'avril';
   const targetStudent = studentsList.find((s) => s.id === initialTarget) || studentsList[0];
@@ -78,6 +85,7 @@ export const StudentLoginModal: React.FC<StudentLoginModalProps> = ({
     if (result.success && result.student) {
       setSuccessMsg(`¡Bienvenido de nuevo, ${result.student.name}! Accediendo al aula...`);
       setTimeout(() => {
+        setActiveTab('space');
         onClose();
         setView('login');
       }, 700);
