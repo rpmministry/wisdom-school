@@ -53,84 +53,6 @@ export const StudentLoginModal: React.FC<StudentLoginModalProps> = ({
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [showDemoHint, setShowDemoHint] = useState<boolean>(true);
 
-  if (!isOpen) return null;
-
-  const handleSelectQuickStudent = (student: Student) => {
-    setIdentifier(student.email || student.pinCode || student.id);
-    setPassword(student.password || 'avril');
-    setPinCode(student.pinCode || '');
-    setErrorMsg(null);
-    setView('login');
-    setLoginMode('password');
-  };
-
-  const handleLoginSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setErrorMsg(null);
-    setSuccessMsg(null);
-
-    const credInput = loginMode === 'password' ? identifier : pinCode;
-    const secretInput = loginMode === 'password' ? password : pinCode;
-
-    if (!credInput.trim()) {
-      setErrorMsg(
-        loginMode === 'password'
-          ? 'Por favor ingresa tu correo electrónico o código de estudiante.'
-          : 'Por favor ingresa tu código PIN de acceso.'
-      );
-      return;
-    }
-
-    const result = loginStudent(credInput, secretInput);
-      if (result.success && result.student) {
-        // Send PIN code email to the student's email address
-        const sendPinEmail = async () => {
-          try {
-            await fetch('/api/send-pin', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ email: result.student.email, pinCode: result.student.pinCode }),
-            });
-          } catch (e) {
-            console.warn('Failed to send PIN email', e);
-          }
-        };
-        sendPinEmail();
-        setSuccessMsg(`¡Bienvenido de nuevo, ${result.student.name}! Accediendo al aula...`);
-        setTimeout(() => {
-          setActiveTab('space');
-          onClose();
-          setView('login');
-        }, 700);
-      } else {
-      setErrorMsg(result.error || 'Credenciales incorrectas. Revisa tu correo, código PIN o contraseña.');
-    }
-  };
-
-  const handleForgotPasswordSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setErrorMsg(null);
-    setSuccessMsg(null);
-
-    if (!identifier.trim() || !pinCode.trim() || !newPassword.trim()) {
-      setErrorMsg('Por favor llena todos los campos para restablecer tu contraseña.');
-      return;
-    }
-
-    const result = resetPasswordWithPin(identifier, pinCode, newPassword);
-    if (result.success) {
-      setSuccessMsg('Tu contraseña ha sido actualizada correctamente. Inicia sesión ahora.');
-      setTimeout(() => {
-        setPassword('');
-        setLoginMode('password');
-        setView('login');
-        setSuccessMsg(null);
-      }, 2000);
-    } else {
-      setErrorMsg(result.error || 'Error al restablecer contraseña.');
-    }
-  };
-
   // Google Sign-In handling
   const handleGoogleResponse = async (response: any) => {
     const idToken = response.credential;
@@ -181,6 +103,84 @@ export const StudentLoginModal: React.FC<StudentLoginModalProps> = ({
       document.body.removeChild(script);
     };
   }, []);
+
+  if (!isOpen) return null;
+
+  const handleSelectQuickStudent = (student: Student) => {
+    setIdentifier(student.email || student.pinCode || student.id);
+    setPassword(student.password || 'avril');
+    setPinCode(student.pinCode || '');
+    setErrorMsg(null);
+    setView('login');
+    setLoginMode('password');
+  };
+
+  const handleLoginSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMsg(null);
+    setSuccessMsg(null);
+
+    const credInput = loginMode === 'password' ? identifier : pinCode;
+    const secretInput = loginMode === 'password' ? password : pinCode;
+
+    if (!credInput.trim()) {
+      setErrorMsg(
+        loginMode === 'password'
+          ? 'Por favor ingresa tu correo electrónico o código de estudiante.'
+          : 'Por favor ingresa tu código PIN de acceso.'
+      );
+      return;
+    }
+
+    const result = loginStudent(credInput, secretInput);
+    if (result.success && result.student) {
+      // Send PIN code email to the student's email address
+      const sendPinEmail = async () => {
+        try {
+          await fetch('/api/send-pin', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: result.student.email, pinCode: result.student.pinCode }),
+          });
+        } catch (e) {
+          console.warn('Failed to send PIN email', e);
+        }
+      };
+      sendPinEmail();
+      setSuccessMsg(`¡Bienvenido de nuevo, ${result.student.name}! Accediendo al aula...`);
+      setTimeout(() => {
+        setActiveTab('space');
+        onClose();
+        setView('login');
+      }, 700);
+    } else {
+      setErrorMsg(result.error || 'Credenciales incorrectas. Revisa tu correo, código PIN o contraseña.');
+    }
+  };
+
+  const handleForgotPasswordSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMsg(null);
+    setSuccessMsg(null);
+
+    if (!identifier.trim() || !pinCode.trim() || !newPassword.trim()) {
+      setErrorMsg('Por favor llena todos los campos para restablecer tu contraseña.');
+      return;
+    }
+
+    const result = resetPasswordWithPin(identifier, pinCode, newPassword);
+    if (result.success) {
+      setSuccessMsg('Tu contraseña ha sido actualizada correctamente. Inicia sesión ahora.');
+      setTimeout(() => {
+        setPassword('');
+        setLoginMode('password');
+        setView('login');
+        setSuccessMsg(null);
+      }, 2000);
+    } else {
+      setErrorMsg(result.error || 'Error al restablecer contraseña.');
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in">
