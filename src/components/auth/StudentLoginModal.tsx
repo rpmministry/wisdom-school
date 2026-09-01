@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSchool } from '../../context/SchoolContext';
 import { Student } from '../../types';
 import { SchoolLogo } from '../common/SchoolLogo';
@@ -184,30 +184,31 @@ export const StudentLoginModal: React.FC<StudentLoginModalProps> = ({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
                 <button
                   type="button"
-                  onClick={() => handleSelectQuickStudent(studentsList.find((s) => s.id === 'avril') || studentsList[0])}
-                  className="p-2.5 rounded-xl bg-slate-900 hover:bg-indigo-950/50 border border-indigo-500/30 text-left transition-colors flex items-center gap-2"
+                  onClick={() => handleSelectQuickStudent(studentsList.find((s) => s.id === 'karen') || studentsList[0])}
+                  className="p-2.5 rounded-xl bg-slate-900 hover:bg-indigo-950/50 border border-indigo-500/30 text-left transition-all flex items-center gap-2"
                 >
-                  <StudentAvatar studentId="avril" name="Avril" size="xs" />
+                  <StudentAvatar studentId="karen" name="Karen" size="xs" />
                   <div className="overflow-hidden">
-                    <p className="font-bold text-white truncate">Avril (8.º EGB)</p>
-                    <p className="text-[10px] text-slate-400">PIN: <span className="font-mono text-indigo-300">AVR-2026</span></p>
+                    <p className="font-bold text-white truncate">Karen (8.º EGB)</p>
+                    <p className="text-[10px] text-slate-400">PIN: <span className="font-mono text-indigo-300">KAR-2026</span></p>
                   </div>
                 </button>
 
                 <button
                   type="button"
-                  onClick={() => handleSelectQuickStudent(studentsList.find((s) => s.id === 'gael') || studentsList[1] || studentsList[0])}
-                  className="p-2.5 rounded-xl bg-slate-900 hover:bg-amber-950/50 border border-amber-500/30 text-left transition-colors flex items-center gap-2"
+                  onClick={() => handleSelectQuickStudent(studentsList.find((s) => s.id === 'mauricio') || studentsList[1] || studentsList[0])}
+                  className="p-2.5 rounded-2xl bg-slate-900 hover:bg-amber-950/50 border border-amber-500/30 text-left transition-all flex items-center gap-2"
                 >
-                  <StudentAvatar studentId="gael" name="Gael" size="xs" />
+                  <StudentAvatar studentId="mauricio" name="Mauricio" size="xs" />
                   <div className="overflow-hidden">
-                    <p className="font-bold text-white truncate">Gael (4.º EGB)</p>
-                    <p className="text-[10px] text-slate-400">PIN: <span className="font-mono text-amber-300">GAE-2026</span></p>
+                    <p className="font-bold text-white truncate">Mauricio (4.º EGB)</p>
+                    <p className="text-[10px] text-slate-400">PIN: <span className="font-mono text-amber-300">MAU-2026</span></p>
                   </div>
                 </button>
               </div>
             </div>
           )}
+
 
           {/* Mode Switcher Tabs */}
           {view === 'login' && (
