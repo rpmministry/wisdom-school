@@ -1,5 +1,6 @@
 import React from 'react';
 import { useSchool } from '../../context/SchoolContext';
+import { PageHeader } from '../layout/PageHeader';
 import {
   TrendingUp,
   Award,

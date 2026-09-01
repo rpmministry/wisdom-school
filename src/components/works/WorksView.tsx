@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useSchool } from '../../context/SchoolContext';
 import { analyzeWork } from '../../services/aiService';
 import { StudentSubmission, WorkAnalysisResult } from '../../types';
+import { PageHeader } from '../layout/PageHeader';
 import {
   FileCheck2,
   Upload,
@@ -151,20 +152,8 @@ export const WorksView: React.FC = () => {
   return (
     <div className="space-y-8">
       
-      {/* Header */}
-      <div>
-        <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-emerald-400">
-          <FileCheck2 className="w-4 h-4" />
-          <span>Entrega de Trabajos & Análisis Pedagógico</span>
-        </div>
-        <h1 className="text-2xl sm:text-3xl font-extrabold text-white mt-1">
-          Portafolio y Tareas de {currentStudent.name}
-        </h1>
-        <p className="text-sm text-slate-400">
-          Sube tus fotografías o documentos resueltos. La IA pedagógica evaluará tus aciertos y te explicará cómo perfeccionar tu razonamiento.
-        </p>
-      </div>
-
+      <PageHeader title={`Portafolio de ${currentStudent.name}`} />
+      
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         
         {/* Upload Form Card (5 Cols) */}

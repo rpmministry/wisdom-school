@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useSchool, DayOfWeekName } from '../../context/SchoolContext';
 import { ClassActivity, DailyClass } from '../../types';
 import { ActivityDetailModal } from './ActivityDetailModal';
+import { PageHeader } from '../layout/PageHeader';
 import {
   ListTodo,
   CheckCircle2,
@@ -59,8 +60,11 @@ export const ActivitiesView: React.FC = () => {
   return (
     <div className="space-y-8">
       
+      <PageHeader title="Actividades" />
+      
       {/* Header with Day Selector */}
-      <div className="p-6 sm:p-8 rounded-3xl bg-gradient-to-r from-slate-900 via-indigo-950/40 to-slate-900 border border-slate-800 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-6">
+      <div className="hidden">
+        <div className="p-6 sm:p-8 rounded-3xl bg-gradient-to-r from-slate-900 via-indigo-950/40 to-slate-900 border border-slate-800 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
           <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-indigo-400">
             <ListTodo className="w-4 h-4" />

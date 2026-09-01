@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useSchool } from '../../context/SchoolContext';
 import { Subject, CurriculumUnit, MicrocurriculumItem, DailyClass } from '../../types';
+import { PageHeader } from '../layout/PageHeader';
 import {
   BookMarked,
   Bot,
@@ -138,6 +139,8 @@ export const SubjectsView: React.FC = () => {
 
   return (
     <div className="space-y-8">
+      
+      <PageHeader title={`Materias de ${currentStudent.name}`} />
       
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">

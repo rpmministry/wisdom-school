@@ -5,6 +5,7 @@ import { formatYouTubeEmbedUrl, getYouTubeWatchUrl, getYouTubeSearchUrl } from '
 import { downloadClassGuide } from '../../utils/guideGenerator';
 import { ActivityDetailModal } from '../activities/ActivityDetailModal';
 import { ClassVideoPlayer } from './ClassVideoPlayer';
+import { PageHeader } from '../layout/PageHeader';
 import {
   PlayCircle,
   BookOpen,
@@ -130,6 +131,8 @@ export const DailyClassView: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      
+      <PageHeader title="Clases del Día" />
       
       {/* Day Selector & Official Schedule Ribbon */}
       <div className="p-5 rounded-3xl bg-slate-800/90 border border-slate-700/80 space-y-4 shadow-xl">
