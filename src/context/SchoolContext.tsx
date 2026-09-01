@@ -301,7 +301,8 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       const matchEmail = s.email?.toLowerCase() === cleanId;
       const matchPin = s.pinCode?.toLowerCase() === cleanId;
       const matchId = s.id.toLowerCase() === cleanId;
-      return matchEmail || matchPin || matchId;
+      const matchName = s.name?.toLowerCase() === cleanId;
+      return matchEmail || matchPin || matchId || matchName;
     });
 
     if (!found) {
