@@ -85,7 +85,7 @@ export const StudentLoginModal: React.FC<StudentLoginModalProps> = ({
       if (window.google && window.google.accounts) {
         const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
         if (!clientId) {
-          console.warn('VITE_GOOGLE_CLIENT_ID no está definido');
+          console.warn('VITE_GOOGLE_CLIENT_ID no está definido en .env');
           return;
         }
         window.google.accounts.id.initialize({
@@ -96,6 +96,9 @@ export const StudentLoginModal: React.FC<StudentLoginModalProps> = ({
           document.getElementById('google-signin-button'),
           { theme: 'filled_black', size: 'large' }
         );
+        // Ocultar el hint cuando el botón se renderiza
+        const hint = document.getElementById('google-btn-hint');
+        if (hint) hint.style.display = 'none';
       }
     };
     document.body.appendChild(script);
@@ -262,8 +265,11 @@ export const StudentLoginModal: React.FC<StudentLoginModalProps> = ({
 
 
           {/* Google Sign-In */}
-          <div className="flex justify-center my-4">
-            <div id="google-signin-button"></div>
+          <div className="flex flex-col items-center my-4">
+            <div id="google-signin-button" className="w-full max-w-xs"></div>
+            <p className="text-center text-xs text-slate-500 mt-2" id="google-btn-hint">
+              Configura <code>VITE_GOOGLE_CLIENT_ID</code> en <code>.env</code> para ver el botón de Google
+            </p>
           </div>
 
           {/* Mode Switcher Tabs */}
