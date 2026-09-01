@@ -131,6 +131,57 @@ export const StudentLoginModal: React.FC<StudentLoginModalProps> = ({
     }
   };
 
+  // Google Sign-In handling
+  const handleGoogleResponse = async (response: any) => {
+    const idToken = response.credential;
+    try {
+      const r = await fetch('/api/auth/google', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idToken }),
+      });
+      const data = await r.json();
+      if (data.success) {
+        const studentId = data.student.id;
+        setCurrentStudentId(studentId);
+        setActiveTab('space');
+        onClose();
+      } else {
+        setErrorMsg(data.error ?? 'Error al iniciar sesión con Google');
+      }
+    } catch (e) {
+      setErrorMsg('Falló la comunicación con el servidor');
+    }
+  };
+
+  useEffect(() => {
+    const script = document.createElement('script');
+    script.src = 'https://accounts.google.com/gsi/client';
+    script.async = true;
+    script.defer = true;
+    script.onload = () => {
+      if (window.google && window.google.accounts) {
+        const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+        if (!clientId) {
+          console.warn('VITE_GOOGLE_CLIENT_ID no está definido');
+          return;
+        }
+        window.google.accounts.id.initialize({
+          client_id: clientId,
+          callback: handleGoogleResponse,
+        });
+        window.google.accounts.id.renderButton(
+          document.getElementById('google-signin-button'),
+          { theme: 'filled_black', size: 'large' }
+        );
+      }
+    };
+    document.body.appendChild(script);
+    return () => {
+      document.body.removeChild(script);
+    };
+  }, []);
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in">
       <div className="relative w-full max-w-lg bg-slate-900 border border-slate-700/80 rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[95vh] sm:max-h-[90vh] text-slate-100">
@@ -209,6 +260,11 @@ export const StudentLoginModal: React.FC<StudentLoginModalProps> = ({
             </div>
           )}
 
+
+          {/* Google Sign-In */}
+          <div className="flex justify-center my-4">
+            <div id="google-signin-button"></div>
+          </div>
 
           {/* Mode Switcher Tabs */}
           {view === 'login' && (
