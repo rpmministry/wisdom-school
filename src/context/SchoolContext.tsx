@@ -83,11 +83,10 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // Paso 1: persistimos la lista de estudiantes para que las credenciales y perfiles queden disponibles aunque se recargue la app.
   const [studentsList, setStudentsList] = useState<Student[]>(() => {
     try {
-      const saved = localStorage.getItem('wisdom_students_list_v3');
+      const saved = localStorage.getItem('wisdom_students_list_v4');
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          // Merge with STUDENTS_DATA to preserve pre-configured credentials for Avril and Gael
           return STUDENTS_DATA.map((base) => {
             const match = parsed.find((p: Student) => p.id === base.id);
             return match ? { ...base, ...match, email: base.email, pinCode: base.pinCode, password: base.password } : base;
@@ -103,7 +102,7 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // Paso 2: guardamos quién ha iniciado sesión para que el sistema recuerde al alumno autenticado y muestre su espacio privado.
   const [authenticatedStudentId, setAuthenticatedStudentId] = useState<StudentId | null>(() => {
     try {
-      const saved = localStorage.getItem('wisdom_auth_student_id_v2');
+      const saved = localStorage.getItem('wisdom_auth_student_id_v3');
       if (saved && saved !== 'null') return saved;
     } catch {
       // fallback
@@ -155,7 +154,7 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // Dynamic subjects state
   const [allSubjects, setAllSubjects] = useState<Subject[]>(() => {
     try {
-      const saved = localStorage.getItem('wisdom_subjects_list_v2');
+      const saved = localStorage.getItem('wisdom_subjects_list_v3');
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length >= SUBJECTS_DATA.length) {
@@ -171,7 +170,7 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // Dynamic schedule entries state
   const [allSchedules, setAllSchedules] = useState<ScheduleEntry[]>(() => {
     try {
-      const saved = localStorage.getItem('wisdom_schedules_list_v2');
+      const saved = localStorage.getItem('wisdom_schedules_list_v3');
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length >= SCHEDULE_DATA.length) {
@@ -187,7 +186,7 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // Daily Classes List
   const [classesList, setClassesList] = useState<DailyClass[]>(() => {
     try {
-      const saved = localStorage.getItem('wisdom_classes_v10');
+      const saved = localStorage.getItem('wisdom_classes_v11');
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length >= DAILY_CLASSES_DATA.length) {
@@ -215,7 +214,7 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const [submissions, setSubmissions] = useState<StudentSubmission[]>(() => {
     try {
-      const saved = localStorage.getItem('wisdom_submissions_v9');
+      const saved = localStorage.getItem('wisdom_submissions_v10');
       return saved ? JSON.parse(saved) : INITIAL_SUBMISSIONS;
     } catch {
       return INITIAL_SUBMISSIONS;
@@ -224,7 +223,7 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const [customAvatars, setCustomAvatars] = useState<Record<StudentId, string>>(() => {
     try {
-      const saved = localStorage.getItem('wisdom_student_avatars_v2');
+      const saved = localStorage.getItem('wisdom_student_avatars_v3');
       return saved ? JSON.parse(saved) : {};
     } catch {
       return {};
@@ -234,7 +233,7 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // Persistence Effects
   useEffect(() => {
     try {
-      localStorage.setItem('wisdom_students_list_v3', JSON.stringify(studentsList));
+      localStorage.setItem('wisdom_students_list_v4', JSON.stringify(studentsList));
     } catch (e) {
       console.warn('Error writing students storage:', e);
     }
@@ -242,7 +241,7 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   useEffect(() => {
     try {
-      localStorage.setItem('wisdom_auth_student_id_v2', authenticatedStudentId || 'null');
+      localStorage.setItem('wisdom_auth_student_id_v3', authenticatedStudentId || 'null');
     } catch (e) {
       console.warn('Error writing auth student storage:', e);
     }
@@ -250,7 +249,7 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   useEffect(() => {
     try {
-      localStorage.setItem('wisdom_subjects_list_v2', JSON.stringify(allSubjects));
+      localStorage.setItem('wisdom_subjects_list_v3', JSON.stringify(allSubjects));
     } catch (e) {
       console.warn('Error writing subjects storage:', e);
     }
@@ -258,7 +257,7 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   useEffect(() => {
     try {
-      localStorage.setItem('wisdom_schedules_list_v2', JSON.stringify(allSchedules));
+      localStorage.setItem('wisdom_schedules_list_v3', JSON.stringify(allSchedules));
     } catch (e) {
       console.warn('Error writing schedules storage:', e);
     }
@@ -266,7 +265,7 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   useEffect(() => {
     try {
-      localStorage.setItem('wisdom_classes_v10', JSON.stringify(classesList));
+      localStorage.setItem('wisdom_classes_v11', JSON.stringify(classesList));
     } catch (e) {
       console.warn('Error writing classes storage:', e);
     }
@@ -274,7 +273,7 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   useEffect(() => {
     try {
-      localStorage.setItem('wisdom_submissions_v9', JSON.stringify(submissions));
+      localStorage.setItem('wisdom_submissions_v10', JSON.stringify(submissions));
     } catch (e) {
       console.warn('Error writing submissions storage:', e);
     }
@@ -284,7 +283,7 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setCustomAvatars((prev) => {
       const updated = { ...prev, [studentId]: avatarUrl };
       try {
-        localStorage.setItem('wisdom_student_avatars_v2', JSON.stringify(updated));
+        localStorage.setItem('wisdom_student_avatars_v3', JSON.stringify(updated));
       } catch (e) {
         console.warn('Error writing avatar storage:', e);
       }

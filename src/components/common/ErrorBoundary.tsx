@@ -33,9 +33,13 @@ export class ErrorBoundary extends React.Component<Props, State> {
 
   private handleReset = () => {
     try {
-      localStorage.removeItem('wisdom_student_avatars_v2');
-      localStorage.removeItem('wisdom_classes_v9');
-      localStorage.removeItem('wisdom_submissions_v9');
+      localStorage.removeItem('wisdom_student_avatars_v3');
+      localStorage.removeItem('wisdom_classes_v11');
+      localStorage.removeItem('wisdom_submissions_v10');
+      localStorage.removeItem('wisdom_students_list_v4');
+      localStorage.removeItem('wisdom_auth_student_id_v3');
+      localStorage.removeItem('wisdom_subjects_list_v3');
+      localStorage.removeItem('wisdom_schedules_list_v3');
     } catch (e) {
       console.warn('Could not clear storage:', e);
     }
