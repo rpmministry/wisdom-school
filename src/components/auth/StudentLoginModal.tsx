@@ -77,34 +77,46 @@ export const StudentLoginModal: React.FC<StudentLoginModalProps> = ({
   };
 
   useEffect(() => {
-    const script = document.createElement('script');
-    script.src = 'https://accounts.google.com/gsi/client';
-    script.async = true;
-    script.defer = true;
-    script.onload = () => {
-      if (window.google && window.google.accounts) {
-        const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-        if (!clientId) {
-          console.warn('VITE_GOOGLE_CLIENT_ID no está definido en .env');
-          return;
-        }
-        window.google.accounts.id.initialize({
-          client_id: clientId,
-          callback: handleGoogleResponse,
-        });
-        window.google.accounts.id.renderButton(
-          document.getElementById('google-signin-button'),
-          { theme: 'filled_black', size: 'large' }
-        );
-        // Ocultar el hint cuando el botón se renderiza
-        const hint = document.getElementById('google-btn-hint');
-        if (hint) hint.style.display = 'none';
+    const loadGoogleButton = () => {
+      const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+      console.log('[GoogleSignIn] clientId detectado:', clientId);
+
+      if (!clientId) {
+        console.warn('[GoogleSignIn] VITE_GOOGLE_CLIENT_ID sigue undefined');
+        return;
       }
+
+      if (window.google?.accounts) {
+        renderButton(clientId);
+        return;
+      }
+
+      // Si la librería aún no cargó, la inyectamos
+      const script = document.createElement('script');
+      script.src = 'https://accounts.google.com/gsi/client';
+      script.async = true;
+      script.defer = true;
+      script.onload = () => renderButton(clientId);
+      script.onerror = () => console.error('[GoogleSignIn] Error cargando gsi/client');
+      document.body.appendChild(script);
     };
-    document.body.appendChild(script);
-    return () => {
-      document.body.removeChild(script);
+
+    const renderButton = (clientId: string) => {
+      if (!window.google?.accounts) return;
+      window.google.accounts.id.initialize({
+        client_id: clientId,
+        callback: handleGoogleResponse,
+      });
+      window.google.accounts.id.renderButton(
+        document.getElementById('google-signin-button'),
+        { theme: 'filled_black', size: 'large', width: '100%' }
+      );
+      // Oculta el hint
+      const hint = document.getElementById('google-btn-hint');
+      if (hint) hint.style.display = 'none';
     };
+
+    loadGoogleButton();
   }, []);
 
   if (!isOpen) return null;
