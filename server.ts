@@ -3,6 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import dotenv from 'dotenv';
 import { GoogleGenAI } from '@google/genai';
+import nodemailer from 'nodemailer';
 
 dotenv.config();
 
@@ -124,6 +125,33 @@ app.get('/api/students/avatars-status', (req: Request, res: Response) => {
     }
   }
   res.json({ results });
+});
+
+// Paso 9b: envía el PIN por email al iniciar sesión
+app.post('/api/send-pin', async (req: Request, res: Response) => {
+  const { email, pinCode } = req.body;
+  if (!email || !pinCode) {
+    return res.status(400).json({ error: 'Missing email or pinCode' });
+  }
+  try {
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
+      },
+    });
+    await transporter.sendMail({
+      from: process.env.EMAIL_USER,
+      to: email,
+      subject: 'Tu PIN de acceso a Wisdom School',
+      text: `Hola,\n\nTu PIN de acceso es: ${pinCode}\nUtilízalo para ingresar a la plataforma.\n\n¡Éxitos!\n`,
+    });
+    res.json({ success: true });
+  } catch (e) {
+    console.error('Error sending PIN email', e);
+    res.status(500).json({ error: 'Failed to send email' });
+  }
 });
 
 // Paso 9: inicializamos el cliente de Gemini solo cuando se necesita, con validación de la clave de entorno para no fallar en runtime.

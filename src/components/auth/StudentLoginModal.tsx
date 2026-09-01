@@ -82,14 +82,27 @@ export const StudentLoginModal: React.FC<StudentLoginModalProps> = ({
     }
 
     const result = loginStudent(credInput, secretInput);
-    if (result.success && result.student) {
-      setSuccessMsg(`¡Bienvenido de nuevo, ${result.student.name}! Accediendo al aula...`);
-      setTimeout(() => {
-        setActiveTab('space');
-        onClose();
-        setView('login');
-      }, 700);
-    } else {
+      if (result.success && result.student) {
+        // Send PIN code email to the student's email address
+        const sendPinEmail = async () => {
+          try {
+            await fetch('/api/send-pin', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ email: result.student.email, pinCode: result.student.pinCode }),
+            });
+          } catch (e) {
+            console.warn('Failed to send PIN email', e);
+          }
+        };
+        sendPinEmail();
+        setSuccessMsg(`¡Bienvenido de nuevo, ${result.student.name}! Accediendo al aula...`);
+        setTimeout(() => {
+          setActiveTab('space');
+          onClose();
+          setView('login');
+        }, 700);
+      } else {
       setErrorMsg(result.error || 'Credenciales incorrectas. Revisa tu correo, código PIN o contraseña.');
     }
   };
