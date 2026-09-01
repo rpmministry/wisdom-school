@@ -38,6 +38,9 @@ interface SchoolContextType {
   setSelectedDayOfWeek: (day: DayOfWeekName) => void;
   activeTab: NavigationTab;
   setActiveTab: (tab: NavigationTab) => void;
+  navigationHistory: NavigationTab[];
+  navigateBack: () => void;
+  navigateToHome: () => void;
   studentSubjects: Subject[];
   allSubjects: Subject[];
   activeSubject: Subject | null;
@@ -129,9 +132,25 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // Paso 3: definimos los estados globales de navegación, calendario y sesiones del estudiante dentro del ecosistema escolar.
   const [selectedDayOfWeek, setSelectedDayOfWeek] = useState<DayOfWeekName>(getInitialDayOfWeek);
   const [activeTab, setActiveTab] = useState<NavigationTab>('home');
+  const [navigationHistory, setNavigationHistory] = useState<NavigationTab[]>([]);
   const [activeSubject, setActiveSubject] = useState<Subject | null>(null);
   const [activeClass, setActiveClass] = useState<DailyClass | null>(null);
   const [isTeacherDrawerOpen, setIsTeacherDrawerOpen] = useState<boolean>(false);
+
+  const navigateBack = () => {
+    setNavigationHistory((prev) => {
+      if (prev.length === 0) return prev;
+      const newHistory = prev.slice(0, -1);
+      const previousTab = prev[prev.length - 1];
+      setActiveTab(previousTab);
+      return newHistory;
+    });
+  };
+
+  const navigateToHome = () => {
+    setNavigationHistory([]);
+    setActiveTab('home');
+  };
 
   // Dynamic subjects state
   const [allSubjects, setAllSubjects] = useState<Subject[]>(() => {
@@ -388,7 +407,19 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       openAuthModal(currentStudentId);
       return;
     }
-    setActiveTab(tab);
+    
+    // Add current tab to history before changing to new tab (except when going to home or refreshing same tab)
+    setActiveTab((prevTab) => {
+      // Only add to history if it's a different tab and not home (to avoid clutter)
+      if (prevTab !== tab && prevTab !== 'home') {
+        setNavigationHistory((prev) => [...prev, prevTab]);
+      }
+      // If navigating to home, clear history
+      if (tab === 'home') {
+        setNavigationHistory([]);
+      }
+      return tab;
+    });
   };
 
   const currentStudent = studentsList.find((s) => s.id === currentStudentId) || studentsList[0];
@@ -520,6 +551,9 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         updateStudentAvatar,
         changePassword,
         resetPasswordWithPin,
+        navigationHistory,
+        navigateBack,
+        navigateToHome,
       }}
     >
       {children}
