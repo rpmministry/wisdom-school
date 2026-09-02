@@ -43,6 +43,7 @@ export const StudentLoginModal: React.FC<StudentLoginModalProps> = ({
   const [password, setPassword] = useState<string>('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [googleReady, setGoogleReady] = useState(false);
   const googleButtonRef = useRef<HTMLDivElement>(null);
 
   // Google Sign-In handling
@@ -54,7 +55,6 @@ export const StudentLoginModal: React.FC<StudentLoginModalProps> = ({
     }
 
     try {
-      // Verify the token with Google's API
       const googleRes = await fetch(
         `https://www.googleapis.com/oauth2/v3/tokeninfo?id_token=${idToken}`
       );
@@ -72,7 +72,6 @@ export const StudentLoginModal: React.FC<StudentLoginModalProps> = ({
         return;
       }
 
-      // Find student by email
       const found = studentsList.find((s) => s.email?.toLowerCase() === email);
 
       if (!found) {
@@ -82,7 +81,6 @@ export const StudentLoginModal: React.FC<StudentLoginModalProps> = ({
         return;
       }
 
-      // Authenticate the student
       setCurrentStudentId(found.id);
       setActiveTab('space');
       onClose();
@@ -93,20 +91,19 @@ export const StudentLoginModal: React.FC<StudentLoginModalProps> = ({
   };
 
   useEffect(() => {
+    if (!isOpen) return;
+
     const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-    console.log('[GoogleSignIn] clientId detectado:', clientId);
 
     if (!clientId) {
       console.warn('[GoogleSignIn] VITE_GOOGLE_CLIENT_ID no está definido');
+      setGoogleReady(false);
       return;
     }
 
     const loadAndRender = () => {
       if (!window.google?.accounts) return;
-      if (!googleButtonRef.current) {
-        console.warn('[GoogleSignIn] googleButtonRef no está disponible');
-        return;
-      }
+      if (!googleButtonRef.current) return;
       
       try {
         window.google.accounts.id.initialize({
@@ -115,33 +112,31 @@ export const StudentLoginModal: React.FC<StudentLoginModalProps> = ({
         });
         window.google.accounts.id.renderButton(
           googleButtonRef.current,
-          { theme: 'filled_black', size: 'large', width: '100%' }
+          { theme: 'filled_black', size: 'large', width: 280 }
         );
         console.log('[GoogleSignIn] Botón de Google renderizado correctamente');
+        setGoogleReady(true);
       } catch (err) {
         console.error('[GoogleSignIn] Error al renderizar botón:', err);
+        setGoogleReady(false);
       }
     };
 
-    // Check if Google script is already loaded
     if (window.google?.accounts) {
       loadAndRender();
     } else {
-      // Wait for existing script or create new one
-      const existingScript = document.querySelector('script[src="https://accounts.google.com/gsi/client"]');
-      if (existingScript) {
-        existingScript.addEventListener('load', loadAndRender);
-      } else {
-        const script = document.createElement('script');
-        script.src = 'https://accounts.google.com/gsi/client';
-        script.async = true;
-        script.defer = true;
-        script.onload = loadAndRender;
-        script.onerror = () => console.error('[GoogleSignIn] Error cargando gsi/client');
-        document.body.appendChild(script);
-      }
+      const script = document.createElement('script');
+      script.src = 'https://accounts.google.com/gsi/client';
+      script.async = true;
+      script.defer = true;
+      script.onload = loadAndRender;
+      script.onerror = () => {
+        console.error('[GoogleSignIn] Error cargando gsi/client');
+        setGoogleReady(false);
+      };
+      document.head.appendChild(script);
     }
-  }, []);
+  }, [isOpen]);
 
   const handleLoginSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -249,11 +244,13 @@ export const StudentLoginModal: React.FC<StudentLoginModalProps> = ({
             {/* 2. Google Sign-In Button */}
             <div className="pt-2">
               <div className="flex flex-col items-center gap-3">
-                <div className="relative w-full max-w-xs">
+                <div className="relative w-full">
                   <div ref={googleButtonRef} id="google-signin-button" className="w-full"></div>
-                  <p className="text-center text-xs text-slate-500 mt-2" id="google-btn-hint">
-                    Configura <code>VITE_GOOGLE_CLIENT_ID</code> en <code>.env</code> para ver el botón de Google
-                  </p>
+                  {!googleReady && (
+                    <p className="text-center text-xs text-slate-500 mt-2">
+                      Configura <code>VITE_GOOGLE_CLIENT_ID</code> en <code>.env</code> para ver el botón de Google
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
