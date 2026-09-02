@@ -103,16 +103,16 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [authenticatedStudentId, setAuthenticatedStudentId] = useState<StudentId | null>(() => {
     try {
       const saved = localStorage.getItem('wisdom_auth_student_id_v3');
-      if (saved && saved !== 'null') return saved;
+      if (saved && saved !== 'null' && saved !== '') return saved;
     } catch {
       // fallback
     }
-    // Default session initialized with Avril for smooth preview experience
-    return 'avril';
+    // No student authenticated by default - user must log in
+    return null;
   });
 
   const [currentStudentId, setCurrentStudentId] = useState<StudentId>(() => {
-    return authenticatedStudentId || 'avril';
+    return authenticatedStudentId || null;
   });
 
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);

@@ -25,6 +25,7 @@ import {
   Users,
   Star,
   ArrowRight,
+  Lock,
 } from 'lucide-react';
 
 export const LandingView: React.FC = () => {
@@ -157,7 +158,7 @@ export const LandingView: React.FC = () => {
               <div className="p-6 sm:p-8 rounded-3xl bg-slate-900/90 border border-indigo-500/30 shadow-2xl relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/5 rounded-full blur-2xl pointer-events-none" />
 
-                <div className="relative z-10">
+                <div className="relative z-10 flex flex-wrap items-center justify-between gap-4">
                   <div className="space-y-2 max-w-2xl">
                     <h3 className="text-2xl font-extrabold text-white tracking-tight">
                       Acceso Privado al Aula Virtual
@@ -166,6 +167,13 @@ export const LandingView: React.FC = () => {
                       Por motivos de seguridad y privacidad estudiantil, los perfiles de los alumnos inscritos no se muestran de manera pública. Ingrese con sus credenciales personales (correo electrónico o código PIN) para ingresar a su espacio educativo.
                     </p>
                   </div>
+                  <button
+                    onClick={() => openAuthModal()}
+                    className="px-6 py-3 rounded-2xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold text-sm shadow-xl shadow-indigo-950/50 transition-all flex items-center gap-2 transform hover:scale-105"
+                  >
+                    <Lock className="w-4 h-4" />
+                    Iniciar Sesión de Alumno
+                  </button>
                 </div>
               </div>
             )}
