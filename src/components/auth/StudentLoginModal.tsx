@@ -129,7 +129,12 @@ try {
          });
         window.google.accounts.id.renderButton(
           googleButtonRef.current,
-          { theme: 'filled_black', size: 'large', width: 280 }
+          { 
+            theme: 'outline', 
+            size: 'large', 
+            width: '100%', 
+            text: 'continue_with'
+          }
         );
         console.log('[GoogleSignIn] Botón de Google renderizado correctamente');
         setGoogleReady(true);
