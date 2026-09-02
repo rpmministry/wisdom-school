@@ -48,6 +48,16 @@ const {
   const [googleReady, setGoogleReady] = useState(false);
   const googleButtonRef = useRef<HTMLDivElement>(null);
 
+  // Clear form fields when modal closes
+  useEffect(() => {
+    if (!isOpen) {
+      setIdentifier('');
+      setPassword('');
+      setErrorMsg(null);
+      setSuccessMsg(null);
+    }
+  }, [isOpen]);
+
   // Google Sign-In handling
   const handleGoogleResponse = async (response: any) => {
     const idToken = response.credential;
