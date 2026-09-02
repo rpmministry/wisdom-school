@@ -13,7 +13,7 @@ export const STUDENTS_DATA: Student[] = [
   {
     id: 'avril',
     name: 'Avril',
-    email: 'avril@wisdomschool.edu',
+    email: 'andradesanchezavril@gmail.com',
     pinCode: 'AVR-2026',
     password: 'avril',
     age: 12,
