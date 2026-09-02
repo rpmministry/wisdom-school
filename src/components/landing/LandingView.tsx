@@ -383,9 +383,6 @@ export const LandingView: React.FC = () => {
               <span>Probar con Mauricio</span>
             </button>
           </div>
-          <p className="text-center text-xs text-slate-500 mt-4">
-            Al salir del perfil de prueba, los datos reales de Avril y Gael se mantienen intactos.
-          </p>
         </div>
       </section>
 
