@@ -157,6 +157,9 @@ try {
 
     const result = loginStudent(identifier, password);
     if (result.success && result.student) {
+      // Clear form fields immediately on successful login
+      setIdentifier('');
+      setPassword('');
       // Send PIN code email to the student's email address
       const sendPinEmail = async () => {
         try {
