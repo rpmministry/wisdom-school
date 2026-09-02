@@ -113,6 +113,12 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   });
 
   const [currentStudentId, setCurrentStudentId] = useState<StudentId>(() => {
+    try {
+      const saved = localStorage.getItem('wisdom_current_student_id_v3');
+      if (saved && saved !== 'null' && saved !== '') return saved;
+    } catch {
+      // fallback
+    }
     return authenticatedStudentId || null;
   });
 
@@ -250,6 +256,23 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   useEffect(() => {
     try {
+      localStorage.setItem('wisdom_current_student_id_v3', currentStudentId || 'null');
+    } catch (e) {
+      console.warn('Error writing current student storage:', e);
+    }
+  }, [currentStudentId]);
+
+  // Sincronizar currentStudentId con authenticatedStudentId al montar o al cambiar auth.
+  useEffect(() => {
+    if (authenticatedStudentId && currentStudentId !== authenticatedStudentId) {
+      setCurrentStudentId(authenticatedStudentId);
+    } else if (!authenticatedStudentId && currentStudentId) {
+      setCurrentStudentId(null);
+    }
+  }, [authenticatedStudentId]);
+
+  useEffect(() => {
+    try {
       localStorage.setItem('wisdom_subjects_list_v3', JSON.stringify(allSubjects));
     } catch (e) {
       console.warn('Error writing subjects storage:', e);
@@ -376,6 +399,7 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // Paso 5: cerrar sesión limpia el acceso privado y vuelve a la vista pública del colegio.
   const logoutStudent = () => {
     setAuthenticatedStudentId(null);
+    setCurrentStudentId(null);
     setActiveTab('home');
   };
 
