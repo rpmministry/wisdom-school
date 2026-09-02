@@ -95,36 +95,36 @@ export const LandingView: React.FC = () => {
 
               {/* Active Session Banner - moved to the right of title/subtitle when authenticated */}
               {authenticatedStudentId && (
-                <div className="lg:w-80 lg:flex-shrink-0 w-full">
-                  <div className="p-5 sm:p-6 rounded-3xl bg-gradient-to-r from-emerald-950/60 via-slate-900 to-indigo-950/60 border border-emerald-500/30 flex flex-col items-start justify-center gap-4 shadow-xl min-h-[180px]">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2.5 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-300">
-                        <ShieldCheck className="w-6 h-6" />
+                <div className="lg:w-[400px] lg:flex-shrink-0 w-full">
+                  <div className="p-6 sm:p-8 rounded-3xl bg-gradient-to-r from-emerald-950/60 via-slate-900 to-indigo-950/60 border border-emerald-500/30 flex flex-col items-start justify-start gap-6 shadow-xl min-h-[360px]">
+                    <div className="flex items-start gap-4">
+                      <div className="p-3 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 flex-shrink-0 mt-1">
+                        <ShieldCheck className="w-8 h-8" />
                       </div>
-                      <div>
-                        <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-bold uppercase tracking-wider mb-1">
+                      <div className="space-y-3">
+                        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-xs font-bold uppercase tracking-wider">
                           <span>Sesión Autenticada Activa</span>
                         </div>
-                        <h3 className="text-lg font-extrabold text-white">
+                        <h3 className="text-xl font-extrabold text-white leading-tight">
                           ¡Bienvenido/a de nuevo!
                         </h3>
-                        <p className="text-[11px] text-slate-300">
-                          Has ingresado a tu perfil privado. Accede directamente a tus materias y aula virtual.
+                        <p className="text-sm text-slate-300 leading-relaxed max-w-xs">
+                          Has ingresado a tu perfil privado. Accede directamente a tus materias, microcurrículo diario, profesores virtuales y aula virtual completa.
                         </p>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2 w-full pt-2 border-t border-emerald-500/20">
+                    <div className="space-y-3 w-full pt-4 border-t border-emerald-500/20">
                       <button
                         onClick={() => setActiveTab('space')}
-                        className="flex-1 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-bold text-xs shadow-lg shadow-emerald-950/40 transition-all flex items-center justify-center gap-2 transform hover:scale-105"
+                        className="w-full px-5 py-3.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-bold text-sm shadow-lg shadow-emerald-950/40 transition-all flex items-center justify-center gap-2 transform hover:scale-[1.02]"
                       >
                         <span>Ir a mi Espacio Educativo</span>
-                        <ArrowRight className="w-3.5 h-3.5" />
+                        <ArrowRight className="w-4.5 h-4.5" />
                       </button>
                       <button
                         onClick={() => openAuthModal()}
-                        className="px-3 py-2.5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition-colors whitespace-nowrap"
+                        className="w-full px-5 py-3 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-bold transition-colors"
                       >
                         Cambiar Cuenta
                       </button>
