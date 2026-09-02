@@ -28,13 +28,15 @@ export const StudentLoginModal: React.FC<StudentLoginModalProps> = ({
   targetStudentId,
   onOpenRegister,
 }) => {
-  const {
-    studentsList,
-    loginStudent,
-    currentStudentId,
-    setCurrentStudentId,
-    setActiveTab,
-  } = useSchool();
+const {
+  studentsList,
+  loginStudent,
+  currentStudentId,
+  setCurrentStudentId,
+  setActiveTab,
+  authenticatedStudentId,
+  setAuthenticatedStudentId,
+} = useSchool();
 
   const initialTarget = targetStudentId || currentStudentId || 'avril';
   const targetStudent = studentsList.find((s) => s.id === initialTarget) || studentsList[0];
@@ -81,9 +83,12 @@ export const StudentLoginModal: React.FC<StudentLoginModalProps> = ({
         return;
       }
 
+      setAuthenticatedStudentId(found.id);
       setCurrentStudentId(found.id);
-      setActiveTab('space');
-      onClose();
+      setTimeout(() => {
+        setActiveTab('space');
+        onClose();
+      }, 150);
     } catch (e) {
       console.error('Error en Google Sign-In:', e);
       setErrorMsg('Falló la comunicación con el servidor de Google.');

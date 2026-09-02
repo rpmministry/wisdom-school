@@ -26,6 +26,7 @@ interface SchoolContextType {
   currentStudentId: StudentId;
   setCurrentStudentId: (id: StudentId) => void;
   authenticatedStudentId: StudentId | null;
+  setAuthenticatedStudentId: (id: StudentId | null) => void;
   isAuthenticated: boolean;
   loginStudent: (identifier: string, passOrPin: string) => { success: boolean; student?: Student; error?: string };
   logoutStudent: () => void;
@@ -517,6 +518,7 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         currentStudentId,
         setCurrentStudentId,
         authenticatedStudentId,
+        setAuthenticatedStudentId,
         isAuthenticated: !!authenticatedStudentId,
         loginStudent,
         logoutStudent,
