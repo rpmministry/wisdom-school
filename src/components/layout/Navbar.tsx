@@ -4,14 +4,10 @@ import { SchoolLogo } from '../common/SchoolLogo';
 import { StudentAvatar } from '../common/StudentAvatar';
 import { AccountSettingsModal } from '../auth/AccountSettingsModal';
 import {
-  Sparkles,
-  Bot,
-  UserCheck,
   Lock,
   LogOut,
   ChevronDown,
   ShieldCheck,
-  UserPlus,
   Settings,
 } from 'lucide-react';
 
@@ -26,8 +22,6 @@ export const Navbar: React.FC = () => {
     openAuthModal,
     activeTab,
     setActiveTab,
-    setIsTeacherDrawerOpen,
-    activeSubject,
   } = useSchool();
 
   // Paso 1: detectamos qué perfil está activo para aplicar el tema visual correcto (Avril o Gael).
@@ -69,27 +63,11 @@ export const Navbar: React.FC = () => {
           </div>
         </div>
 
-        {/* Paso 3: el lado derecho reúne acciones clave del usuario: profesor IA, perfil, seguridad y cierre de sesión. */}
+        {/* Paso 3: el lado derecho muestra "Iniciar sesión de alumno" en la landing page. */}
         <div className="flex items-center gap-2.5">
 
-          {/* Quick AI Teacher Summon */}
-          <button
-            id="btn-open-ai-teacher"
-            onClick={() => setIsTeacherDrawerOpen(true)}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-bold shadow-sm transition-all hover:scale-[1.02] active:scale-[0.98] ${
-              isAvril
-                ? 'bg-gradient-to-r from-indigo-600/30 to-purple-600/30 hover:from-indigo-600/50 hover:to-purple-600/50 border-indigo-500/40 text-indigo-200'
-                : 'bg-gradient-to-r from-amber-600/30 to-emerald-600/30 hover:from-amber-600/50 hover:to-emerald-600/50 border-amber-500/40 text-amber-200'
-            }`}
-            title="Abrir Profesor IA Socrático"
-          >
-            <Bot className={`w-4 h-4 animate-pulse ${isAvril ? 'text-indigo-400' : 'text-amber-400'}`} />
-            <span className="hidden sm:inline">Profesor IA</span>
-            <span className="inline sm:hidden">Profesor IA</span>
-          </button>
-
           {/* Student Selector Switcher or Auth Badge */}
-          {authenticatedStudentId ? (
+          {authenticatedStudentId && activeTab !== 'home' ? (
             <div className="flex items-center gap-2 bg-slate-950/80 p-1 rounded-2xl border border-slate-800 shadow-inner">
               
               {/* Active Student Pill */}

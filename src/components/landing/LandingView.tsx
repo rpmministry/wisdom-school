@@ -49,7 +49,6 @@ export const LandingView: React.FC = () => {
         <div className="relative z-10 space-y-4">
           
           {/* Paso 4: la primera fila incluye identidad institucional y acceso rápido a ingresar o registrar. */}
-          <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <div className="p-3 rounded-2xl bg-slate-900/90 border border-slate-700/80 shadow-lg shadow-black/40 flex items-center justify-center">
                 <SchoolLogo size="md" className="w-10 h-10 object-contain" />
@@ -62,17 +61,6 @@ export const LandingView: React.FC = () => {
                 <h2 className="text-xs text-slate-400 font-mono mt-0.5">Año Lectivo 2026 - 2027</h2>
               </div>
             </div>
-
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => setAdmissionModalOpen(true)}
-                className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-gradient-to-r from-amber-500 via-amber-500 to-orange-500 hover:from-amber-400 hover:via-amber-400 hover:to-orange-400 text-slate-950 font-extrabold text-sm shadow-xl shadow-amber-950/50 transition-all transform hover:scale-105 active:scale-95 ring-1 ring-amber-300/40"
-              >
-                <UserPlus className="w-4 h-4" />
-                <span>Inscribir Estudiante</span>
-              </button>
-            </div>
-          </div>
 
           {/* Paso 5: aquí se define el mensaje principal de la marca: ¿qué es Wisdom School y para quién está pensado? */}
           <div className="max-w-5xl space-y-4">
