@@ -77,7 +77,7 @@ export const Navbar: React.FC = () => {
                 title="Perfil autenticado • Click para cambiar de cuenta"
               >
                 <div className="relative">
-                  <StudentAvatar studentId={currentStudent.id} name={currentStudent.name} size="xs" className="ring-2 ring-emerald-500/30" />
+                  <StudentAvatar studentId={currentStudent.id} name={currentStudent.name} size="xs" isActive={true} />
                   <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-400 rounded-full border-2 border-slate-900">
                     <div className="absolute inset-0 bg-emerald-400 rounded-full animate-pulse"></div>
                   </div>

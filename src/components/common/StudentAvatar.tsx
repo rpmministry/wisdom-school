@@ -11,6 +11,8 @@ interface StudentAvatarProps {
   className?: string;
   size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
   editable?: boolean;
+  isActive?: boolean;
+  customRingColor?: string;
 }
 
 const sizeConfig = {
@@ -27,6 +29,8 @@ export const StudentAvatar: React.FC<StudentAvatarProps> = ({
   className = '',
   size = 'md',
   editable = false,
+  isActive = false,
+  customRingColor,
 }) => {
   const { customAvatars } = useSchool();
   const [isHovered, setIsHovered] = useState(false);
@@ -66,6 +70,14 @@ export const StudentAvatar: React.FC<StudentAvatarProps> = ({
 
   const { box, icon, btn } = sizeConfig[size];
 
+  const ringClass = isActive
+    ? 'ring-emerald-500/30 group-hover:ring-emerald-400/50'
+    : customRingColor
+    ? `${customRingColor} group-hover:${customRingColor.replace(/\/\d+\//, '/50')}`
+    : isAvril
+    ? 'ring-amber-400 group-hover:ring-amber-300'
+    : 'ring-red-500 group-hover:ring-red-400';
+
   return (
     <>
       <div
@@ -80,9 +92,7 @@ export const StudentAvatar: React.FC<StudentAvatarProps> = ({
             onError={handleImgError}
             referrerPolicy="no-referrer"
             style={{ objectPosition: studentId === 'avril' ? '50% 10%' : '50% 20%' }}
-            className={`${box} object-cover bg-slate-900 ring-2 ${
-              isAvril ? 'ring-amber-400 group-hover:ring-amber-300' : 'ring-red-500 group-hover:ring-red-400'
-            } transition-all duration-300 shadow-xl`}
+            className={`${box} object-cover bg-slate-900 ring-2 ${ringClass} transition-all duration-300 shadow-xl`}
           />
         ) : (
           <div
@@ -94,8 +104,6 @@ export const StudentAvatar: React.FC<StudentAvatarProps> = ({
             <span className="text-[10px] tracking-tighter">{name ? name.slice(0, 4) : studentId}</span>
           </div>
         )}
-
-
 
         {editable && (
           <button
