@@ -38,12 +38,12 @@ export const ScheduleView: React.FC = () => {
   const [activeSubTab, setActiveSubTab] = useState<'horario' | 'cronograma' | 'proyectos'>('horario');
   const [selectedDay, setSelectedDay] = useState<'Todos' | 'Lunes' | 'Martes' | 'Miércoles' | 'Jueves' | 'Viernes'>('Todos');
 
-  const scheduleDays: { day: 'Lunes' | 'Martes' | 'Miércoles' | 'Jueves' | 'Viernes'; date: string; isStart?: boolean }[] = [
-    { day: 'Martes', date: '01 Sep', isStart: true },
-    { day: 'Miércoles', date: '02 Sep' },
-    { day: 'Jueves', date: '03 Sep' },
-    { day: 'Viernes', date: '04 Sep' },
-    { day: 'Lunes', date: '07 Sep' },
+  const scheduleDays: { day: 'Lunes' | 'Martes' | 'Miércoles' | 'Jueves' | 'Viernes'; date: string; isRepaso?: boolean; isStart?: boolean }[] = [
+    { day: 'Martes', date: '01 Sep', isRepaso: true },
+    { day: 'Miércoles', date: '02 Sep', isRepaso: true },
+    { day: 'Jueves', date: '03 Sep', isRepaso: true },
+    { day: 'Viernes', date: '04 Sep', isRepaso: true },
+    { day: 'Lunes', date: '07 Sep', isStart: true },
   ];
 
   const plan = currentStudent.academicPlan;
@@ -202,7 +202,7 @@ export const ScheduleView: React.FC = () => {
               >
                 Tabla Completa
               </button>
-              {scheduleDays.map(({ day, date, isStart }) => (
+              {scheduleDays.map(({ day, date, isRepaso, isStart }) => (
                 <button
                   key={day}
                   onClick={() => setSelectedDay(day)}
@@ -215,43 +215,48 @@ export const ScheduleView: React.FC = () => {
                   <span>{day}</span>
                   <span className="text-[10px] font-mono opacity-80">{date}</span>
                   {isStart && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />}
+                  {isRepaso && <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />}
                 </button>
               ))}
             </div>
           </div>
 
-          {/* TABLA OFICIAL (Matching Page 4 of PDF exactly) */}
-          {selectedDay === 'Todos' ? (
-            <div className="overflow-x-auto rounded-2xl border border-slate-700/80 bg-slate-900/90 shadow-xl">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-slate-800/90 border-b border-slate-700 text-xs font-extrabold uppercase text-slate-300">
-                    <th className="py-3.5 px-4 text-slate-400 w-32 border-r border-slate-700/60">Hora</th>
-                    <th className="py-3.5 px-4 border-r border-slate-700/60">
-                      <div>Lunes</div>
-                      <div className="text-[10px] text-slate-400 font-normal font-mono normal-case">07 Sep</div>
-                    </th>
-                    <th className="py-3.5 px-4 border-r border-slate-700/60 bg-indigo-950/40">
-                      <div className="flex items-center gap-1 text-indigo-300">
-                        <span>Martes</span>
-                        <span className="text-[9px] px-1 rounded bg-emerald-500/20 text-emerald-300 font-bold">1.er Día</span>
-                      </div>
-                      <div className="text-[10px] text-indigo-200 font-normal font-mono normal-case">01 Sep 2026</div>
-                    </th>
-                    <th className="py-3.5 px-4 border-r border-slate-700/60">
-                      <div>Miércoles</div>
-                      <div className="text-[10px] text-slate-400 font-normal font-mono normal-case">02 Sep</div>
-                    </th>
-                    <th className="py-3.5 px-4 border-r border-slate-700/60">
-                      <div>Jueves</div>
-                      <div className="text-[10px] text-slate-400 font-normal font-mono normal-case">03 Sep</div>
-                    </th>
-                    <th className="py-3.5 px-4">
-                      <div>Viernes</div>
-                      <div className="text-[10px] text-slate-400 font-normal font-mono normal-case">04 Sep</div>
-                    </th>
-                  </tr>
-                </thead>
+{/* TABLA OFICIAL (Matching Page 4 of PDF exactly) */}
+              {selectedDay === 'Todos' ? (
+                <div className="overflow-x-auto rounded-2xl border border-slate-700/80 bg-slate-900/90 shadow-xl">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-slate-800/90 border-b border-slate-700 text-xs font-extrabold uppercase text-slate-300">
+                        <th className="py-3.5 px-4 text-slate-400 w-32 border-r border-slate-700/60">Hora</th>
+                        <th className="py-3.5 px-4 border-r border-slate-700/60">
+                          <div>Martes</div>
+                          <div className="text-[10px] text-slate-400 font-normal font-mono normal-case">01 Sep</div>
+                          <div className="text-[9px] px-1 rounded bg-emerald-500/20 text-emerald-300 font-bold">REPASO</div>
+                        </th>
+                        <th className="py-3.5 px-4 border-r border-slate-700/60">
+                          <div>Miércoles</div>
+                          <div className="text-[10px] text-slate-400 font-normal font-mono normal-case">02 Sep</div>
+                          <div className="text-[9px] px-1 rounded bg-emerald-500/20 text-emerald-300 font-bold">REPASO</div>
+                        </th>
+                        <th className="py-3.5 px-4 border-r border-slate-700/60">
+                          <div>Jueves</div>
+                          <div className="text-[10px] text-slate-400 font-normal font-mono normal-case">03 Sep</div>
+                          <div className="text-[9px] px-1 rounded bg-emerald-500/20 text-emerald-300 font-bold">REPASO</div>
+                        </th>
+                        <th className="py-3.5 px-4 border-r border-slate-700/60">
+                          <div>Viernes</div>
+                          <div className="text-[10px] text-slate-400 font-normal font-mono normal-case">04 Sep</div>
+                          <div className="text-[9px] px-1 rounded bg-emerald-500/20 text-emerald-300 font-bold">REPASO</div>
+                        </th>
+                        <th className="py-3.5 px-4 border-r border-slate-700/60 bg-indigo-950/40">
+                          <div className="flex items-center gap-1 text-indigo-300">
+                            <span>Lunes</span>
+                            <span className="text-[9px] px-1 rounded bg-emerald-500/20 text-emerald-300 font-bold">PRIMER DÍA</span>
+                          </div>
+                          <div className="text-[10px] text-indigo-200 font-normal font-mono normal-case">07 Sep 2026</div>
+                        </th>
+                      </tr>
+                    </thead>
                 <tbody className="divide-y divide-slate-800 text-xs">
                   {scheduleSlots.map((slot, index) => {
                     if (slot.isRecess) {
