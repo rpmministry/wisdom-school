@@ -15,7 +15,7 @@ declare global {
     google?: {
       accounts: {
         id: {
-          initialize: (config: { client_id: string; callback: (response: any) => void }) => void;
+          initialize: (config: { client_id: string; callback: (response: any) => void; auto_select?: boolean; prompt?: string }) => void;
           renderButton: (
             ref: HTMLElement | null,
             options: { theme?: string; size?: string; width?: number | string; text?: string }

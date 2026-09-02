@@ -105,11 +105,13 @@ export const StudentLoginModal: React.FC<StudentLoginModalProps> = ({
       if (!window.google?.accounts) return;
       if (!googleButtonRef.current) return;
       
-      try {
-        window.google.accounts.id.initialize({
-          client_id: clientId,
-          callback: handleGoogleResponse,
-        });
+try {
+         window.google.accounts.id.initialize({
+           client_id: clientId,
+           callback: handleGoogleResponse,
+           auto_select: false,
+           prompt: 'select_account'
+         });
         window.google.accounts.id.renderButton(
           googleButtonRef.current,
           { theme: 'filled_black', size: 'large', width: 280 }
