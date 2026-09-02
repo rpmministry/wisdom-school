@@ -68,52 +68,61 @@ export const Navbar: React.FC = () => {
 
           {/* Student Selector Switcher or Auth Badge */}
           {authenticatedStudentId && activeTab !== 'home' ? (
-            <div className="flex items-center gap-2 bg-slate-950/80 p-1 rounded-2xl border border-slate-800 shadow-inner">
-              
-              {/* Active Student Pill */}
+            <div className="relative flex items-center">
+              {/* Active Student Dropdown Trigger */}
               <button
                 type="button"
                 onClick={() => openAuthModal(currentStudentId)}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700/80 hover:border-slate-500 text-xs font-bold transition-all"
+                className="group flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-900/90 border border-slate-700/50 hover:border-slate-600 backdrop-blur-sm text-xs font-medium transition-all duration-200"
                 title="Perfil autenticado • Click para cambiar de cuenta"
               >
-                <StudentAvatar studentId={currentStudent.id} name={currentStudent.name} size="xs" />
-                <span className="text-white hidden sm:inline">{currentStudent.name}</span>
-                <span className="text-[10px] text-emerald-400 flex items-center gap-1 font-mono">
-                  <ShieldCheck className="w-3 h-3 text-emerald-400" />
-                  <span className="hidden md:inline">Acceso Activo</span>
-                </span>
-                <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+                <div className="relative">
+                  <StudentAvatar studentId={currentStudent.id} name={currentStudent.name} size="xs" className="ring-2 ring-emerald-500/30" />
+                  <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-400 rounded-full border-2 border-slate-900">
+                    <div className="absolute inset-0 bg-emerald-400 rounded-full animate-pulse"></div>
+                  </div>
+                </div>
+                <div className="hidden sm:flex flex-col items-start">
+                  <span className="text-white font-semibold leading-tight">{currentStudent.name}</span>
+                  <span className="text-[9px] text-emerald-400 font-mono flex items-center gap-1">
+                    <ShieldCheck className="w-2.5 h-2.5" />
+                    ACTIVO
+                  </span>
+                </div>
+                <ChevronDown className="w-3.5 h-3.5 text-slate-400 group-hover:text-white transition-colors" />
               </button>
 
-              {/* Account Settings Button */}
-              <button
-                type="button"
-                onClick={() => setSettingsModalOpen(true)}
-                className="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-600 text-slate-400 hover:text-white transition-colors"
-                title="Seguridad y contraseña"
-              >
-                <Settings className="w-4 h-4" />
-              </button>
+              {/* Compact Action Buttons */}
+              <div className="flex items-center gap-1 ml-2">
+                {/* Account Settings Button */}
+                <button
+                  type="button"
+                  onClick={() => setSettingsModalOpen(true)}
+                  className="p-1.5 rounded-lg bg-slate-800/60 hover:bg-slate-700/60 border border-slate-700/30 hover:border-slate-600/50 text-slate-400 hover:text-white transition-all duration-200"
+                  title="Seguridad y contraseña"
+                >
+                  <Settings className="w-3.5 h-3.5" />
+                </button>
 
-              {/* Log Out Button */}
-              <button
-                type="button"
-                onClick={logoutStudent}
-                className="p-2 rounded-xl bg-slate-900 hover:bg-rose-950/50 border border-slate-800 hover:border-rose-500/50 text-slate-400 hover:text-rose-300 transition-colors"
-                title="Cerrar sesión de estudiante"
-              >
-                <LogOut className="w-4 h-4" />
-              </button>
+                {/* Log Out Button */}
+                <button
+                  type="button"
+                  onClick={logoutStudent}
+                  className="p-1.5 rounded-lg bg-slate-800/60 hover:bg-rose-950/30 border border-slate-700/30 hover:border-rose-500/30 text-slate-400 hover:text-rose-300 transition-all duration-200"
+                  title="Cerrar sesión de estudiante"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                </button>
+              </div>
             </div>
           ) : (
             <button
               type="button"
               onClick={() => openAuthModal()}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold text-xs shadow-lg shadow-indigo-950/50 transition-all transform hover:scale-105"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold text-xs shadow-lg shadow-indigo-950/30 transition-all transform hover:scale-105"
             >
               <Lock className="w-3.5 h-3.5" />
-              <span>Iniciar Sesión de Alumno</span>
+              <span>Iniciar Sesión</span>
             </button>
           )}
 
