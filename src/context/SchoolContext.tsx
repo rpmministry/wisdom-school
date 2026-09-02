@@ -64,6 +64,7 @@ interface SchoolContextType {
   updateStudentAvatar: (studentId: StudentId, avatarUrl: string) => void;
   changePassword: (studentId: StudentId, currentPass: string, newPass: string) => { success: boolean; error?: string };
   resetPasswordWithPin: (identifier: string, pin: string, newPass: string) => { success: boolean; error?: string };
+  loginAsTestStudent: (testStudentId: StudentId) => void;
 }
 
 const SchoolContext = createContext<SchoolContextType | undefined>(undefined);
@@ -237,10 +238,11 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   });
 
-  // Persistence Effects
+  // Persistence Effects (exclude demo students from persistence)
   useEffect(() => {
     try {
-      localStorage.setItem('wisdom_students_list_v4', JSON.stringify(studentsList));
+      const realStudents = studentsList.filter((s) => !s.isDemo);
+      localStorage.setItem('wisdom_students_list_v4', JSON.stringify(realStudents));
     } catch (e) {
       console.warn('Error writing students storage:', e);
     }
@@ -401,6 +403,18 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setAuthenticatedStudentId(null);
     setCurrentStudentId(null);
     setActiveTab('home');
+  };
+
+  // Demo: login as test student (Karen or Mauricio) for evaluating platform without affecting real data
+  const loginAsTestStudent = (testStudentId: StudentId) => {
+    const demoStudent = studentsList.find((s) => s.id === testStudentId && s.isDemo);
+    if (!demoStudent) {
+      console.error(`Demo student ${testStudentId} not found in studentsList`);
+      return;
+    }
+    setAuthenticatedStudentId(testStudentId);
+    setCurrentStudentId(testStudentId);
+    setActiveTab('space');
   };
 
   // Paso 6: el registro crea un nuevo estudiante, asigna materias, horarios y lo autentica automáticamente para comenzar su experiencia.
@@ -580,8 +594,8 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         navigationHistory,
         navigateBack,
         navigateToHome,
-      }}
-    >
+        loginAsTestStudent,
+      }}>
       {children}
     </SchoolContext.Provider>
   );

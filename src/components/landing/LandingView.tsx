@@ -37,6 +37,7 @@ export const LandingView: React.FC = () => {
     setCurrentStudentId,
     openAuthModal,
     setActiveTab,
+    loginAsTestStudent,
   } = useSchool();
 
   const [admissionModalOpen, setAdmissionModalOpen] = useState(false);
@@ -348,6 +349,43 @@ export const LandingView: React.FC = () => {
               Los estudiantes suben fotos o archivos de sus cuadernos y tareas. La IA evalúa la precisión, felicita los aciertos y señala errores conceptuales de forma constructiva.
             </p>
           </div>
+        </div>
+      </section>
+
+      {admissionModalOpen && (
+        <NewStudentModal
+          isOpen={admissionModalOpen}
+          onClose={() => setAdmissionModalOpen(false)}
+        />
+      )}
+
+      {/* Sección de perfiles de prueba para evaluación de usabilidad */}
+      <section className="p-6 sm:p-8 rounded-3xl bg-gradient-to-r from-purple-950/60 via-slate-900 to-purple-950/60 border border-purple-500/30 flex flex-col items-center justify-start gap-6 shadow-xl max-w-2xl mx-auto mb-10">
+        <div className="text-center space-y-4">
+          <h2 className="text-2xl font-bold text-white tracking-tight">Perfiles de Prueba</h2>
+          <p className="text-sm text-slate-400">
+            Evalúa la usabilidad de la plataforma con perfiles de estudiantes de prueba
+            sin afectar el progreso de los perfiles reales.
+          </p>
+          <div className="grid grid-cols-2 gap-4">
+            <button
+              onClick={() => loginAsTestStudent('karen')}
+              className="w-full px-6 py-3.5 rounded-2xl bg-gradient-to-r from-cyan-500 to-teal-600 hover:from-cyan-400 hover:to-teal-500 text-slate-950 font-bold text-sm shadow-lg shadow-cyan-950/40 transition-all flex items-center justify-center gap-2 transform hover:scale-[1.02]"
+            >
+              <UserPlus className="w-4 h-4" />
+              <span>Probar con Karen</span>
+            </button>
+            <button
+              onClick={() => loginAsTestStudent('mauricio')}
+              className="w-full px-6 py-3.5 rounded-2xl bg-gradient-to-r from-pink-500 to-rose-600 hover:from-pink-400 hover:to-rose-500 text-slate-950 font-bold text-sm shadow-lg shadow-pink-950/40 transition-all flex items-center justify-center gap-2 transform hover:scale-[1.02]"
+            >
+              <UserPlus className="w-4 h-4" />
+              <span>Probar con Mauricio</span>
+            </button>
+          </div>
+          <p className="text-center text-xs text-slate-500 mt-4">
+            Al salir del perfil de prueba, los datos reales de Avril y Gael se mantienen intactos.
+          </p>
         </div>
       </section>
 

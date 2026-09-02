@@ -78,6 +78,7 @@ export interface Student {
   };
   motto: string;
   interests: string[];
+  isDemo?: boolean;
 }
 
 export interface AITeacher {
