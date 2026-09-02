@@ -48,23 +48,47 @@ export const StudentLoginModal: React.FC<StudentLoginModalProps> = ({
   // Google Sign-In handling
   const handleGoogleResponse = async (response: any) => {
     const idToken = response.credential;
+    if (!idToken) {
+      setErrorMsg('Error: No se recibió token de Google.');
+      return;
+    }
+
     try {
-      const r = await fetch('/api/auth/google', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ idToken }),
-      });
-      const data = await r.json();
-      if (data.success) {
-        const studentId = data.student.id;
-        setCurrentStudentId(studentId);
-        setActiveTab('space');
-        onClose();
-      } else {
-        setErrorMsg(data.error ?? 'Error al iniciar sesión con Google');
+      // Verify the token with Google's API
+      const googleRes = await fetch(
+        `https://www.googleapis.com/oauth2/v3/tokeninfo?id_token=${idToken}`
+      );
+
+      if (!googleRes.ok) {
+        setErrorMsg('Error verificando el token de Google.');
+        return;
       }
+
+      const googleData = await googleRes.json();
+      const email = googleData.email?.toLowerCase();
+
+      if (!email) {
+        setErrorMsg('No se pudo obtener el correo de Google.');
+        return;
+      }
+
+      // Find student by email
+      const found = studentsList.find((s) => s.email?.toLowerCase() === email);
+
+      if (!found) {
+        setErrorMsg(
+          `Tu cuenta de Google (${email}) no está registrada en Wisdom School. Contacta a la administración.`
+        );
+        return;
+      }
+
+      // Authenticate the student
+      setCurrentStudentId(found.id);
+      setActiveTab('space');
+      onClose();
     } catch (e) {
-      setErrorMsg('Falló la comunicación con el servidor');
+      console.error('Error en Google Sign-In:', e);
+      setErrorMsg('Falló la comunicación con el servidor de Google.');
     }
   };
 
@@ -79,28 +103,43 @@ export const StudentLoginModal: React.FC<StudentLoginModalProps> = ({
 
     const loadAndRender = () => {
       if (!window.google?.accounts) return;
-      if (!googleButtonRef.current) return;
+      if (!googleButtonRef.current) {
+        console.warn('[GoogleSignIn] googleButtonRef no está disponible');
+        return;
+      }
       
-      window.google.accounts.id.initialize({
-        client_id: clientId,
-        callback: handleGoogleResponse,
-      });
-      window.google.accounts.id.renderButton(
-        googleButtonRef.current,
-        { theme: 'filled_black', size: 'large', width: '100%' }
-      );
+      try {
+        window.google.accounts.id.initialize({
+          client_id: clientId,
+          callback: handleGoogleResponse,
+        });
+        window.google.accounts.id.renderButton(
+          googleButtonRef.current,
+          { theme: 'filled_black', size: 'large', width: '100%' }
+        );
+        console.log('[GoogleSignIn] Botón de Google renderizado correctamente');
+      } catch (err) {
+        console.error('[GoogleSignIn] Error al renderizar botón:', err);
+      }
     };
 
+    // Check if Google script is already loaded
     if (window.google?.accounts) {
       loadAndRender();
     } else {
-      const script = document.createElement('script');
-      script.src = 'https://accounts.google.com/gsi/client';
-      script.async = true;
-      script.defer = true;
-      script.onload = loadAndRender;
-      script.onerror = () => console.error('[GoogleSignIn] Error cargando gsi/client');
-      document.body.appendChild(script);
+      // Wait for existing script or create new one
+      const existingScript = document.querySelector('script[src="https://accounts.google.com/gsi/client"]');
+      if (existingScript) {
+        existingScript.addEventListener('load', loadAndRender);
+      } else {
+        const script = document.createElement('script');
+        script.src = 'https://accounts.google.com/gsi/client';
+        script.async = true;
+        script.defer = true;
+        script.onload = loadAndRender;
+        script.onerror = () => console.error('[GoogleSignIn] Error cargando gsi/client');
+        document.body.appendChild(script);
+      }
     }
   }, []);
 

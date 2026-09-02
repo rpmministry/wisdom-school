@@ -84,9 +84,7 @@ export const Navbar: React.FC = () => {
             title="Abrir Profesor IA Socrático"
           >
             <Bot className={`w-4 h-4 animate-pulse ${isAvril ? 'text-indigo-400' : 'text-amber-400'}`} />
-            <span className="hidden sm:inline">
-              {activeSubject ? activeSubject.teacher.name : 'Profesor IA'}
-            </span>
+            <span className="hidden sm:inline">Profesor IA</span>
             <span className="inline sm:hidden">Profesor IA</span>
           </button>
 

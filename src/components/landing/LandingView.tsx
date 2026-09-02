@@ -11,7 +11,6 @@ import {
   FileCheck2,
   CalendarCheck,
   Award,
-  ArrowRight,
   Compass,
   CheckCircle,
   Lightbulb,
@@ -25,9 +24,7 @@ import {
   BookOpen,
   Users,
   Star,
-  Lock,
-  KeyRound,
-  ShieldAlert,
+  ArrowRight,
 } from 'lucide-react';
 
 export const LandingView: React.FC = () => {
@@ -68,15 +65,8 @@ export const LandingView: React.FC = () => {
 
             <div className="flex items-center gap-3">
               <button
-                onClick={() => openAuthModal()}
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl border border-indigo-400/40 bg-slate-900/70 text-indigo-100 font-bold text-xs shadow-lg shadow-indigo-950/40 transition-all transform hover:scale-105"
-              >
-                <ShieldCheck className="w-4 h-4 text-indigo-300" />
-                <span>Ingresar al Aula</span>
-              </button>
-              <button
                 onClick={() => setAdmissionModalOpen(true)}
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold text-xs shadow-lg shadow-amber-950/40 transition-all transform hover:scale-105"
+                className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-gradient-to-r from-amber-500 via-amber-500 to-orange-500 hover:from-amber-400 hover:via-amber-400 hover:to-orange-400 text-slate-950 font-extrabold text-sm shadow-xl shadow-amber-950/50 transition-all transform hover:scale-105 active:scale-95 ring-1 ring-amber-300/40"
               >
                 <UserPlus className="w-4 h-4" />
                 <span>Inscribir Estudiante</span>
@@ -104,17 +94,10 @@ export const LandingView: React.FC = () => {
 
             <div className="flex flex-wrap items-center gap-3 pt-1">
               <button
-                onClick={() => openAuthModal()}
-                className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-indigo-500 to-purple-600 px-5 py-3 text-sm font-bold text-white shadow-xl shadow-indigo-950/60 transition-all hover:scale-[1.02]"
-              >
-                <ArrowRight className="w-4 h-4" />
-                Entrar al Aula
-              </button>
-              <button
                 onClick={() => setAdmissionModalOpen(true)}
-                className="inline-flex items-center gap-2 rounded-2xl border border-slate-700 bg-slate-900/80 px-5 py-3 text-sm font-bold text-slate-200 transition-colors hover:border-slate-500 hover:bg-slate-800"
+                className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 px-6 py-3 text-sm font-bold text-slate-950 shadow-xl shadow-amber-950/50 transition-all hover:scale-[1.02]"
               >
-                <UserPlus className="w-4 h-4 text-amber-300" />
+                <UserPlus className="w-4 h-4" />
                 Registrar Nuevo Estudiante
               </button>
             </div>
@@ -183,55 +166,17 @@ export const LandingView: React.FC = () => {
               </div>
             ) : (
               /* Private Authentication Prompt Card */
-              <div className="p-6 sm:p-8 rounded-3xl bg-slate-900/90 border border-indigo-500/30 space-y-6 shadow-2xl relative overflow-hidden">
+              <div className="p-6 sm:p-8 rounded-3xl bg-slate-900/90 border border-indigo-500/30 shadow-2xl relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/5 rounded-full blur-2xl pointer-events-none" />
 
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
+                <div className="relative z-10">
                   <div className="space-y-2 max-w-2xl">
-                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 text-xs font-bold">
-                      <Lock className="w-3.5 h-3.5 text-amber-400" />
-                      <span>Privacidad & Seguridad Garantizada</span>
-                    </div>
                     <h3 className="text-2xl font-extrabold text-white tracking-tight">
                       Acceso Privado al Aula Virtual
                     </h3>
                     <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-                      Por motivos de seguridad y privacidad estudiantil, los perfiles de los alumnos inscritos no se muestran de manera pública. Ingresa con tus credenciales personales (correo electrónico o código PIN) para ingresar a tu espacio educativo.
+                      Por motivos de seguridad y privacidad estudiantil, los perfiles de los alumnos inscritos no se muestran de manera pública. Ingrese con sus credenciales personales (correo electrónico o código PIN) para ingresar a su espacio educativo.
                     </p>
-                  </div>
-
-                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 shrink-0">
-                    <button
-                      onClick={() => openAuthModal()}
-                      className="px-6 py-3.5 rounded-2xl bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold text-xs shadow-xl shadow-indigo-950/60 transition-all flex items-center justify-center gap-2.5 transform hover:scale-105 active:scale-95"
-                    >
-                      <KeyRound className="w-4 h-4 text-amber-300" />
-                      <span>Ingresar con Correo / Código PIN</span>
-                    </button>
-
-                    <button
-                      onClick={() => setAdmissionModalOpen(true)}
-                      className="px-5 py-3.5 rounded-2xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700 text-slate-200 font-bold text-xs transition-colors flex items-center justify-center gap-2"
-                    >
-                      <UserPlus className="w-4 h-4 text-indigo-400" />
-                      <span>Nuevo Estudiante</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Features Security Badges */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-slate-800/80 text-xs">
-                  <div className="flex items-center gap-2 text-slate-400">
-                    <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
-                    <span>Perfiles cifrados y protegidos por contraseña / PIN</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-slate-400">
-                    <BookOpen className="w-4 h-4 text-indigo-400 shrink-0" />
-                    <span>Acceso a microcurrículo y tareas personalizadas</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-slate-400">
-                    <Bot className="w-4 h-4 text-amber-400 shrink-0" />
-                    <span>Tutoría socrática adaptada a cada nivel</span>
                   </div>
                 </div>
               </div>
