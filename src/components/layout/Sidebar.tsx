@@ -40,7 +40,7 @@ export const Sidebar: React.FC = () => {
     { id: 'progress', label: 'Progreso', icon: TrendingUp },
   ];
 
-  const isAvril = currentStudent.id === 'avril';
+  const isAvril = currentStudent.id === 'avril' || currentStudent.id === 'karen';
 
   return (
     <aside className={`w-64 border-r p-4 flex flex-col justify-between hidden md:flex shrink-0 transition-colors duration-300 ${
@@ -64,8 +64,11 @@ export const Sidebar: React.FC = () => {
               editable={true}
             />
             <div className="overflow-hidden">
-              <div className="flex items-center gap-1.5">
+<div className="flex items-center gap-1.5">
                 <span className="font-extrabold text-sm text-white">{currentStudent.name}</span>
+                {currentStudent.isDemo && (
+                  <span className="text-[10px] bg-red-500/40 text-red-200 px-1.5 py-0.5 rounded-full">TEST</span>
+                )}
                 <span className="text-[11px] font-medium text-slate-400">({currentStudent.age}a)</span>
               </div>
               <p className={`text-xs font-bold truncate ${isAvril ? 'text-amber-300' : 'text-red-300'}`}>

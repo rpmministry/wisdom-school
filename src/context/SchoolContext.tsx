@@ -82,6 +82,23 @@ const getInitialDayOfWeek = (): DayOfWeekName => {
 };
 
 export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  // Paso 1: Limpiar localStorage de sesiones de prueba persistidas previamente.
+  useEffect(() => {
+    try {
+      const demoStudentIds = ['karen', 'mauricio'];
+      const authSaved = localStorage.getItem('wisdom_auth_student_id_v3');
+      const currentSaved = localStorage.getItem('wisdom_current_student_id_v3');
+      if (authSaved && demoStudentIds.includes(authSaved)) {
+        localStorage.removeItem('wisdom_auth_student_id_v3');
+      }
+      if (currentSaved && demoStudentIds.includes(currentSaved)) {
+        localStorage.removeItem('wisdom_current_student_id_v3');
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
   // Paso 1: persistimos la lista de estudiantes para que las credenciales y perfiles queden disponibles aunque se recargue la app.
   const [studentsList, setStudentsList] = useState<Student[]>(() => {
     try {
@@ -102,10 +119,17 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   });
 
   // Paso 2: guardamos quién ha iniciado sesión para que el sistema recuerde al alumno autenticado y muestre su espacio privado.
+  // Los estudiantes de prueba (karen, mauricio) NO deben persistir su sessión.
   const [authenticatedStudentId, setAuthenticatedStudentId] = useState<StudentId | null>(() => {
     try {
       const saved = localStorage.getItem('wisdom_auth_student_id_v3');
-      if (saved && saved !== 'null' && saved !== '') return saved;
+      if (saved && saved !== 'null' && saved !== '') {
+        // No persistir estudiantes de prueba
+        const demoStudentIds = ['karen', 'mauricio'];
+        if (!demoStudentIds.includes(saved)) {
+          return saved;
+        }
+      }
     } catch {
       // fallback
     }
@@ -113,14 +137,19 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return null;
   });
 
-  const [currentStudentId, setCurrentStudentId] = useState<StudentId>(() => {
+  const [currentStudentId, setCurrentStudentId] = useState<StudentId | null>(() => {
     try {
       const saved = localStorage.getItem('wisdom_current_student_id_v3');
-      if (saved && saved !== 'null' && saved !== '') return saved;
+      if (saved && saved !== 'null' && saved !== '') {
+        const demoStudentIds = ['karen', 'mauricio'];
+        if (!demoStudentIds.includes(saved)) {
+          return saved;
+        }
+      }
     } catch {
       // fallback
     }
-    return authenticatedStudentId || null;
+    return null;
   });
 
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
@@ -250,11 +279,16 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   useEffect(() => {
     try {
-      localStorage.setItem('wisdom_auth_student_id_v3', authenticatedStudentId || 'null');
+      const student = studentsList.find((s) => s.id === authenticatedStudentId);
+      if (student && !student.isDemo) {
+        localStorage.setItem('wisdom_auth_student_id_v3', authenticatedStudentId || 'null');
+      } else {
+        localStorage.removeItem('wisdom_auth_student_id_v3');
+      }
     } catch (e) {
       console.warn('Error writing auth student storage:', e);
     }
-  }, [authenticatedStudentId]);
+  }, [authenticatedStudentId, studentsList]);
 
   useEffect(() => {
     try {

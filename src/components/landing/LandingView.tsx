@@ -40,6 +40,11 @@ export const LandingView: React.FC = () => {
     loginAsTestStudent,
   } = useSchool();
 
+  // Check if authenticated student is a demo/test student (no persistent session allowed)
+  const isDemoStudent = authenticatedStudentId 
+    ? studentsList.some((s) => s.id === authenticatedStudentId && s.isDemo)
+    : false;
+
   const [admissionModalOpen, setAdmissionModalOpen] = useState(false);
 
   const googleButtonRef = useRef<HTMLDivElement>(null);
@@ -264,7 +269,7 @@ export const LandingView: React.FC = () => {
             </div>
 
             <div className="lg:w-[400px] lg:flex-shrink-0 w-full">
-              {authenticatedStudentId ? <ActiveSessionBanner /> : <InactiveSessionBanner />}
+              {authenticatedStudentId && !isDemoStudent ? <ActiveSessionBanner /> : (!authenticatedStudentId ? <InactiveSessionBanner /> : null)}
             </div>
           </div>
 

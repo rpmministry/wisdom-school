@@ -48,9 +48,9 @@ export const StudentAvatar: React.FC<StudentAvatarProps> = ({
 
   const sources: string[] = [
     ...(custom ? [custom] : []),
-    studentId === 'avril' ? '/Snoopy.png' : '/mario-3d.png',
+    studentId === 'avril' ? '/Snoopy.png' : studentId === 'karen' ? '/Snoopy.png' : '/mario-3d.png',
     `/students/${studentId}.png`,
-    `/students/${studentId === 'avril' ? 'Avril' : 'Gael'}.png`,
+    `/students/${studentId === 'avril' ? 'Avril' : studentId === 'karen' ? 'Avril' : 'Gael'}.png`,
     defaultObj?.avatar || unsplashBackup,
     unsplashBackup,
     `/students/${studentId}.svg`,
@@ -66,7 +66,7 @@ export const StudentAvatar: React.FC<StudentAvatarProps> = ({
     }
   };
 
-  const isAvril = studentId === 'avril';
+  const isAvril = studentId === 'avril' || studentId === 'karen';
 
   const { box, icon, btn } = sizeConfig[size];
 

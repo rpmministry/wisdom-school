@@ -25,7 +25,11 @@ export const Navbar: React.FC = () => {
   } = useSchool();
 
   // Paso 1: detectamos qué perfil está activo para aplicar el tema visual correcto (Avril o Gael).
-  const isAvril = currentStudentId === 'avril';
+  const isAvril = currentStudentId === 'avril' || currentStudentId === 'karen';
+  // Check if authenticated student is a demo/test student
+  const isDemoStudent = authenticatedStudentId 
+    ? studentsList.some((s) => s.id === authenticatedStudentId && s.isDemo)
+    : false;
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
 
   return (
@@ -49,12 +53,15 @@ export const Navbar: React.FC = () => {
               <span className="font-extrabold text-lg tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white via-slate-100 to-indigo-200">
                 WISDOM SCHOOL
               </span>
-              <span className={`text-[10px] font-black tracking-wider uppercase px-2.5 py-0.5 rounded-full border shadow-sm ${
+              <span className={`text-[10px] font-black tracking-wider uppercase px-2.5 py-0.5 rounded-full border shadow-sm flex items-center gap-1 ${
                 isAvril
                   ? 'bg-indigo-500/20 text-indigo-300 border-indigo-500/40'
                   : 'bg-amber-500/20 text-amber-300 border-amber-500/40'
               }`}>
                 {currentStudent.name} ({currentStudent.grade.split(' ')[0]})
+                {isDemoStudent && (
+                  <span className="bg-red-500/40 text-red-200 px-1 py-0.5 rounded text-[9px] font-bold">TEST</span>
+                )}
               </span>
             </div>
             <p className="text-xs text-slate-400 hidden sm:block">
@@ -67,7 +74,7 @@ export const Navbar: React.FC = () => {
         <div className="flex items-center gap-2.5">
 
           {/* Student Selector Switcher or Auth Badge */}
-          {authenticatedStudentId && activeTab !== 'home' ? (
+          {authenticatedStudentId && !isDemoStudent && activeTab !== 'home' ? (
             <div className="relative flex items-center">
               {/* Active Student Dropdown Trigger */}
               <button
@@ -84,6 +91,11 @@ export const Navbar: React.FC = () => {
                 </div>
                 <div className="hidden sm:flex flex-col items-start">
                   <span className="text-white font-semibold leading-tight">{currentStudent.name}</span>
+                  {isDemoStudent && (
+                    <span className="ml-2 text-xs bg-red-500/20 text-red-300 px-1.5 py-0.5 rounded-full">
+                      TEST
+                    </span>
+                  )}
                   <span className="text-[9px] text-emerald-400 font-mono flex items-center gap-1">
                     <ShieldCheck className="w-2.5 h-2.5" />
                     ACTIVO

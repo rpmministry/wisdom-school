@@ -65,7 +65,7 @@ export const StudentDashboard: React.FC = () => {
     setActiveTab('subjects');
   };
 
-  const isAvril = currentStudent.id === 'avril';
+  const isAvril = currentStudent.id === 'avril' || currentStudent.id === 'karen';
 
   return (
     <div className="space-y-8">

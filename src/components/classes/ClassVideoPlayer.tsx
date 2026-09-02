@@ -78,7 +78,7 @@ export const ClassVideoPlayer: React.FC<ClassVideoPlayerProps> = ({
       ];
 
   // Student theme detection (Avril = Snoopy & Peanuts, Gael = Super Mario Bros)
-  const isAvril = currentClass.studentId === 'avril';
+  const isAvril = currentClass.studentId === 'avril' || currentClass.studentId === 'karen';
   const isGael = currentClass.studentId === 'gael';
 
   // Slides structure for the interactive multimedia classroom with Montessori, Charlotte Mason & Custom Themes

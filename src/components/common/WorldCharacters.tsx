@@ -175,7 +175,7 @@ export const WorldHeaderBanner: React.FC<WorldHeaderBannerProps> = ({
   studentId,
   studentName,
 }) => {
-  const isAvril = studentId === 'avril';
+  const isAvril = studentId === 'avril' || studentId === 'karen';
 
   if (isAvril) {
     return (

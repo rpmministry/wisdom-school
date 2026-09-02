@@ -19,7 +19,7 @@ export function generateClassGuideHTML(
   const socraticQuestions = currentClass.socraticQuestions || [];
   const timeBreakdown = currentClass.timeBreakdown || [];
 
-  const isAvril = currentClass.studentId === 'avril' || studentName.toLowerCase().includes('avril');
+  const isAvril = currentClass.studentId === 'avril' || currentClass.studentId === 'karen' || studentName.toLowerCase().includes('avril') || studentName.toLowerCase().includes('karen');
   const isGael = currentClass.studentId === 'gael' || studentName.toLowerCase().includes('gael');
 
   const themeBannerHTML = isAvril
