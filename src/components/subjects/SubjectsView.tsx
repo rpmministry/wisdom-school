@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSchool } from '../../context/SchoolContext';
 import { Subject, CurriculumUnit, MicrocurriculumItem, DailyClass } from '../../types';
 import { PageHeader } from '../layout/PageHeader';
@@ -25,6 +25,18 @@ import {
 } from 'lucide-react';
 
 export const SubjectsView: React.FC = () => {
+  // Lógica de validación de la Semana de Repaso
+  const [isReviewWeek, setIsReviewWeek] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+    const today = new Date();
+    // Fecha oficial de inicio: 7 de Septiembre de 2026
+    const schoolStart = new Date('2026-09-07T00:00:00');
+    setIsReviewWeek(today < schoolStart);
+  }, []);
+
   const {
     studentSubjects,
     activeSubject,
@@ -43,10 +55,10 @@ export const SubjectsView: React.FC = () => {
   const [searchFilter, setSearchFilter] = useState('');
 
   const selectedSubject =
-    studentSubjects.find((s) => s.id === selectedSubjectId) || studentSubjects[0];
+    studentSubjects.find((s: any) => s.id === selectedSubjectId) || studentSubjects[0];
 
   const handleSelectMicroClass = (item: MicrocurriculumItem) => {
-    const matchingClass = todayClasses.find((c) => c.id === item.classId);
+    const matchingClass = todayClasses.find((c: any) => c.id === item.classId);
     if (matchingClass) {
       setActiveClass(matchingClass);
       setActiveSubject(selectedSubject);
@@ -137,10 +149,17 @@ export const SubjectsView: React.FC = () => {
     }
   };
 
+  // Prevenir errores de hidratación y cálculos sin montar
+  if (!isMounted) return null;
+
+  // Intercepción de los valores visuales por Semana de Repaso
+  const displayClassesCompleted = isReviewWeek ? 0 : selectedSubject?.classesCompleted || 0;
+  const displayProgressPercentage = isReviewWeek ? 0 : selectedSubject?.progressPercentage || 0;
+
   return (
     <div className="space-y-8">
       
-      <PageHeader title={`Materias de ${currentStudent.name}`} />
+      <PageHeader title={isReviewWeek ? `Materias de ${currentStudent.name} (Modo Repaso)` : `Materias de ${currentStudent.name}`} />
       
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -153,7 +172,9 @@ export const SubjectsView: React.FC = () => {
             Materias de {currentStudent.name}
           </h1>
           <p className="text-sm text-slate-400 mt-1">
-            Currículo oficial 2026-2027 adaptado con enfoque socrático, ABP y recursos verificados día a día.
+            {isReviewWeek 
+              ? "Semana de repaso activa. El registro de avance curricular oficial comenzará el 7 de septiembre." 
+              : "Currículo oficial 2026-2027 adaptado con enfoque socrático, ABP y recursos verificados día a día."}
           </p>
         </div>
 
@@ -170,8 +191,10 @@ export const SubjectsView: React.FC = () => {
 
       {/* Subject Tabs */}
       <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
-        {studentSubjects.map((sub) => {
+        {studentSubjects.map((sub: any) => {
           const isSelected = sub.id === selectedSubject?.id;
+          const displayTabProgress = isReviewWeek ? 0 : sub.progressPercentage;
+
           return (
             <button
               key={sub.id}
@@ -191,7 +214,7 @@ export const SubjectsView: React.FC = () => {
                 className="w-5 h-5 rounded-full object-cover"
               />
               <span>{sub.name}</span>
-              <span className="text-[10px] opacity-75">({sub.progressPercentage}%)</span>
+              <span className="text-[10px] opacity-75">({displayTabProgress}%)</span>
             </button>
           );
         })}
@@ -236,7 +259,7 @@ export const SubjectsView: React.FC = () => {
                   }`}
                 >
                   <Layers className="w-3.5 h-3.5" />
-                  <span>Microcurrículo Día a Día ({(selectedSubject.units || []).reduce((acc, u) => acc + (u.microcurriculum?.length || 0), 0)} Clases)</span>
+                  <span>Microcurrículo Día a Día ({(selectedSubject.units || []).reduce((acc: number, u: any) => acc + (u.microcurriculum?.length || 0), 0)} Clases)</span>
                 </button>
                 {selectedSubject.macroCurriculum && (
                   <button
@@ -257,14 +280,14 @@ export const SubjectsView: React.FC = () => {
               <div className="pt-2 space-y-2">
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-slate-400">
-                    Avance Curricular: <strong>{selectedSubject.classesCompleted}</strong> de <strong>{selectedSubject.totalClasses}</strong> completadas
+                    Avance Curricular: <strong>{displayClassesCompleted}</strong> de <strong>{selectedSubject.totalClasses}</strong> completadas
                   </span>
-                  <span className="font-bold text-indigo-400">{selectedSubject.progressPercentage}%</span>
+                  <span className="font-bold text-indigo-400">{displayProgressPercentage}%</span>
                 </div>
                 <div className="w-full h-2 rounded-full bg-slate-700 overflow-hidden">
                   <div
-                    className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-purple-500"
-                    style={{ width: `${selectedSubject.progressPercentage}%` }}
+                    className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 transition-all duration-500"
+                    style={{ width: `${displayProgressPercentage}%` }}
                   />
                 </div>
               </div>
@@ -296,7 +319,7 @@ export const SubjectsView: React.FC = () => {
                   </h3>
 
                   <div className="grid grid-cols-1 gap-4">
-                    {(selectedSubject.macroCurriculum.trimesters || selectedSubject.macroCurriculum.trimestersOverview || []).map((tri) => (
+                    {(selectedSubject.macroCurriculum.trimesters || selectedSubject.macroCurriculum.trimestersOverview || []).map((tri: any) => (
                       <div
                         key={tri.trimesterNumber}
                         className="p-5 rounded-2xl bg-slate-800/50 border border-slate-700/60 space-y-3"
@@ -352,9 +375,9 @@ export const SubjectsView: React.FC = () => {
                 </div>
 
                 {(selectedSubject.units || []).length > 0 ? (
-                  (selectedSubject.units || []).map((unit) => {
+                  (selectedSubject.units || []).map((unit: any) => {
                     const filteredItems = (unit.microcurriculum || []).filter(
-                      (item) => {
+                      (item: any) => {
                         const target = `${item.theme || ''} ${item.objective || ''} ${item.socraticQuestion || ''} ${item.dynamicActivity || ''}`.toLowerCase();
                         return target.includes(searchFilter.toLowerCase());
                       }
@@ -379,8 +402,11 @@ export const SubjectsView: React.FC = () => {
 
                         {/* Microcurriculum Days Detailed Cards */}
                         <div className="space-y-3 pt-2 border-t border-slate-700/40">
-                          {filteredItems.map((dayItem) => {
-                            const isTodayClass = todayClasses.some((c) => c.id === dayItem.classId);
+                          {filteredItems.map((dayItem: any) => {
+                            const isTodayClass = todayClasses.some((c: any) => c.id === dayItem.classId);
+                            // Interceptar estado de la clase por semana de repaso
+                            const displayStatusCompleted = isReviewWeek ? false : dayItem.status === 'completed';
+
                             return (
                               <div
                                 key={dayItem.id}
@@ -395,14 +421,14 @@ export const SubjectsView: React.FC = () => {
                                   <div className="flex items-center gap-2.5">
                                     <span
                                       className={`px-2.5 py-1 rounded-lg text-xs font-bold flex items-center justify-center shrink-0 ${
-                                        dayItem.status === 'completed'
+                                        displayStatusCompleted
                                           ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
                                           : isTodayClass
                                           ? 'bg-indigo-500 text-white shadow'
                                           : 'bg-slate-800 text-slate-300 border border-slate-700'
                                       }`}
                                     >
-                                      {dayItem.status === 'completed' ? '✓ Completada' : `Día ${dayItem.dayNumber}`}
+                                      {displayStatusCompleted ? '✓ Completada' : `Día ${dayItem.dayNumber}`}
                                     </span>
                                     <span className="text-xs text-slate-400">{dayItem.date}</span>
                                     {isTodayClass && (

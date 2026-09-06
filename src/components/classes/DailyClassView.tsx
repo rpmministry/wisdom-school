@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSchool, DayOfWeekName } from '../../context/SchoolContext';
 import { DailyClass, ClassActivity } from '../../types';
 import { formatYouTubeEmbedUrl, getYouTubeWatchUrl, getYouTubeSearchUrl } from '../../utils/youtube';
@@ -43,6 +43,18 @@ const DAYS_CONFIG: { day: DayOfWeekName; date: string; isStart?: boolean }[] = [
 ];
 
 export const DailyClassView: React.FC = () => {
+  // Lógica de validación de la Semana de Repaso
+  const [isReviewWeek, setIsReviewWeek] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+    const today = new Date();
+    // Fecha oficial de inicio: 7 de Septiembre de 2026
+    const schoolStart = new Date('2026-09-07T00:00:00');
+    setIsReviewWeek(today < schoolStart);
+  }, []);
+
   const {
     activeClass,
     todayClasses,
@@ -70,7 +82,7 @@ export const DailyClassView: React.FC = () => {
 
   const currentClass = activeClass || todayClasses[0] || allStudentClasses[0];
   const subject = currentClass
-    ? studentSubjects.find((s) => s.id === currentClass.subjectId)
+    ? studentSubjects.find((s: any) => s.id === currentClass.subjectId)
     : studentSubjects[0];
 
   const activeVideoUrl = videoOverrideUrl || currentClass?.videoUrl;
@@ -80,13 +92,13 @@ export const DailyClassView: React.FC = () => {
   const resourcesList = currentClass?.resources || [];
   const socraticQuestionsList = currentClass?.socraticQuestions || [];
 
-  const currentClassIndex = currentClass ? todayClasses.findIndex((c) => c.id === currentClass.id) : -1;
+  const currentClassIndex = currentClass ? todayClasses.findIndex((c: any) => c.id === currentClass.id) : -1;
   const prevClass = currentClassIndex > 0 ? todayClasses[currentClassIndex - 1] : null;
   const nextClass = currentClassIndex >= 0 && currentClassIndex < todayClasses.length - 1 ? todayClasses[currentClassIndex + 1] : null;
 
   const handleSelectClass = (targetClass: DailyClass) => {
     setActiveClass(targetClass);
-    const targetSub = studentSubjects.find((s) => s.id === targetClass.subjectId);
+    const targetSub = studentSubjects.find((s: any) => s.id === targetClass.subjectId);
     if (targetSub) setActiveSubject(targetSub);
     setVideoOverrideUrl(null);
     setCustomVideoInput('');
@@ -113,6 +125,8 @@ export const DailyClassView: React.FC = () => {
     setActiveTab('works');
   };
 
+  if (!isMounted) return null;
+
   if (!currentClass || !subject) {
     return (
       <div className="p-12 text-center rounded-3xl bg-slate-800/40 border border-slate-700/40 space-y-4">
@@ -132,7 +146,7 @@ export const DailyClassView: React.FC = () => {
   return (
     <div className="space-y-6">
       
-      <PageHeader title="Clases del Día" />
+      <PageHeader title={isReviewWeek ? "Clases de Entrenamiento (Modo Repaso)" : "Clases del Día"} />
       
       {/* Day Selector & Official Schedule Ribbon */}
       <div className="p-5 rounded-3xl bg-slate-800/90 border border-slate-700/80 space-y-4 shadow-xl">
@@ -146,7 +160,7 @@ export const DailyClassView: React.FC = () => {
             {DAYS_CONFIG.map(({ day, date, isStart }) => {
               const isSelected = day === selectedDayOfWeek;
               const countForDay = allStudentClasses.filter(
-                (c) => c.studentId === currentStudent.id && c.dayOfWeek === day
+                (c: any) => c.studentId === currentStudent.id && c.dayOfWeek === day
               ).length;
 
               return (
@@ -155,11 +169,11 @@ export const DailyClassView: React.FC = () => {
                   onClick={() => {
                     setSelectedDayOfWeek(day);
                     const classesOnDay = allStudentClasses.filter(
-                      (c) => c.studentId === currentStudent.id && c.dayOfWeek === day
+                      (c: any) => c.studentId === currentStudent.id && c.dayOfWeek === day
                     );
                     if (classesOnDay.length > 0) {
                       setActiveClass(classesOnDay[0]);
-                      const clsSub = studentSubjects.find((s) => s.id === classesOnDay[0].subjectId);
+                      const clsSub = studentSubjects.find((s: any) => s.id === classesOnDay[0].subjectId);
                       if (clsSub) setActiveSubject(clsSub);
                     }
                   }}
@@ -224,9 +238,12 @@ export const DailyClassView: React.FC = () => {
             </div>
             
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-2.5">
-              {todayClasses.map((cls, idx) => {
-                const clsSub = studentSubjects.find((s) => s.id === cls.subjectId);
+              {todayClasses.map((cls: any, idx: number) => {
+                const clsSub = studentSubjects.find((s: any) => s.id === cls.subjectId);
                 const isSelected = cls.id === currentClass.id && viewMode === 'focus';
+                // En semana de repaso ninguna clase está completada aún
+                const displayIsCompleted = isReviewWeek ? false : cls.isCompleted;
+
                 return (
                   <button
                     key={cls.id}
@@ -262,7 +279,7 @@ export const DailyClassView: React.FC = () => {
 
                     <div className="flex items-center justify-between pt-1 border-t border-slate-700/40 text-[10px]">
                       <span className="text-slate-400">{cls.activities.length} actividades</span>
-                      {cls.isCompleted ? (
+                      {displayIsCompleted ? (
                         <span className="font-bold text-emerald-400 flex items-center gap-1">
                           <CheckCircle2 className="w-3 h-3" /> Lista
                         </span>
@@ -301,8 +318,11 @@ export const DailyClassView: React.FC = () => {
           </div>
 
           <div className="grid grid-cols-1 gap-6">
-            {todayClasses.map((cls, idx) => {
-              const clsSub = studentSubjects.find((s) => s.id === cls.subjectId);
+            {todayClasses.map((cls: any, idx: number) => {
+              const clsSub = studentSubjects.find((s: any) => s.id === cls.subjectId);
+              // Interceptar completados en semana de repaso
+              const displayCompletedActivities = isReviewWeek ? 0 : cls.activities.filter((a: any) => a.completed).length;
+
               return (
                 <div
                   key={cls.id}
@@ -366,7 +386,7 @@ export const DailyClassView: React.FC = () => {
                         <ListTodo className="w-3.5 h-3.5" /> Actividades Prácticas
                       </span>
                       <p className="text-xs text-slate-300">
-                        {cls.activities.filter((a) => a.completed).length} de {cls.activities.length} completadas
+                        {displayCompletedActivities} de {cls.activities.length} completadas
                       </p>
                     </div>
 
@@ -650,7 +670,7 @@ export const DailyClassView: React.FC = () => {
                   Momentos Pedagógicos del Horario:
                 </span>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
-                  {currentClass.timeBreakdown.map((tb, idx) => (
+                  {currentClass.timeBreakdown.map((tb: any, idx: number) => (
                     <div
                       key={idx}
                       className="p-3 rounded-xl bg-slate-900/50 border border-slate-700/50 space-y-1 hover:border-indigo-500/40 transition-all"
@@ -675,7 +695,7 @@ export const DailyClassView: React.FC = () => {
         {[
           { id: 'content', label: '1. Lectura y Recursos', icon: BookOpen },
           { id: 'simulator', label: '2. Simulador & Video', icon: Cpu },
-          { id: 'activities', label: '3. Actividades & Test', icon: ListTodo, badge: `${activitiesList.filter(a => a.completed).length}/${activitiesList.length}` },
+          { id: 'activities', label: '3. Actividades & Test', icon: ListTodo, badge: `${isReviewWeek ? 0 : activitiesList.filter((a: any) => a.completed).length}/${activitiesList.length}` },
           { id: 'homework', label: '4. Guía & Tarea', icon: Upload },
           { id: 'reflection', label: '5. Preguntas Socráticas', icon: MessageSquareQuote },
         ].map((tab) => {
@@ -742,7 +762,7 @@ export const DailyClassView: React.FC = () => {
 
             <div className="space-y-3">
               {resourcesList.length > 0 ? (
-                resourcesList.map((res) => (
+                resourcesList.map((res: any) => (
                   <div
                     key={res.id}
                     className="p-4 rounded-2xl bg-slate-800/60 border border-slate-700/60 space-y-2 hover:border-slate-600 transition-all"
@@ -845,8 +865,8 @@ export const DailyClassView: React.FC = () => {
             <ClassVideoPlayer
               currentClass={currentClass}
               subject={subject}
-              onActivitySelect={(actId) => {
-                const act = currentClass.activities?.find((a) => a.id === actId);
+              onActivitySelect={(actId: string) => {
+                const act = currentClass.activities?.find((a: any) => a.id === actId);
                 if (act) setSelectedActivityForModal(act);
               }}
             />
@@ -873,84 +893,89 @@ export const DailyClassView: React.FC = () => {
 
             <div className="flex items-center gap-2">
               <span className="text-xs px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-slate-300 font-medium">
-                Completadas: <strong className="text-emerald-400 font-mono">{activitiesList.filter(a => a.completed).length}</strong> / {activitiesList.length}
+                Completadas: <strong className="text-emerald-400 font-mono">{isReviewWeek ? 0 : activitiesList.filter((a: any) => a.completed).length}</strong> / {activitiesList.length}
               </span>
             </div>
           </div>
 
           <div className="space-y-4">
             {activitiesList.length > 0 ? (
-              activitiesList.map((act, index) => (
-                <div
-                  key={act.id}
-                  className={`p-5 rounded-2xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${
-                    act.completed
-                      ? 'bg-emerald-950/20 border-emerald-500/40 text-slate-200'
-                      : 'bg-slate-900/80 border-slate-700/80 hover:border-indigo-500/50 hover:bg-slate-900 text-slate-300'
-                  }`}
-                >
-                  <div
-                    className="flex items-start gap-3.5 flex-1 cursor-pointer"
-                    onClick={() => setSelectedActivityForModal(act)}
-                  >
-                    {/* Quick check toggle */}
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        toggleActivityCompletion(currentClass.id, act.id);
-                      }}
-                      className={`w-7 h-7 rounded-xl flex items-center justify-center shrink-0 mt-0.5 transition-all text-xs font-bold ${
-                        act.completed
-                          ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20'
-                          : 'border border-slate-600 bg-slate-800 text-slate-400 hover:border-indigo-400 hover:text-white'
-                      }`}
-                      title={act.completed ? 'Marcar como pendiente' : 'Marcar como completada'}
-                    >
-                      {act.completed ? '✓' : index + 1}
-                    </button>
+              activitiesList.map((act: any, index: number) => {
+                // Forzar completado a false en semana de repaso
+                const displayActCompleted = isReviewWeek ? false : act.completed;
 
-                    <div className="space-y-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h4 className="text-sm sm:text-base font-bold text-white group-hover:text-indigo-300">
-                          {act.title}
-                        </h4>
-                        <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-indigo-300">
-                          {act.type === 'practice' ? 'Práctica' : act.type === 'project' ? 'Proyecto' : act.type === 'reflection' ? 'Reflexión' : act.type === 'experiment' ? 'Experimento' : 'Evaluación'}
-                        </span>
-                        {act.completed && (
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
-                            <CheckCircle2 className="w-3 h-3" /> Completada
+                return (
+                  <div
+                    key={act.id}
+                    className={`p-5 rounded-2xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${
+                      displayActCompleted
+                        ? 'bg-emerald-950/20 border-emerald-500/40 text-slate-200'
+                        : 'bg-slate-900/80 border-slate-700/80 hover:border-indigo-500/50 hover:bg-slate-900 text-slate-300'
+                    }`}
+                  >
+                    <div
+                      className="flex items-start gap-3.5 flex-1 cursor-pointer"
+                      onClick={() => setSelectedActivityForModal(act)}
+                    >
+                      {/* Quick check toggle */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleActivityCompletion(currentClass.id, act.id);
+                        }}
+                        className={`w-7 h-7 rounded-xl flex items-center justify-center shrink-0 mt-0.5 transition-all text-xs font-bold ${
+                          displayActCompleted
+                            ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20'
+                            : 'border border-slate-600 bg-slate-800 text-slate-400 hover:border-indigo-400 hover:text-white'
+                        }`}
+                        title={displayActCompleted ? 'Marcar como pendiente' : 'Marcar como completada'}
+                      >
+                        {displayActCompleted ? '✓' : index + 1}
+                      </button>
+
+                      <div className="space-y-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h4 className="text-sm sm:text-base font-bold text-white group-hover:text-indigo-300">
+                            {act.title}
+                          </h4>
+                          <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-indigo-300">
+                            {act.type === 'practice' ? 'Práctica' : act.type === 'project' ? 'Proyecto' : act.type === 'reflection' ? 'Reflexión' : act.type === 'experiment' ? 'Experimento' : 'Evaluación'}
                           </span>
-                        )}
+                          {displayActCompleted && (
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
+                              <CheckCircle2 className="w-3 h-3" /> Completada
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-slate-400 leading-relaxed max-w-2xl">
+                          {act.description}
+                        </p>
                       </div>
-                      <p className="text-xs text-slate-400 leading-relaxed max-w-2xl">
-                        {act.description}
-                      </p>
+                    </div>
+
+                    {/* Actions column */}
+                    <div className="flex items-center justify-between sm:justify-end gap-3 pt-3 sm:pt-0 border-t sm:border-t-0 border-slate-800 shrink-0">
+                      <span className="text-xs font-bold text-amber-400 font-mono bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 rounded-lg">
+                        +{act.points} pts
+                      </span>
+
+                      <button
+                        type="button"
+                        onClick={() => setSelectedActivityForModal(act)}
+                        className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm ${
+                          displayActCompleted
+                            ? 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-600'
+                            : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/30'
+                        }`}
+                      >
+                        <Sparkles className="w-3.5 h-3.5" />
+                        <span>{displayActCompleted ? 'Ver / Editar Solución' : 'Ingresar y Resolver ▶'}</span>
+                      </button>
                     </div>
                   </div>
-
-                  {/* Actions column */}
-                  <div className="flex items-center justify-between sm:justify-end gap-3 pt-3 sm:pt-0 border-t sm:border-t-0 border-slate-800 shrink-0">
-                    <span className="text-xs font-bold text-amber-400 font-mono bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 rounded-lg">
-                      +{act.points} pts
-                    </span>
-
-                    <button
-                      type="button"
-                      onClick={() => setSelectedActivityForModal(act)}
-                      className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm ${
-                        act.completed
-                          ? 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-600'
-                          : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/30'
-                      }`}
-                    >
-                      <Sparkles className="w-3.5 h-3.5" />
-                      <span>{act.completed ? 'Ver / Editar Solución' : 'Ingresar y Resolver ▶'}</span>
-                    </button>
-                  </div>
-                </div>
-              ))
+                );
+              })
             ) : (
               <div className="p-8 rounded-2xl bg-slate-900/60 border border-slate-700 text-center space-y-2">
                 <ListTodo className="w-8 h-8 text-slate-500 mx-auto" />
@@ -1042,7 +1067,7 @@ export const DailyClassView: React.FC = () => {
 
           <div className="space-y-4">
             {socraticQuestionsList.length > 0 ? (
-              socraticQuestionsList.map((q, idx) => (
+              socraticQuestionsList.map((q: string, idx: number) => (
                 <div
                   key={idx}
                   className="p-4 rounded-2xl bg-indigo-950/30 border border-indigo-500/30 space-y-2"

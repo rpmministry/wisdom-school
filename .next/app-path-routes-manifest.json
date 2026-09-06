@@ -1,0 +1,10 @@
+{
+  "/_global-error/page": "/_global-error",
+  "/_not-found/page": "/_not-found",
+  "/api/profesor/route": "/api/profesor",
+  "/aula/[student]/page": "/aula/[student]",
+  "/avril/page": "/avril",
+  "/favicon.ico/route": "/favicon.ico",
+  "/gael/page": "/gael",
+  "/page": "/"
+}

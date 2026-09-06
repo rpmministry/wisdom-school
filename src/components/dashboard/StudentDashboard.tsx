@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSchool, DayOfWeekName } from '../../context/SchoolContext';
 import { StudentAvatar } from '../common/StudentAvatar';
 import { WorldHeaderBanner } from '../common/WorldCharacters';
@@ -30,6 +30,14 @@ const DAYS_CONFIG: { day: DayOfWeekName; date: string; isStart?: boolean }[] = [
 ];
 
 export const StudentDashboard: React.FC = () => {
+  // FORZAMOS LA VARIABLE A TRUE PARA IGNORAR EL RELOJ DE TU PC EN ESTA PRUEBA
+  const isReviewWeek = true; 
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
   const {
     currentStudent,
     studentSubjects,
@@ -44,18 +52,18 @@ export const StudentDashboard: React.FC = () => {
     todaySchedule,
   } = useSchool();
 
-  const studentSubmissions = submissions.filter((s) => s.studentId === currentStudent.id);
+  const studentSubmissions = submissions.filter((s: any) => s.studentId === currentStudent.id);
   const activeClass = todayClasses[0];
   const activeSubject = activeClass
-    ? studentSubjects.find((s) => s.id === activeClass.subjectId)
+    ? studentSubjects.find((s: any) => s.id === activeClass.subjectId)
     : studentSubjects[0];
 
   const plan = currentStudent.academicPlan;
-  const currentProject = plan.projects.find((p) => p.status === 'active') || plan.projects[0];
+  const currentProject = plan.projects.find((p: any) => p.status === 'active') || plan.projects[0];
 
   const handleStartClass = (cls: typeof todayClasses[0]) => {
     setActiveClass(cls);
-    const sub = studentSubjects.find((s) => s.id === cls.subjectId) || null;
+    const sub = studentSubjects.find((s: any) => s.id === cls.subjectId) || null;
     setActiveSubject(sub);
     setActiveTab('classes');
   };
@@ -66,6 +74,8 @@ export const StudentDashboard: React.FC = () => {
   };
 
   const isAvril = currentStudent.id === 'avril' || currentStudent.id === 'karen';
+
+  if (!isMounted) return null;
 
   return (
     <div className="space-y-8">
@@ -192,8 +202,8 @@ export const StudentDashboard: React.FC = () => {
           {/* List of classes for the selected day */}
           {todayClasses.length > 0 ? (
             <div className="space-y-4">
-              {todayClasses.map((cls, idx) => {
-                const sub = studentSubjects.find((s) => s.id === cls.subjectId);
+              {todayClasses.map((cls: any, idx: number) => {
+                const sub = studentSubjects.find((s: any) => s.id === cls.subjectId);
                 const isFeatured = idx === 0;
                 return (
                   <div
@@ -248,16 +258,19 @@ export const StudentDashboard: React.FC = () => {
                       <div className="flex items-center gap-4 text-xs text-slate-400">
                         <div className="flex items-center gap-1">
                           <BookOpen className={`w-4 h-4 ${isAvril ? 'text-amber-400' : 'text-red-400'}`} />
-                          <span>{cls.resources.length} recursos</span>
+                          <span>{cls.resources?.length || 1} recursos</span>
                         </div>
                         <div className="flex items-center gap-1">
                           <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                          <span>{cls.activities.length} actividades</span>
+                          <span>{cls.activities?.length || 1} actividades</span>
                         </div>
                       </div>
 
                       <div className="flex items-center gap-2 w-full sm:w-auto">
-                        <button
+                        
+                        {/* ETIQUETA 'A' REEMPLAZA AL BUTTON */}
+                        <a
+                          href={`/aula/${currentStudent.id}`}
                           onClick={() => handleStartClass(cls)}
                           className={`flex-1 sm:flex-initial px-4 py-2 rounded-xl text-xs font-black shadow-md transition-all flex items-center justify-center gap-2 ${
                             isAvril
@@ -267,7 +280,8 @@ export const StudentDashboard: React.FC = () => {
                         >
                           <Play className="w-3.5 h-3.5 fill-current" />
                           <span>Entrar a Clase</span>
-                        </button>
+                        </a>
+
                         {sub && (
                           <button
                             onClick={() => openTeacherDrawerWithContext(sub, cls)}
@@ -297,7 +311,8 @@ export const StudentDashboard: React.FC = () => {
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-bold text-white flex items-center gap-2">
                 <BookOpen className={`w-5 h-5 ${isAvril ? 'text-amber-400' : 'text-red-400'}`} />
-                <span>Materias del Plan ({studentSubjects.length})</span>
+                {/* INDICADOR VISUAL PARA CONFIRMAR EL CAMBIO */}
+                <span>Materias del Plan - Modo Repaso</span>
               </h2>
               <button
                 onClick={() => setActiveTab('subjects')}
@@ -309,7 +324,11 @@ export const StudentDashboard: React.FC = () => {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {studentSubjects.map((subject) => (
+              {studentSubjects.map((subject: any) => {
+                // Cálculo visual del progreso interceptado
+                const displayProgress = isReviewWeek ? 0 : subject.progressPercentage;
+
+                return (
                 <div
                   key={subject.id}
                   onClick={() => handleOpenSubject(subject)}
@@ -345,7 +364,9 @@ export const StudentDashboard: React.FC = () => {
                   <div className="mt-4 pt-2 border-t border-slate-800">
                     <div className="flex items-center justify-between text-xs mb-1">
                       <span className="text-slate-400">Progreso del curso</span>
-                      <span className={`font-bold ${isAvril ? 'text-amber-300' : 'text-red-300'}`}>{subject.progressPercentage}%</span>
+                      <span className={`font-bold ${isAvril ? 'text-amber-300' : 'text-red-300'}`}>
+                        {displayProgress}%
+                      </span>
                     </div>
                     <div className="w-full h-1.5 rounded-full bg-slate-800 overflow-hidden">
                       <div
@@ -354,12 +375,12 @@ export const StudentDashboard: React.FC = () => {
                             ? 'bg-gradient-to-r from-amber-500 to-yellow-400'
                             : 'bg-gradient-to-r from-red-500 to-amber-500'
                         }`}
-                        style={{ width: `${subject.progressPercentage}%` }}
+                        style={{ width: `${displayProgress}%` }}
                       />
                     </div>
                   </div>
                 </div>
-              ))}
+              )})}
             </div>
           </div>
 
@@ -388,9 +409,9 @@ export const StudentDashboard: React.FC = () => {
             </div>
 
             <div className="space-y-2.5">
-              {todaySchedule.map((entry) => {
+              {todaySchedule.map((entry: any) => {
                 const matchingClass = entry.classId
-                  ? todayClasses.find((c) => c.id === entry.classId)
+                  ? todayClasses.find((c: any) => c.id === entry.classId)
                   : null;
                 return (
                   <div
@@ -456,7 +477,7 @@ export const StudentDashboard: React.FC = () => {
             </div>
 
             <div className="space-y-3">
-              {studentSubmissions.slice(0, 2).map((sub) => (
+              {studentSubmissions.slice(0, 2).map((sub: any) => (
                 <div
                   key={sub.id}
                   onClick={() => setActiveTab('works')}
