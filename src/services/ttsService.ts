@@ -23,6 +23,22 @@ interface TTSService {
   clearCache: () => void;
 }
 
+const FEMALE_FIRST_NAMES = [
+  'sofia', 'sarah', 'valentina', 'carla', 'clara', 'lucia', 'maya',
+  'emma', 'pincelita', 'mariana', 'camila', 'valeria', 'paula', 'maria',
+];
+
+const isTeacherFemale = (teacherName: string): boolean => {
+  if (!teacherName) return false;
+  const lower = teacherName.toLowerCase().trim();
+  const parts = lower.replace(/[.,]/g, '').split(/\s+/);
+  if (parts.some((p) => FEMALE_FIRST_NAMES.includes(p))) return true;
+  if (lower.includes('dra.') || lower.includes('maestra') || lower.includes('profesora') ||
+      lower.includes('miss') || lower.includes('tía ') || lower.includes('tia ') ||
+      lower.includes('mba')) return true;
+  return false;
+};
+
 const synthesizeWithBrowser = (opts: TTSOptions): void => {
   if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
   window.speechSynthesis.cancel();
@@ -34,12 +50,11 @@ const synthesizeWithBrowser = (opts: TTSOptions): void => {
   window.speechSynthesis.speak(utterance);
 };
 
-const fetchGoogleAudio = async (text: string): Promise<string | null> => {
+const fetchGoogleAudio = async (opts: TTSOptions): Promise<string | null> => {
   if (!isGoogleTTSAvailable) return null;
-  const teacherNameLower = (text.match(/Soy\s+([A-Za-z\s]+)/)?.[1] || '').toLowerCase().trim();
-  const isFemale = teacherNameLower.endsWith('a') || teacherNameLower.includes('miss') || teacherNameLower.includes('profesora');
+  const isFemale = isTeacherFemale(opts.teacherName);
   const voiceName = isFemale ? 'es-US-Neural2-A' : 'es-US-Neural2-B';
-  const cleanText = text.replace(/[*_#`~]/g, '').substring(0, 5000);
+  const cleanText = opts.text.replace(/[*_#`~]/g, '').substring(0, 5000);
   const response = await fetch(`https://texttospeech.googleapis.com/v1/text:synthesize?key=${GOOGLE_API_KEY}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -59,7 +74,7 @@ const fetchGoogleAudio = async (text: string): Promise<string | null> => {
 const playWithGoogle = async (opts: TTSOptions): Promise<void> => {
   const audioUrl = opts.messageId in googleTTSState.audioCache
     ? googleTTSState.audioCache[opts.messageId]
-    : await fetchGoogleAudio(opts.text);
+    : await fetchGoogleAudio(opts);
 
   if (!audioUrl) {
     synthesizeWithBrowser(opts);
