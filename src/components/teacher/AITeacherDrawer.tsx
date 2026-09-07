@@ -39,6 +39,8 @@ export const AITeacherDrawer: React.FC = () => {
   const [isFetchingAudio, setIsFetchingAudio] = useState(false);
   
   const playTimeoutRef = useRef<any>(null);
+  const lastActivityRef = useRef(Date.now());
+  const classIntervalRef = useRef<any>(null);
 
   // --- MOTOR GOOGLE NEURAL2 TTS ---
   const handlePlayVoice = async (text: string, messageId: string) => {
@@ -166,6 +168,7 @@ export const AITeacherDrawer: React.FC = () => {
     if (!textToSend || isLoading || !teacher || !subject) return;
 
     handleStopVoice();
+    lastActivityRef.current = Date.now();
 
     const userMessage: ChatMessage = { id: `msg-${Date.now()}`, role: 'user', content: textToSend, timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) };
     const updatedMessages = [...messages, userMessage];
@@ -206,6 +209,7 @@ export const AITeacherDrawer: React.FC = () => {
 
   useEffect(() => {
     if (isTeacherDrawerOpen) {
+      lastActivityRef.current = Date.now();
       const pendingPrompt = localStorage.getItem('pending_socratic_prompt');
       if (pendingPrompt) {
         localStorage.removeItem('pending_socratic_prompt');
@@ -213,6 +217,30 @@ export const AITeacherDrawer: React.FC = () => {
       }
     }
   }, [isTeacherDrawerOpen]);
+
+  // 5. PROGRESIÓN AUTOMÁTICA: El profesor mantiene la clase activa con preguntas guiadas
+  useEffect(() => {
+    if (!isTeacherDrawerOpen || isLoading) return;
+
+    classIntervalRef.current = setInterval(() => {
+      const inactiveMs = Date.now() - lastActivityRef.current;
+      if (inactiveMs > 90000 && messages.length > 0) {
+        const followUpPrompts = [
+          `Profesor, ¿podrías profundizar en "${dailyClass?.theme || 'el tema'}" con otro ejemplo concreto?`,
+          `¿Podrías conectar este aprendizaje con algo que vivamos en el día a día?`,
+          `Profesor, ¿qué otra perspectiva podemos explorar sobre "${dailyClass?.theme || 'este tema'}"?`,
+          `¿Me puedes guiar para aplicar lo aprendido en un problema práctico?`,
+        ];
+        const randomPrompt = followUpPrompts[Math.floor(Math.random() * followUpPrompts.length)];
+        handleSendMessage(randomPrompt);
+        lastActivityRef.current = Date.now();
+      }
+    }, 30000);
+
+    return () => {
+      if (classIntervalRef.current) clearInterval(classIntervalRef.current);
+    };
+  }, [isTeacherDrawerOpen, isLoading, messages.length, dailyClass?.theme]);
 
   if (!isTeacherDrawerOpen || !teacher || !subject) return null;
 
