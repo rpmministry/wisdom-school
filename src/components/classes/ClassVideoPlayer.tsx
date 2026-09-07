@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { DailyClass, Subject } from '../../types';
 import { formatYouTubeEmbedUrl, getYouTubeWatchUrl, getYouTubeSearchUrl } from '../../utils/youtube';
+import { ttsService } from '../../services/ttsService';
 import {
   Tv,
   ExternalLink,
@@ -42,7 +43,6 @@ export const ClassVideoPlayer: React.FC<ClassVideoPlayerProps> = ({
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [speechRate, setSpeechRate] = useState<number>(1.0);
   const [voiceGender, setVoiceGender] = useState<'female' | 'male'>('female');
-  const [speechSupported, setSpeechSupported] = useState(true);
 
   const activeVideoUrl = videoUrlOverride || currentClass.videoUrl;
   const isEnglishSubject = subject?.id?.startsWith('ing') || subject?.name?.toLowerCase().includes('inglés');
@@ -193,56 +193,33 @@ export const ClassVideoPlayer: React.FC<ClassVideoPlayerProps> = ({
         },
       ];
 
-  // Check speech synthesis support
-  useEffect(() => {
-    if (typeof window !== 'undefined' && !('speechSynthesis' in window)) {
-      setSpeechSupported(false);
-    }
-  }, []);
-
   // Cleanup speech when unmounting or changing slide/class
   useEffect(() => {
     return () => {
-      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-        window.speechSynthesis.cancel();
-      }
+      ttsService.stop();
     };
   }, [currentClass.id, currentSlideIndex]);
 
   const handleSpeak = (text: string) => {
-    if (!speechSupported || typeof window === 'undefined') return;
-
     if (isSpeaking) {
-      window.speechSynthesis.cancel();
-      setIsSpeaking(false);
+      ttsService.pause();
+      setIsSpeaking(true);
       return;
     }
 
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.rate = speechRate;
-    utterance.lang = isEnglishSubject && currentSlideIndex === 1 ? 'en-US' : 'es-EC';
-
-    // Pick voices if available
-    const voices = window.speechSynthesis.getVoices();
-    const langVoice = voices.find(
-      (v) => v.lang.startsWith(utterance.lang.substring(0, 2)) && (voiceGender === 'female' ? v.name.includes('Female') || v.name.includes('Helena') || v.name.includes('Monica') || v.name.includes('Zira') || v.name.includes('Google') : true)
-    );
-    if (langVoice) {
-      utterance.voice = langVoice;
-    }
-
-    utterance.onend = () => setIsSpeaking(false);
-    utterance.onerror = () => setIsSpeaking(false);
-
-    window.speechSynthesis.speak(utterance);
-    setIsSpeaking(true);
+    const teacherName = subject?.teacher?.name || '';
+    ttsService.play({
+      messageId: `video-${currentClass.id}-${currentSlideIndex}`,
+      text,
+      teacherName,
+      onEnd: () => { setIsSpeaking(false); },
+      onPause: () => { setIsSpeaking(true); },
+      onPlay: () => { setIsSpeaking(true); },
+    });
   };
 
   const handleStopSpeech = () => {
-    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-    }
+    ttsService.stop();
     setIsSpeaking(false);
   };
 

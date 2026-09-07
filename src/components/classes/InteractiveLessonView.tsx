@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AITeacher, Student } from '../../types';
+import { ttsService } from '../../services/ttsService';
 import { Bot, CheckCircle2, Sparkles, ArrowRight, Volume2, Trophy, Lightbulb, Heart, Star, BookOpen } from 'lucide-react';
 
 export interface LessonNode {
@@ -101,7 +102,6 @@ export const InteractiveLessonView: React.FC<InteractiveLessonViewProps> = ({ te
   const [aiMessage, setAiMessage] = useState('');
   const [showHint, setShowHint] = useState(false);
   const [completedNodes, setCompletedNodes] = useState<Set<number>>(new Set());
-  const voiceRef = useRef<SpeechSynthesisUtterance | null>(null);
 
   const isPrimary = student.grade?.toLowerCase().includes('elemental') || student.age < 10;
 
@@ -196,27 +196,37 @@ export const InteractiveLessonView: React.FC<InteractiveLessonViewProps> = ({ te
   const celebrateAndContinue = (message: string) => {
     setFeedback('celebration');
     setAiMessage(message);
-    if ('speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-      const utt = new SpeechSynthesisUtterance(message);
-      utt.lang = 'es-ES';
-      utt.rate = 0.95;
-      voiceRef.current = utt;
-      window.speechSynthesis.speak(utt);
-    }
+    ttsService.play({
+      messageId: `celebration-${Date.now()}`,
+      text: message,
+      teacherName: teacher.name,
+      onEnd: () => {},
+      onPause: () => {},
+      onPlay: () => {},
+    });
   };
 
   const guideWithHints = (message: string) => {
     setFeedback('guide');
     setAiMessage(message);
-    if ('speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-      const utt = new SpeechSynthesisUtterance(message);
-      utt.lang = 'es-ES';
-      utt.rate = 0.95;
-      voiceRef.current = utt;
-      window.speechSynthesis.speak(utt);
-    }
+    ttsService.play({
+      messageId: `guide-${Date.now()}`,
+      text: message,
+      teacherName: teacher.name,
+      onEnd: () => {},
+      onPause: () => {},
+      onPlay: () => {},
+    });
+  };
+
+  const handleNextLevel = () => {
+    setFeedback('idle');
+    setSelectedOption(null);
+    setTextAnswer('');
+    setShowHint(false);
+    setAiMessage('');
+    setCurrentNodeIndex((prev) => prev + 1);
+    ttsService.stop();
   };
 
   const handleVerify = () => {
@@ -254,23 +264,13 @@ export const InteractiveLessonView: React.FC<InteractiveLessonViewProps> = ({ te
     }
   };
 
-  const handleNextLevel = () => {
-    setFeedback('idle');
-    setSelectedOption(null);
-    setTextAnswer('');
-    setShowHint(false);
-    setAiMessage('');
-    setCurrentNodeIndex((prev) => prev + 1);
-    if ('speechSynthesis' in window) window.speechSynthesis.cancel();
-  };
-
   const handleShowHint = () => {
     setShowHint(true);
   };
 
   useEffect(() => {
     return () => {
-      if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+      ttsService.stop();
     };
   }, []);
 
@@ -345,13 +345,14 @@ export const InteractiveLessonView: React.FC<InteractiveLessonViewProps> = ({ te
           <button
             className="absolute -bottom-2 -right-2 p-2 rounded-full bg-indigo-600 text-white shadow-md hover:bg-indigo-500 transition-transform active:scale-95"
             onClick={() => {
-              if ('speechSynthesis' in window) {
-                window.speechSynthesis.cancel();
-                const utt = new SpeechSynthesisUtterance(currentNode.teacherDialogue);
-                utt.lang = 'es-ES';
-                utt.rate = 0.95;
-                window.speechSynthesis.speak(utt);
-              }
+              ttsService.play({
+                messageId: `listen-${currentNode.id}`,
+                text: currentNode.teacherDialogue,
+                teacherName: teacher.name,
+                onEnd: () => {},
+                onPause: () => {},
+                onPlay: () => {},
+              });
             }}
             title="Escuchar de nuevo"
           >

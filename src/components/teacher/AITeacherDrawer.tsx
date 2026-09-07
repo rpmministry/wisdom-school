@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useSchool } from '../../context/SchoolContext';
 import { askAITeacher, ChatMessage, renderMarkdownToHtml } from '../../services/aiService';
+import { ttsService } from '../../services/ttsService';
 import { Bot, X, Send, Loader2, Volume2, VolumeX, Play, Pause, StopCircle } from 'lucide-react';
 
 export const AITeacherDrawer: React.FC = () => {
@@ -30,112 +31,30 @@ export const AITeacherDrawer: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
-  // --- ESTADOS PARA GOOGLE CLOUD TTS ---
   const [isVoiceEnabled, setIsVoiceEnabled] = useState(true);
   const [speakingId, setSpeakingId] = useState<string | null>(null);
   const [isPaused, setIsPaused] = useState(false);
-  const [audioCache, setAudioCache] = useState<Record<string, string>>({});
-  const [currentAudio, setCurrentAudio] = useState<HTMLAudioElement | null>(null);
-  const [isFetchingAudio, setIsFetchingAudio] = useState(false);
-  
-  const playTimeoutRef = useRef<any>(null);
+
   const lastActivityRef = useRef(Date.now());
   const classIntervalRef = useRef<any>(null);
 
-  // --- MOTOR GOOGLE NEURAL2 TTS ---
   const handlePlayVoice = async (text: string, messageId: string) => {
-    if (speakingId === messageId && isPaused && currentAudio) {
-      currentAudio.play();
-      setIsPaused(false);
-      return;
-    }
-
-    if (currentAudio) {
-      currentAudio.pause();
-      currentAudio.currentTime = 0;
-    }
-
-    setIsPaused(false);
-    let audioUrl = audioCache[messageId];
-
-    if (!audioUrl) {
-      setIsFetchingAudio(true);
-      setSpeakingId(messageId); 
-
-      try {
-        // AQUÍ LEE TU LLAVE SECRETA DEL ARCHIVO .env
-        const GOOGLE_API_KEY = import.meta.env.VITE_GOOGLE_TTS_API_KEY;
-        
-        if (!GOOGLE_API_KEY) {
-          console.error("FALTA LA CLAVE DE GOOGLE TTS EN EL ARCHIVO .env");
-          setIsFetchingAudio(false);
-          setSpeakingId(null);
-          return;
-        }
-
-        const teacherNameLower = (teacher?.name || '').toLowerCase().trim();
-        const isFemale = teacherNameLower.endsWith('a') || teacherNameLower.includes('miss') || teacherNameLower.includes('profesora') || teacherNameLower.includes('sophia') || teacherNameLower.includes('carla') || teacherNameLower.includes('clara') || teacherNameLower.includes('lucia') || teacherNameLower.includes('maya') || teacherNameLower.includes('emma') || teacherNameLower.includes('pincelita');
-        
-        // Voces Neural2 HD de Google
-        const voiceName = isFemale ? 'es-US-Neural2-A' : 'es-US-Neural2-B';
-        const cleanText = text.replace(/[*_#`~]/g, '');
-
-        const response = await fetch(`https://texttospeech.googleapis.com/v1/text:synthesize?key=${GOOGLE_API_KEY}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            input: { text: cleanText },
-            voice: { languageCode: 'es-US', name: voiceName },
-            audioConfig: { audioEncoding: 'MP3', speakingRate: 1.05, pitch: isFemale ? 1.0 : -2.0 }
-          })
-        });
-
-        const data = await response.json();
-        
-        if (data.audioContent) {
-          audioUrl = "data:audio/mp3;base64," + data.audioContent;
-          setAudioCache(prev => ({ ...prev, [messageId]: audioUrl }));
-        } else {
-          console.error("Error en Google TTS:", data);
-          setSpeakingId(null);
-          setIsFetchingAudio(false);
-          return;
-        }
-      } catch (error) {
-        console.error("Error de red con Google TTS:", error);
-        setSpeakingId(null);
-        setIsFetchingAudio(false);
-        return;
-      }
-      setIsFetchingAudio(false);
-    }
-
-    // Reproducir audio
-    const audio = new Audio(audioUrl);
-    audio.onended = () => { setSpeakingId(null); setIsPaused(false); };
-    audio.onpause = () => { setIsPaused(true); };
-    audio.onplay = () => { setSpeakingId(messageId); setIsPaused(false); };
-    
-    setCurrentAudio(audio);
-    
-    try {
-      await audio.play();
-    } catch (e) {
-      console.warn("Autoplay bloqueado.", e);
-      setIsPaused(true);
-    }
+    await ttsService.play({
+      messageId,
+      text,
+      teacherName: teacher?.name || '',
+      onEnd: () => { setSpeakingId(null); setIsPaused(false); },
+      onPause: () => { setIsPaused(true); },
+      onPlay: () => { setSpeakingId(messageId); setIsPaused(false); },
+    });
   };
 
   const handlePauseVoice = () => {
-    if (currentAudio) currentAudio.pause();
+    ttsService.pause();
   };
 
   const handleStopVoice = () => {
-    if (playTimeoutRef.current) clearTimeout(playTimeoutRef.current);
-    if (currentAudio) {
-      currentAudio.pause();
-      currentAudio.currentTime = 0;
-    }
+    ttsService.stop();
     setSpeakingId(null);
     setIsPaused(false);
   };
@@ -156,7 +75,7 @@ export const AITeacherDrawer: React.FC = () => {
       setMessages([greeting]);
 
       if (isVoiceEnabled) {
-        playTimeoutRef.current = setTimeout(() => handlePlayVoice(greetingContent, greetingId), 800);
+        setTimeout(() => handlePlayVoice(greetingContent, greetingId), 800);
       }
     }
   }, [teacher?.id, currentStudent.id, subject?.id, dailyClass?.id, isTeacherDrawerOpen]);
@@ -190,7 +109,7 @@ export const AITeacherDrawer: React.FC = () => {
       setMessages((prev) => [...prev, modelMessage]);
 
       if (isVoiceEnabled) {
-        playTimeoutRef.current = setTimeout(() => handlePlayVoice(reply, replyId), 500);
+        setTimeout(() => handlePlayVoice(reply, replyId), 500);
       }
     } catch (err: any) {
       console.error(err);
@@ -200,7 +119,7 @@ export const AITeacherDrawer: React.FC = () => {
       setMessages((prev) => [...prev, errorMessage]);
       
       if (isVoiceEnabled && !isSystemError) {
-        playTimeoutRef.current = setTimeout(() => handlePlayVoice(errorMessage.content, errId), 500);
+        setTimeout(() => handlePlayVoice(errorMessage.content, errId), 500);
       }
     } finally {
       setIsLoading(false);
@@ -218,7 +137,6 @@ export const AITeacherDrawer: React.FC = () => {
     }
   }, [isTeacherDrawerOpen]);
 
-  // 5. PROGRESIÓN AUTOMÁTICA: El profesor mantiene la clase activa con preguntas guiadas
   useEffect(() => {
     if (!isTeacherDrawerOpen || isLoading) return;
 
@@ -245,7 +163,7 @@ export const AITeacherDrawer: React.FC = () => {
   if (!isTeacherDrawerOpen || !teacher || !subject) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] overflow-hidden flex justify-end bg-black/60 backdrop-blur-sm transition-opacity duration-300">
+    <div className="fixed inset-0 z-[100] overflow-hidden flex justify-right bg-black/60 backdrop-blur-sm transition-opacity duration-300">
       <div className="w-full max-w-lg border-l shadow-2xl flex flex-col h-full bg-slate-900 transition-transform duration-300 translate-x-0" style={{ background: 'linear-gradient(180deg, rgba(15,23,42,0.98), rgba(15,23,42,0.94))', borderColor: `${studentTheme.accent}55` }}>
         
         <div className="p-4 sm:p-5 border-b flex items-center justify-between shadow-md" style={{ background: `linear-gradient(135deg, ${studentTheme.accent}22, rgba(15,23,42,0.92) 60%, rgba(2,6,23,0.96))` }}>
@@ -296,9 +214,9 @@ export const AITeacherDrawer: React.FC = () => {
                             <Pause className="w-3.5 h-3.5 fill-current" /> PAUSAR
                           </button>
                         ) : (
-                          <button onClick={() => handlePlayVoice(msg.content, msg.id)} disabled={isFetchingAudio && speakingId === msg.id} className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-500 text-emerald-950 hover:bg-emerald-400 font-black text-[10px] sm:text-xs shadow-md active:scale-95 transition-all disabled:opacity-50">
-                            {isFetchingAudio && speakingId === msg.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5 fill-current" />} 
-                            {isFetchingAudio && speakingId === msg.id ? 'CARGANDO...' : (isActiveSpeech && isPaused ? 'REANUDAR' : 'ESCUCHAR')}
+                          <button onClick={() => handlePlayVoice(msg.content, msg.id)} className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-500 text-emerald-950 hover:bg-emerald-400 font-black text-[10px] sm:text-xs shadow-md active:scale-95 transition-all">
+                            <Play className="w-3.5 h-3.5 fill-current" /> 
+                            {isPaused ? 'REANUDAR' : 'ESCUCHAR'}
                           </button>
                         )}
                         {isActiveSpeech && (
@@ -308,7 +226,7 @@ export const AITeacherDrawer: React.FC = () => {
                         )}
                       </div>
                       <div className="flex flex-col items-end">
-                        {isActiveSpeech && !isPaused && !isFetchingAudio && <span className="text-[9px] font-bold text-emerald-400 uppercase tracking-wider animate-pulse flex items-center gap-1"><Volume2 className="w-3 h-3" /> LEYENDO</span>}
+                        {isActiveSpeech && !isPaused && <span className="text-[9px] font-bold text-emerald-400 uppercase tracking-wider animate-pulse flex items-center gap-1"><Volume2 className="w-3 h-3" /> LEYENDO</span>}
                         <span className="text-[9px] text-slate-500 font-mono mt-0.5">{msg.timestamp}</span>
                       </div>
                     </div>
