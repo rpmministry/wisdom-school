@@ -172,7 +172,7 @@ export const DailyClassView: React.FC = () => {
                   <h2 className="text-xl sm:text-2xl font-black text-white flex items-center gap-2"><BrainCircuit className="w-6 h-6 text-indigo-400" /> Lección Interactiva</h2>
                   <p className="text-indigo-200 mt-1 text-xs sm:text-sm">Supera los retos de tu profesor para desbloquear el siguiente conocimiento.</p>
                 </div>
-                <button onClick={handleDownloadGuide} className="w-full sm:w-auto px-5 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs shadow-lg transition-all flex items-center justify-center gap-2">
+                <button onClick={() => handleDownloadGuide()} className="w-full sm:w-auto px-5 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs shadow-lg transition-all flex items-center justify-center gap-2">
                   <Download className="w-4 h-4" /> Descargar PDF de Apoyo
                 </button>
               </div>
@@ -322,7 +322,7 @@ export const DailyClassView: React.FC = () => {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <button onClick={handleDownloadGuide} className="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-md transition-all flex items-center justify-center gap-2">
+                  <button onClick={() => handleDownloadGuide()} className="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-md transition-all flex items-center justify-center gap-2">
                     <Download className="w-4 h-4" /><span>Descargar PDF</span>
                   </button>
                   {downloadSuccess && <p className="text-xs text-emerald-400 text-center font-semibold animate-fade-in">✓ PDF descargado correctamente.</p>}
