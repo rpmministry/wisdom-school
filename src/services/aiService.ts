@@ -27,6 +27,39 @@ export interface AnalyzeWorkRequest {
   studentNotes?: string;
 }
 
+// Retry configuration
+const RETRY_DELAYS_MS = [2000, 4000, 6000]; // 2s, 4s, 6s
+const MAX_RETRIES = RETRY_DELAYS_MS.length;
+
+async function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function fetchWithRetry<T>(
+  fetchFn: () => Promise<T>,
+  retries: number = MAX_RETRIES,
+  delays: number[] = RETRY_DELAYS_MS
+): Promise<T> {
+  let lastError: Error | null = null;
+  
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      return await fetchFn();
+    } catch (error: any) {
+      lastError = error;
+      
+      // If this was the last attempt, throw
+      if (attempt === retries) break;
+      
+      const delay = delays[attempt] || delays[delays.length - 1];
+      console.warn(`[Reintento ${attempt + 1}/${retries}] Falló, reintentando en ${delay}ms:`, error.message);
+      await sleep(delay);
+    }
+  }
+  
+  throw lastError || new Error('Todos los reintentos fallaron');
+}
+
 export function renderMarkdownToHtml(content: string): string {
   if (!content || typeof content !== 'string') return '';
   const escapeHtml = (value: string) => value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
@@ -100,7 +133,7 @@ async function fetchWithTimeout(resource: string, options: RequestInit, timeoutM
 }
 
 // ==========================================
-// FUNCIÓN CENTRAL: IA DEL PROFESOR
+// FUNCIÓN CENTRAL: IA DEL PROFESOR CON REINTENTOS
 // ==========================================
 export async function askAITeacher(req: TeacherChatRequest): Promise<string> {
   const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || "";
@@ -127,126 +160,137 @@ export async function askAITeacher(req: TeacherChatRequest): Promise<string> {
     6. Eres su guía. Habla en un tono amigable, motivador y sumamente claro. Usa Markdown (negritas y listas) para resaltar lo importante.
   `;
 
-  let primaryErrorMsg = ""; // Guardará el motivo por el que falla Gemini
+  let primaryErrorMsg = "";
 
-  try {
-    let geminiContents = req.conversationHistory.map(msg => ({
-      role: msg.role === 'model' ? 'model' : 'user',
-      parts: [{ text: msg.content }]
-    }));
-    
-    // Evitar que el historial empiece con el modelo
-    if (geminiContents.length > 0 && geminiContents[0].role === 'model') geminiContents.shift(); 
-    geminiContents.push({ role: 'user', parts: [{ text: req.message }] });
+  const GEMINI_KEY_AVAILABLE = !!import.meta.env.VITE_GEMINI_API_KEY && import.meta.env.VITE_GEMINI_API_KEY !== "TU_CLAVE_AQUI";
+  const OPENROUTER_KEY_AVAILABLE = !!import.meta.env.VITE_OPENROUTER_API_KEY && import.meta.env.VITE_OPENROUTER_API_KEY !== "PEGA_AQUI_TU_CLAVE_OPENROUTER";
 
+  // Build conversation history
+  let geminiContents = req.conversationHistory.map(msg => ({
+    role: msg.role === 'model' ? 'model' : 'user',
+    parts: [{ text: msg.content }]
+  }));
+  
+  if (geminiContents.length > 0 && geminiContents[0].role === 'model') geminiContents.shift(); 
+  geminiContents.push({ role: 'user', parts: [{ text: req.message }] });
+
+  // TRIAL 1: Gemini 3.6 Flash with retries
+  if (GEMINI_KEY_AVAILABLE) {
     try {
-      // 🚀 MOTOR PRINCIPAL ESTÁNDAR 2026: gemini-3.6-flash
-      console.log("[Red Neural] Contactando motor primario: Gemini 3.6 Flash...");
-      const geminiResponse = await fetchWithTimeout(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${GEMINI_API_KEY}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            system_instruction: { parts: [{ text: systemInstruction }] },
-            contents: geminiContents,
-            generationConfig: { temperature: 0.7, maxOutputTokens: 1500 }
-          }),
-        },
-        GEMINI_TIMEOUT
-      );
+      const geminiResponse = await fetchWithRetry(async () => {
+        console.log("[Red Neural] Contactando motor primario: Gemini 3.6 Flash...");
+        const response = await fetchWithTimeout(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${GEMINI_API_KEY}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              system_instruction: { parts: [{ text: systemInstruction }] },
+              contents: geminiContents,
+              generationConfig: { temperature: 0.7, maxOutputTokens: 1500 }
+            }),
+          },
+          GEMINI_TIMEOUT
+        );
 
-      const geminiData = await geminiResponse.json();
-      
-      if (geminiData.candidates && geminiData.candidates.length > 0) {
-        console.log("[Red Neural] ✔️ Respuesta exitosa de Gemini 3.6 Flash");
-        return geminiData.candidates[0].content.parts[0].text;
-      }
-      
-      // Si la API de Gemini responde con un error oficial
-if (geminiData.error) {
+        const geminiData = await response.json();
+        
+        if (geminiData.candidates && geminiData.candidates.length > 0) {
+          console.log("[Red Neural] ✔️ Respuesta exitosa de Gemini 3.6 Flash");
+          return geminiData.candidates[0].content.parts[0].text;
+        }
+        
+        if (geminiData.error) {
           throw new Error(`Error oficial de Google: ${geminiData.error.message}`);
         }
         throw new Error("Respuesta inválida o vacía de Gemini");
-
+      });
+      
+      return geminiResponse;
     } catch (geminiError: any) {
       primaryErrorMsg = geminiError.name === 'AbortError' ? 'Tiempo de espera agotado (Timeout)' : geminiError.message;
-      console.warn(`[Red Neural] ⚠️ Motor primario falló. Motivo: ${primaryErrorMsg}`);
-
-      // FALLBACK LOCAL: Si no hay API keys configuradas, usar respuestas locales
-      const GEMINI_KEY_AVAILABLE = !!import.meta.env.VITE_GEMINI_API_KEY && import.meta.env.VITE_GEMINI_API_KEY !== "TU_CLAVE_AQUI";
-      const OPENROUTER_KEY_AVAILABLE = !!import.meta.env.VITE_OPENROUTER_API_KEY && import.meta.env.VITE_OPENROUTER_API_KEY !== "PEGA_AQUI_TU_CLAVE_OPENROUTER";
-      
-      if (!GEMINI_KEY_AVAILABLE && !OPENROUTER_KEY_AVAILABLE) {
-        console.warn("[Modo Demo] API keys no configuradas. Usando IA pedagógica local.");
-        
-        // Respuestas de fallback basadas en el tema actual - pedagogía socrática
-        const fallbackResponses = {
-          'Modelado algebraico': `Excelente pregunta, ${req.student.name}. Vamos a pensar en esto juntos: si tuvieras que contar alguna historia con números, ¿qué parte te gustaría contar primero? La ecuación es como una historia matemática: tenemos una historia que contar (el resultado) y queremos descubrir qué pasó antes. ¿Cuál sería el primer paso para reconstruir esa historia?`,
-          'Estructura celular': `¡Qué interesante que quieras saber sobre células, ${req.student.name}! Imagina que una célula es como una casita muy pequeñita. ¿Qué crees que necesitaría para funcionar bien? Piensa en los ingredientes que necesitaría para "vivir" y organizarse. Cada parte de la casita tiene un trabajo especial.`,
-          'Fotosíntesis': `${req.student.name}, qué buena intuición sobre las plantas. Imagina que las hojas son como pequeñas fábricas. ¿Qué ingredientes crees que necesitan para producir algo? La luz es como el "combustible", el agua es como la "materia prima", y el oxígeno es lo que "sobrante" producen. ¿Te imaginas una fábrica que solo produce algo cuando tiene luz?`,
-          'default': `${req.student.name}, excelente reflexión. Según la pedagogía socrática, no se busca una respuesta clave, sino construir pensamiento. ¿Podrías profundizar: qué ejemplo concreto de tu vida cotidiana podrías usar para ilustrar este concepto? Cada conexión que haces es un paso hacia el verdadero aprendizaje.`
-        };
-        
-        const theme = req.dailyClass?.theme || '';
-        const response = fallbackResponses[theme as keyof typeof fallbackResponses] || fallbackResponses.default;
-        return `${response}\n\n¿Te gustaría explorar otro aspecto o conectar esto con algo más que ya sabes?`;
-      }
-
-      console.log(`[Red Neural] 🔄 Activando IA Auxiliar (OpenRouter)...`);
-      
-      if (OPENROUTER_API_KEY === "PEGA_AQUI_TU_CLAVE_OPENROUTER" || !OPENROUTER_API_KEY) {
-         throw new Error("No tienes configurada tu clave API de OpenRouter en el código.");
-      }
-
-      const openRouterMessages = [
-        { role: 'system', content: systemInstruction },
-        ...req.conversationHistory.map(msg => ({ role: msg.role === 'model' ? 'assistant' : 'user', content: msg.content })),
-        { role: 'user', content: req.message }
-      ];
-
-      const freeModelsToTry = await getFreeOpenRouterModels();
-      let lastAuxError = "Todos los modelos auxiliares rechazaron la conexión.";
-
-      for (const modelId of freeModelsToTry) {
-        try {
-          console.log(`[Motor Auxiliar] Intentando con: ${modelId}...`);
-          const orResponse = await fetchWithTimeout("https://openrouter.ai/api/v1/chat/completions", {
-              method: "POST",
-              headers: { 
-                "Authorization": `Bearer ${OPENROUTER_API_KEY}`, 
-                "HTTP-Referer": "https://wisdom-school.edu", 
-                "X-Title": "Wisdom School", 
-                "Content-Type": "application/json" 
-              },
-              body: JSON.stringify({ model: modelId, messages: openRouterMessages, temperature: 0.7 })
-            }, OPENROUTER_TIMEOUT);
-            
-          const orData = await orResponse.json();
-          
-          if (orData.choices && orData.choices.length > 0) {
-            console.log(`[Motor Auxiliar] ✔️ Rescate exitoso usando: ${modelId}`);
-            return orData.choices[0].message.content;
-          }
-
-          if (orData.error) {
-            lastAuxError = `Error en ${modelId}: ${orData.error.message}`;
-            console.warn(`[Motor Auxiliar] ⚠️ ${lastAuxError}`);
-          }
-        } catch (e: any) { 
-          lastAuxError = `Fallo de conexión con ${modelId}`;
-          console.warn(`[Motor Auxiliar] ⚠️ ${lastAuxError}`);
-          continue; 
-        }
-      }
-      throw new Error(`Fallo total en cascada auxiliar. Último error: ${lastAuxError}`);
+      console.warn(`[Red Neural] ⚠️ Motor primario falló tras ${MAX_RETRIES} reintentos. Motivo: ${primaryErrorMsg}`);
     }
-  } catch (error: any) {
-    console.error("[Corte de Energía IA] Ambos motores fallaron:", error);
-    
-    // ESTE ES EL MENSAJE DE ALERTA QUE SALDRÁ EN PANTALLA SI TODO FALLA
-    return `⚠️ **SISTEMA DE EMERGENCIA: Fallo de Conexión IA**\n\nNo he podido generar una respuesta debido a un fallo en cascada en los motores:\n\n1. **Fallo Motor Principal (3.6 Flash):** ${primaryErrorMsg}\n2. **Fallo Motor Auxiliar (OpenRouter):** ${error.message}\n\n*Por favor, presiona **F12** y revisa la Consola, o verifica que tus API Keys estén escritas correctamente.*`;
   }
+
+  // FALLBACK LOCAL if no keys configured
+  if (!GEMINI_KEY_AVAILABLE && !OPENROUTER_KEY_AVAILABLE) {
+    console.warn("[Modo Demo] API keys no configuradas. Usando IA pedagógica local.");
+    
+    const fallbackResponses: Record<string, string> = {
+      'Modelado algebraico': `Excelente pregunta, ${req.student.name}. Vamos a pensar en esto juntos: si tuvieras que contar alguna historia con números, ¿qué parte te gustaría contar primero? La ecuación es como una historia matemática: tenemos una historia que contar (el resultado) y queremos descubrir qué pasó antes. ¿Cuál sería el primer paso para reconstruir esa historia?`,
+      'Estructura celular': `¡Qué interesante que quieras saber sobre células, ${req.student.name}! Imagina que una célula es como una casita muy pequeñita. ¿Qué crees que necesitaría para funcionar bien? Piensa en los ingredientes que necesitaría para "vivir" y organizarse. Cada parte de la casita tiene un trabajo especial.`,
+      'Fotosíntesis': `${req.student.name}, qué buena intuición sobre las plantas. Imagina que las hojas son como pequeñas fábricas. ¿Qué ingredientes crees que necesitan para producir algo? La luz es como el "combustible", el agua es como la "materia prima", y el oxígeno es lo que "sobrante" producen. ¿Te imaginas una fábrica que solo produce algo cuando tiene luz?`,
+      'default': `${req.student.name}, excelente reflexión. Según la pedagogía socrática, no se busca una respuesta clave, sino construir pensamiento. ¿Podrías profundizar: qué ejemplo concreto de tu vida cotidiana podrías usar para ilustrar este concepto? Cada conexión que haces es un paso hacia el verdadero aprendizaje.`
+    };
+    
+    const theme = req.dailyClass?.theme || '';
+    const response = fallbackResponses[theme] || fallbackResponses.default;
+    return `${response}\n\n¿Te gustaría explorar otro aspecto o conectar esto con algo más que ya sabes?`;
+  }
+
+  // TRIAL 2: OpenRouter fallback with retries
+  console.log("[Motor Auxiliar] Activando IA Auxiliar (OpenRouter) con reintentos...");
+  
+  if (!OPENROUTER_KEY_AVAILABLE) {
+    throw new Error("No tienes configurada tu clave API de OpenRouter en el código.");
+  }
+
+  const openRouterMessages = [
+    { role: 'system', content: systemInstruction },
+    ...req.conversationHistory.map(msg => ({ role: msg.role === 'model' ? 'assistant' : 'user', content: msg.content })),
+    { role: 'user', content: req.message }
+  ];
+
+  const freeModelsToTry = await getFreeOpenRouterModels();
+  let lastAuxError = "Todos los modelos auxiliares rechazaron la conexión.";
+
+  for (const modelId of freeModelsToTry) {
+    try {
+      const orResponse = await fetchWithRetry(async () => {
+        console.log(`[Motor Auxiliar] Intentando con: ${modelId}...`);
+        const response = await fetchWithTimeout("https://openrouter.ai/api/v1/chat/completions", {
+            method: "POST",
+            headers: { 
+              "Authorization": `Bearer ${OPENROUTER_API_KEY}`, 
+              "HTTP-Referer": "https://wisdom-school.edu", 
+              "X-Title": "Wisdom School", 
+              "Content-Type": "application/json" 
+            },
+            body: JSON.stringify({ model: modelId, messages: openRouterMessages, temperature: 0.7 })
+          }, OPENROUTER_TIMEOUT);
+        
+        const orData = await response.json();
+        
+        if (orData.choices && orData.choices.length > 0) {
+          console.log(`[Motor Auxiliar] ✔️ Rescate exitoso usando: ${modelId}`);
+          return orData.choices[0].message.content;
+        }
+
+        if (orData.error) {
+          throw new Error(`Error en ${modelId}: ${orData.error.message}`);
+        }
+        throw new Error(`Respuesta inválida de ${modelId}`);
+      });
+      
+      return orResponse;
+    } catch (e: any) { 
+      lastAuxError = `Fallo definitivo con ${modelId}: ${e.message}`;
+      console.warn(`[Motor Auxiliar] ⚠️ ${lastAuxError}`);
+      continue; 
+    }
+  }
+  
+  console.error("[Corte de Energía IA] Ambos motores fallaron tras reintentos:", lastAuxError);
+  
+  return `⚠️ **SISTEMA DE EMERGENCIA: Fallo de Conexión IA**
+
+No he podido generar una respuesta debido a un fallo en cascada en los motores:
+
+1. **Fallo Motor Principal (3.6 Flash):** ${primaryErrorMsg} (tras ${MAX_RETRIES} reintentos a 2s/4s/6s)
+2. **Fallo Motor Auxiliar (OpenRouter):** ${lastAuxError}
+
+*Por favor, presiona **F12** y revisa la Consola, o verifica que tus API Keys estén escritas correctamente.*`;
 }
 
 export async function analyzeWork(req: AnalyzeWorkRequest): Promise<WorkAnalysisResult> {

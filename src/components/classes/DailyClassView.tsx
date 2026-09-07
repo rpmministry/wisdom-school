@@ -160,7 +160,7 @@ export const DailyClassView: React.FC = () => {
 
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 <div className="lg:col-span-2">
-                  <InteractiveLessonView teacher={subject.teacher} student={currentStudent} theme={currentClass.theme} />
+                  <InteractiveLessonView teacher={subject.teacher} student={currentStudent} dailyClass={currentClass} />
                 </div>
 
                 <div className="space-y-6">
@@ -235,7 +235,7 @@ export const DailyClassView: React.FC = () => {
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-700/60">
                 <div>
                   <div className="flex items-center gap-2"><ListTodo className="w-5 h-5 text-indigo-400" /><h3 className="text-lg font-bold text-white">Taller Práctico de la Lección</h3></div>
-                  <p className="text-xs text-slate-400 mt-1">Completa estos ejercicios y retos para poner a prueba tu conocimiento.</p>
+                  <p className="text-xs text-slate-400 mt-1">Actividades temáticas alineadas al camino progresivo de la Masterclass.</p>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-xs px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-slate-300 font-medium">
@@ -332,13 +332,31 @@ export const DailyClassView: React.FC = () => {
 
           {/* SUB-TAB 5: PAUSA SOCRÁTICA */}
           {activeSubTab === 'reflection' && (
-            <div className="p-6 rounded-3xl bg-slate-800/60 border border-slate-700/60 space-y-6 shadow-xl animate-fade-in">
+            <div className="space-y-6 animate-fade-in">
               <div>
                 <h3 className="text-lg font-bold text-white flex items-center gap-2"><MessageSquareQuote className="w-5 h-5 text-indigo-400" /><span>Pausa Socrática de Cierre</span></h3>
-                <p className="text-xs text-slate-400 mt-1">Reflexiona y debata estas preguntas con el profesor IA antes de dar por terminada la clase.</p>
+                <p className="text-xs text-slate-400 mt-1">Reflexiona y debate estas preguntas con el profesor IA antes de dar por terminada la clase.</p>
               </div>
+
+              {/* Integrated Socratic Pauses from learning path */}
               <div className="space-y-4">
-                {socraticQuestionsList.length > 0 ? (
+                {currentClass.socraticPauses && currentClass.socraticPauses.length > 0 ? (
+                  currentClass.socraticPauses.map((pause) => (
+                    <div key={pause.id} className="p-5 rounded-2xl bg-violet-950/30 border border-violet-500/30 space-y-3 animate-fade-in">
+                      <div className="flex items-center gap-2 text-xs font-bold text-violet-300"><HelpCircle className="w-4 h-4" /><span>Pausa Socrática</span></div>
+                      <p className="text-sm text-slate-200 font-medium">"{pause.prompt}"</p>
+                      {pause.followUpQuestion && (
+                        <p className="text-xs text-violet-200 italic">"{pause.followUpQuestion}"</p>
+                      )}
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pt-2">
+                        <button onClick={() => handleAskSocraticTeacher(`Profesor, sobre esta pregunta: "${pause.prompt}". ¿Me puedes guiar para razonar la respuesta?`)} className="text-xs text-indigo-400 hover:text-indigo-300 font-semibold flex items-center gap-1">
+                          <span>Debatir con el profesor IA</span><ArrowRight className="w-3 h-3" />
+                        </button>
+                        <span className="text-[10px] text-slate-500">Reflexiona antes de avanzar: {pause.reflectionPrompt}</span>
+                      </div>
+                    </div>
+                  ))
+                ) : socraticQuestionsList.length > 0 ? (
                   socraticQuestionsList.map((q: string, idx: number) => (
                     <div key={idx} className="p-5 rounded-2xl bg-indigo-950/30 border border-indigo-500/30 space-y-3">
                       <div className="flex items-center gap-2 text-xs font-bold text-indigo-300"><HelpCircle className="w-4 h-4 text-indigo-400" /><span>Pregunta de Reflexión #{idx + 1}</span></div>
@@ -354,10 +372,31 @@ export const DailyClassView: React.FC = () => {
                   </div>
                 )}
               </div>
+
               <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-700 space-y-2">
                 <span className="text-xs font-bold uppercase tracking-wider text-amber-400">Reflexión Final del Día</span>
                 <p className="text-xs text-slate-300 italic">"{currentClass.reflectionPrompt}"</p>
               </div>
+
+              {/* Evidence criteria display */}
+              {currentClass.evidenceCriteria && currentClass.evidenceCriteria.length > 0 && (
+                <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-700 space-y-3">
+                  <span className="text-xs font-bold uppercase tracking-wider text-emerald-400">Criterios de Evidencia</span>
+                  <div className="space-y-2">
+                    {currentClass.evidenceCriteria.map((criterion, idx) => (
+                      <div key={idx} className="flex items-start gap-3 p-3 rounded-xl bg-slate-800/60 border border-slate-700">
+                        <div className="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center text-emerald-400 shrink-0 text-xs font-black">
+                          {criterion.weight}
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-xs font-bold text-white">{criterion.criterion}</p>
+                          <p className="text-[10px] text-slate-400">Evidencia: {criterion.indicator}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
