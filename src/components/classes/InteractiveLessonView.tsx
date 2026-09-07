@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { AITeacher, Student } from '../../types';
-import { Bot, CheckCircle2, Sparkles, ArrowRight, Volume2, Trophy, Lightbulb, Heart, Star } from 'lucide-react';
+import { Bot, CheckCircle2, Sparkles, ArrowRight, Volume2, Trophy, Lightbulb, Heart, Star, BookOpen } from 'lucide-react';
 
 export interface LessonNode {
   id: string;
   type: 'concept' | 'exploration' | 'synthesis' | 'creation';
   title: string;
   teacherDialogue: string;
+  conceptContent?: string; // El contenido teórico que se presenta ANTES de preguntar
   guidingQuestion?: string;
   options?: string[];
   placeholder?: string;
@@ -18,6 +19,79 @@ interface InteractiveLessonViewProps {
   student: Student;
   theme: string;
 }
+
+// Conceptos teóricos por tema - el profesor los presenta en el Paso 1
+// El estudiante luego responde basándose en ESTE contenido
+const THEORETICAL_CONTENT: Record<string, { primary: string; secondary: string }> = {
+  'Modelado algebraico': {
+    primary: 'El modelado algebraico es representar situaciones de la vida real usando números, letras y operaciones. Las letras (como x) representan valores desconocidos. Una ecuación como "x + 5 = 12" nos dice: "algo más 5 da 12". El modelo nos permite encontrar ese "algo".',
+    secondary: 'Ejemplo: Si tienes una caja con frutas y dentro hay 5 manzanas más, y en total hay 12 frutas, la ecuación x + 5 = 12 te dice cuántas manzanas había originalmente. x = 7. El álgebra convierte problemas cotidianos en cuentas resolubles.',
+  },
+  'Estructura celular': {
+    primary: 'La célula es la unidad mínima de vida. Tiene membrana (corteza protectora), núcleo (centro de control con ADN) y citoplasma (gel donde ocurren las reacciones). Las células animales tienen forma irregular; las vegetales tienen pared rígida y cloroplastos.',
+    secondary: 'Analogía: La célula es como una fábrica. La membrana es la puerta que controla quién entra y sale. El núcleo es el director que da órdenes. El citoplasma es el piso de fábrica donde se produce todo. Sin cada parte, la fábrica no funciona.',
+  },
+  'Fotosíntesis': {
+    primary: 'La fotosíntesis es el proceso que usan las plantas para convertir luz solar, agua y CO₂ en oxígeno y azúcar. Ocurre en las hojas, dentro de los cloroplastos (contenidos verdes). La energía luminosa se transforma en energía química almacenada.',
+    secondary: 'Analogía: La hoja es un panel solar vivo. Toma luz del sol, agua de las raíces y CO₂ del aire. Produce oxígeno (lo que respiramos) y azúcar (comida para la planta). Sin fotosíntesis, no habría oxígeno ni vida animal.',
+  },
+  'Principios de fe': {
+    primary: 'Los principios de fe son valores fundamentales que guían nuestras acciones y decisiones. Se basan en el respeto, la honestidad, la compasión y la responsabilidad. No se imponen: se descubren reflexionando sobre cómo queremos tratar a los demás.',
+    secondary: 'Ejemplo: Si ves a alguien caer, tu principio de compasión te hace ayudar. No es una regla obligatoria: es una elección basada en valores. La fe viva es practicar esos valores cada día, no solo creer en ellos.',
+  },
+  'Escritura creativa y argumentación': {
+    primary: 'La escritura argumentativa presenta una postura sobre un tema y la respalda con razones y evidencia. No es opinión sin base: es una idea clara defendida con lógica. Estructura: tesis → argumentos → evidencia → conclusión.',
+    secondary: 'Ejemplo: "Las ciudades deberían tener más parques" es una tesis. Los argumentos: mejoran la salud, reducen contaminación, fomentan comunidad. La evidencia: estudios muestran menos estrés en zonas verdes. La conclusión cierra la idea.',
+  },
+  'Comprensión lectora analítica': {
+    primary: 'Comprender un texto va más allá de leer palabras: es captar la idea central, las razones del autor y las implicaciones. Preguntas clave: ¿Qué dice el autor? ¿Por qué lo dice? ¿Qué quiere que el lector piense o sienta?',
+    secondary: 'Ejemplo: Si lees "El gobierno aumentó impuestos", pregunta: ¿Por qué? ¿Para qué? ¿Quién paga más? ¿Es justo? La comprensión analítica busca el "porqué" detrás de cada afirmación.',
+  },
+  'Historia del Ecuador y América Latina': {
+    primary: 'La historia del Ecuador incluye culturas precolombinas (Caranqui, Cañari), la colonia española y la independencia en 1822. Cada etapa dejó huellas culturales, sociales y políticas que explican cómo somos hoy.',
+    secondary: 'Analogía: La historia es como un río: las aguas de hoy vienen de montañas lejanas. Entender el origen ayuda a comprender el presente. Los ríos cambian de curso pero siempre llevan la marca de su fuente.',
+  },
+  'Modelos de negocio': {
+    primary: 'Un modelo de negocio describe cómo una empresa crea, entrega y captura valor. Responde: ¿Qué vendes? ¿A quién? ¿Cómo llega a ellos? ¿Cómo ganas dinero? El Canvas organiza esto en 9 bloques visuales.',
+    secondary: 'Ejemplo: Una tienda de jugos vende salud (valor) a estudiantes (clientes) en la escuela (canal) cobrando precio justo (ingreso). El modelo explica cómo cada pieza encaja para que el negocio funcione.',
+  },
+  'Educación Cultural y Artística': {
+    primary: 'El arte es expresión visual de ideas y emociones. Elementos: línea, color, forma, textura, espacio. Composición es cómo se organizan: equilibrio, ritmo, contraste. El arte comunica lo que las palabras no pueden.',
+    secondary: 'Ejemplo: Un cuadro oscuro con líneas irregulares transmite tensión. Uno claro con formas suaves transmite calma. El color y la forma son un lenguaje visual que todos podemos aprender a leer y crear.',
+  },
+  'Pensamiento computacional, hardware y Scratch': {
+    primary: 'El pensamiento computacional descompone problemas en partes pequeñas, identifica patrones y crea pasos lógicos (algoritmos). Scratch usa bloques visuales: cada bloque es una instrucción. Juntarlos crea programas.',
+    secondary: 'Analogía: Cocinar es como programar. Receta = algoritmo. Ingredientes = datos. Paso a paso = secuencia. Si falta un paso, el resultado cambia. Pensar computacionalmente es pensar como un chef: ordenado y preciso.',
+  },
+  'Sistemas de gobierno y participación ciudadana': {
+    primary: 'Un sistema de gobierno organiza cómo una sociedad toma decisiones colectivas. Tipos: democracia (decide el pueblo), monarquía (un rey), autoritarismo (poder central). La participación ciudadana implica votar, opinar y exigir transparencia.',
+    secondary: 'Ejemplo: Elegir estudiantes para el consejo es democracia. Todos votan, todos tienen voz. Sin participación, las decisiones no representan a nadie. La ciudadanía activa hace que el sistema funcione.',
+  },
+  'Inglés básico': {
+    primary: 'El inglés se basa en vocabulario, gramática y pronunciación. Las oraciones siguen estructura sujeto-verbo-objeto. Las palabras cambian según tiempo: "I eat" (presente), "I ate" (pasado), "I will eat" (futuro).',
+    secondary: 'Ejemplo: "I read books" = Leo libros. "I read a book" = Leí un libro. El contexto y la forma de la palabra indican cuándo ocurre. El inglés es un código que se descifra practicando.',
+  },
+  'Matemáticas básicas': {
+    primary: 'Las matemáticas son el lenguaje del orden. Operaciones básicas: sumar (juntar), restar (quitar), multiplicar (sumar repetidas), dividir (repartir). Cada una tiene una operación inversa que la deshace.',
+    secondary: 'Ejemplo: Si tienes 3 cajas con 4 manzanas cada una, multiplicas 3×4=12. Si repartes 12 entre 3, divides 12÷3=4. Las matemáticas describen relaciones cuantitativas que existen en el mundo real.',
+  },
+  'Ciencias Naturales - Ecosistemas': {
+    primary: 'Un ecosistema es un conjunto de seres vivos que interactúan con su ambiente. Componentes: seres vivos (flora, fauna), no vivos (agua, suelo, clima) y la relación entre ambos. El equilibrio depende de estas conexiones.',
+    secondary: 'Ejemplo: Un bosque es un ecosistema. Los árboles producen oxígeno (vivo), el suelo provee nutrientes (no vivo), los animales dispersan semillas (interacción). Si quitas uno, todo se desequilibra.',
+  },
+  'Ciudad vs campo': {
+    primary: 'La ciudad ofrece servicios, trabajo y diversidad, pero también contaminación y ritmo rápido. El campo ofrece naturaleza, espacio y tranquilidad, pero menos servicios. Ambos tienen ventajas y desafíos que merecen reflexión.',
+    secondary: 'Analogía: La ciudad es como un reloj: preciso, lleno de movimiento, cada pieza conectada. El campo es como un jardín: crece despacio, cada planta tiene su espacio. Ambos son formas válidas de vivir.',
+  },
+  'Arte y colores': {
+    primary: 'El color transmite emociones: rojo = energía, azul = calma, amarillo = alegría, verde = naturaleza. La combinación de colores crea armonía o contraste. El arte usa color para comunicar sin palabras.',
+    secondary: 'Ejemplo: Un atardecer naranja-rosado transmite calma y belleza. Un cuadro con rojo y negro transmite pasión o tensión. Los colores son un lenguaje emocional que usamos sin darnos cuenta.',
+  },
+  'Deporte y salud': {
+    primary: 'La actividad física mantiene el cuerpo sano: fortalece músculos, mejora corazón y coordinación. También beneficia la mente: reduce estrés, mejora sueño y concentración. El deporte enseña disciplina y trabajo en equipo.',
+    secondary: 'Ejemplo: Correr 30 minutos al día fortalece el corazón y libera endorfinas (sustancias que producen bienestar). El deporte no es solo físico: es también mental y social.',
+  },
+};
 
 export const InteractiveLessonView: React.FC<InteractiveLessonViewProps> = ({ teacher, student, theme }) => {
   const [currentNodeIndex, setCurrentNodeIndex] = useState(0);
@@ -31,41 +105,52 @@ export const InteractiveLessonView: React.FC<InteractiveLessonViewProps> = ({ te
 
   const isPrimary = student.grade?.toLowerCase().includes('elemental') || student.age < 10;
 
-  // Build lesson nodes dynamically with socratic constructionist pedagogy
-  // All paths lead to celebration: no "wrong answer" feedback, only guided re-exploration
+  // Get theoretical content for the current theme
+  const conceptContent = THEORETICAL_CONTENT[theme] || {
+    primary: `Hoy vamos a aprender sobre "${theme}". Es un tema importante que tiene que ver con cómo funcionan las cosas a nuestro alrededor. Piensa: ¿qué crees que significa esta palabra? ¿La has escuchado antes?`,
+    secondary: `"${theme}" es un área de estudio que involucra conceptos clave que veremos juntos. Te comparto primero la idea central: todo conocimiento se construye paso a paso, conectando lo nuevo con lo que ya sabes. Presta atención a cada analogía y ejemplo que te presento.`,
+  };
+
+  // Build lesson nodes with correct pedagogical sequence:
+  // 1. CONCEPT: Teacher presents content (theory first)
+  // 2. CHECK: Teacher asks about what was presented
+  // 3. PRACTICE: Student applies with guidance
+  // 4. CREATION: Student creates independently
   const LESSON_NODES: LessonNode[] = [
     {
       id: 'node-1',
       type: 'concept',
-      title: isPrimary ? 'Paso 1: Descubriendo juntos' : 'Paso 1: Activando tu curiosidad',
+      title: isPrimary ? 'Paso 1: Aquí está el conocimiento' : 'Paso 1: Concepto fundamental',
       teacherDialogue: isPrimary
-        ? `¡Hola ${student.name}! Soy ${teacher.name} y voy a ser tu guía en esta aventura. Hoy vamos a explorar juntos "${theme}". No te preocupes si nunca has escuchado esto: aquí no se trata de memorizar, sino de descubrir y construir tu propio conocimiento paso a paso. ¿Estás listo/a para empezar?`
-        : `¡Bienvenido/a ${student.name}! Soy ${teacher.name}. Hoy exploraremos "${theme}" desde cero. En esta plataforma no memorizamos: construimos el conocimiento. Cada pregunta es una oportunidad para pensar, no para sentirte evaluado/a. Empecemos activando lo que ya sabes.`,
+        ? `¡Hola ${student.name}! Soy ${teacher.name}. Hoy vamos a explorar "${theme}". Antes de preguntarte, te voy a compartir el conocimiento fundamental. Escúchame con atención:`
+        : `¡Bienvenido/a ${student.name}! Soy ${teacher.name}. Antes de reflexionar, te presento el concepto clave de "${theme}". Léelo con calma; es la base de todo lo que sigue:`,
+      conceptContent: conceptContent.primary,
       guidingQuestion: isPrimary
-        ? 'Cuéntame: ¿Qué palabra o imagen viene a tu mente cuando escuchas este tema?'
-        : '¿Qué sabes, intuyes o te preguntas sobre este tema? No hay respuesta incorrecta.',
-      placeholder: isPrimary ? 'Escribe o dibuja con palabras lo que piensas...' : 'Comparte tu intuición inicial...',
+        ? 'Ahora que leíste el concepto: ¿Qué parte te llamó más la atención o te pareció más interesante?'
+        : 'Con base en lo que acabas de leer: ¿Qué idea central rescates? ¿Qué parte te parece más relevante y por qué?',
+      placeholder: isPrimary ? 'Cuéntame qué entendiste...' : 'Reformula la idea central...',
       socraticHints: [
-        isPrimary ? '💡 Pista: Piensa en algo que ves todos los días en tu casa, escuela o parque.' : '💡 Pista 1: Conecta el tema con algo cotidiano que observes frecuentemente.',
-        isPrimary ? '💡 Pista: ¿Has visto esto en una película, libro o video?' : '💡 Pista 2: ¿Qué preguntas te surgen al escuchar este concepto?',
-        isPrimary ? '💡 Pista: No hay respuesta mala, ¡solo的好奇心!' : '💡 Pista 3: Tu primera impresión siempre tiene valor; compártela sin filtro.',
+        isPrimary ? '💡 Pista: ¿Qué palabra nueva encontraste? ¿Qué significa?' : '💡 Pista 1: Identifica la idea más importante del texto.',
+        isPrimary ? '💡 Pista: ¿Hay algún ejemplo que te haya gustado?' : '💡 Pista 2: ¿Qué conexión ves con tu vida cotidiana?',
+        isPrimary ? '💡 Pista: ¿Qué querrías saber más sobre esto?' : '💡 Pista 3: ¿Qué parte necesitas que te explique de nuevo?',
       ],
     },
     {
       id: 'node-2',
       type: 'exploration',
-      title: isPrimary ? 'Paso 2: Construyendo el concepto' : 'Paso 2: Construyendo desde lo concreto',
+      title: isPrimary ? 'Paso 2: Profundizando' : 'Paso 2: Verificando comprensión',
       teacherDialogue: isPrimary
-        ? `¡Excelente, ${student.name}! Lo que acabas de decir es un gran comienzo. Ahora te voy a compartir el primer pilar del tema y luego reflexionamos juntos. Recuerda: nadie nace sabiendo, todos aprendemos paso a paso.`
-        : `Excelente punto de partida. Te comparto el primer concepto fundamental de "${theme}". Léelo con calma y luego me cuentas con tus palabras qué entendiste. Si algo no queda claro, es señal de que vamos bien: las preguntas son el camino del aprendizaje.`,
+        ? `¡Muy bien, ${student.name}! Ahora te comparto un segundo dato importante sobre "${theme}". Es como una pieza más del rompecabezas:`
+        : `Excelente reflexión. Ahora te presento un segundo concepto que profundiza en "${theme}". Aquí hay una conexión clave que debes considerar:`,
+      conceptContent: conceptContent.secondary,
       guidingQuestion: isPrimary
-        ? 'Con esta nueva información: ¿podrías decirme en una frase qué acabas de aprender?'
-        : 'Reformula con tus propias palabras: ¿cuál es la idea central que acabas de descubrir?',
-      placeholder: isPrimary ? 'Cuéntame con tus palabras...' : 'Reformula la idea principal...',
+        ? '¿Puedes explicarme con tus palabras qué dice este segundo concepto? ¿Tiene que ver con lo que leíste antes?'
+        : 'Explica con tus propias palabras: ¿Cómo se relaciona este segundo concepto con el primero? ¿Qué nueva comprensión agrega?',
+      placeholder: isPrimary ? 'Cuéntame con tus palabras...' : 'Conecta ambos conceptos...',
       socraticHints: [
-        isPrimary ? '💡 Pista: Imagina que se lo explicas a tu mascota o peluche.' : '💡 Pista 1: Usa un ejemplo de tu vida diaria para ilustrar el concepto.',
-        isPrimary ? '💡 Pista: La idea más simple suele ser la más poderosa.' : '💡 Pista 2: ¿Qué pasaría en el mundo si esto no existiera?',
-        isPrimary ? '💡 Pista: Si tuvieras que dibujar lo aprendido, ¿qué dibujarías?' : '💡 Pista 3: Conecta esta idea con algo que estudiaste el año pasado.',
+        isPrimary ? '💡 Pista: ¿En qué se parece o diferencia del primer concepto?' : '💡 Pista 1: Usa la analogía del texto para explicar.',
+        isPrimary ? '💡 Pista: ¿Puedes inventar un ejemplo propio?' : '💡 Pista 2: ¿Qué pasaría si este concepto no existiera?',
+        isPrimary ? '💡 Pista: Tu ejemplo puede ser de tu casa, escuela o barrio.' : '💡 Pista 3: Aplica a un problema real que te importe.',
       ],
     },
     {
@@ -73,11 +158,11 @@ export const InteractiveLessonView: React.FC<InteractiveLessonViewProps> = ({ te
       type: 'synthesis',
       title: isPrimary ? 'Paso 3: Conectando ideas' : 'Paso 3: Sintetizando tu aprendizaje',
       teacherDialogue: isPrimary
-        ? `¡Lo estás haciendo increíble! Ahora vamos a dar el siguiente salto: conectar lo que sabes con algo nuevo. Cada idea que construyes es como un bloque de Lego: ahora vamos a unirlo con otro bloque.`
-        : `Vas muy bien, ${student.name}. Ahora viene la parte más interesante: la síntesis. Vamos a tomar lo que ya construiste y elevarlo un nivel. La síntesis es donde el conocimiento deja de ser información y se convierte en comprensión profunda.`,
+        ? `¡Lo estás haciendo increíble! Ahora vamos a dar el siguiente salto: conectar lo que sabes con algo nuevo. Cada idea que construyes es como un bloque de Lego:`
+        : `Vas muy bien, ${student.name}. Ahora viene la parte más interesante: la síntesis. Vamos a tomar los dos conceptos que aprendiste y elevarlos un nivel. La síntesis es donde el conocimiento deja de ser información y se convierte en comprensión profunda.`,
       guidingQuestion: isPrimary
-        ? '¿Cómo se conecta lo que aprendiste con algo que ya conocías antes?'
-        : 'Elabora una conexión: ¿de qué manera este nuevo saber se relaciona con un concepto previo o una experiencia real?',
+        ? '¿Cómo se conectan los dos conceptos que aprendiste? ¿Puedes inventar un ejemplo tuyo que los use juntos?'
+        : 'Elabora una conexión: ¿De qué manera estos conceptos se relacionan entre sí? ¿Puedes proponer un ejemplo original que integre ambos?',
       placeholder: isPrimary ? 'Describe la conexión que encontraste...' : 'Desarrolla la conexión entre conceptos...',
       socraticHints: [
         isPrimary ? '💡 Pista: Piensa en una historia: ¿qué pasó antes y qué pasa ahora?' : '💡 Pista 1: Usa analogías: "es como cuando..." o "se parece a..."',
@@ -90,11 +175,11 @@ export const InteractiveLessonView: React.FC<InteractiveLessonViewProps> = ({ te
       type: 'creation',
       title: isPrimary ? 'Paso Final: ¡Tu creación magistral!' : 'Reto Final: Creación y transferencia',
       teacherDialogue: isPrimary
-        ? `¡Increíble viaje, ${student.name}! Has llegado al nivel más alto: la creación. Aquí es donde demuestras que realmente ENTENDISTE, no memorizaste. Crea algo tuyo: una historia, un dibujo descrito, una canción, lo que tu imaginación te dicte. ¡Este es tu momento de brillar!`
-        : `Has llegado a la cúspide del aprendizaje, ${student.name}: la CREACIÓN. Si puedes crear algo nuevo a partir de lo aprendido, realmente lo comprendiste. Demuéstralo: genera una explicación original, un ejemplo propio o una aplicación que no hayamos discutido. Tu pensamiento crítico es tu mayor logro.`,
+        ? `¡Increíble viaje, ${student.name}! Has llegado al nivel más alto: la creación. Aquí es donde demuestras que realmente ENTENDISTE, no memorizaste. Crea algo tuyo basado en los conceptos que aprendiste:`
+        : `Has llegado a la cúspide del aprendizaje, ${student.name}: la CREACIÓN. Si puedes crear algo nuevo a partir de lo aprendido, realmente lo comprendiste. Demuéstralo: genera una explicación original, un ejemplo propio o una aplicación que no hayamos discutido.`,
       guidingQuestion: isPrimary
-        ? 'Crea algo tuyo basado en lo aprendido: una historia, un dibujo, una canción o una explicación para alguien más.'
-        : 'Genera una explicación original, ejemplo propio o aplicación práctica que demuestre que dominas el concepto.',
+        ? 'Crea algo tuyo basado en los conceptos aprendidos: una historia, un dibujo descrito, una canción o una explicación para alguien más.'
+        : 'Genera una explicación original, ejemplo propio o aplicación práctica que demuestre que dominas los conceptos presentados.',
       placeholder: isPrimary ? '¡Crea tu obra maestra aquí!' : 'Desarrolla tu creación original...',
       socraticHints: [
         isPrimary ? '💡 Pista: Usa tus palabras, tu estilo, tu mundo.' : '💡 Pista 1: La verdadera comprensión se nota cuando puedes enseñar a otros.',
@@ -146,30 +231,25 @@ export const InteractiveLessonView: React.FC<InteractiveLessonViewProps> = ({ te
       return;
     }
 
-    // SOCRATIC PEDAGOGY: There are no "wrong" answers. Every attempt is celebrated
-    // and used as a springboard for deeper construction.
     const studentInput = (selectedOption || textAnswer).trim();
     const inputLength = studentInput.length;
-
-    // Validate based on cognitive engagement, not exact wording
-    const isEngaged = inputLength >= 5; // Minimum effort
+    const isEngaged = inputLength >= 5;
 
     if (isEngaged) {
       setCompletedNodes((prev) => new Set(prev).add(currentNodeIndex));
       const celebrations = [
-        `¡Excelente, ${student.name}! Tu aporte es valioso y demuestra que estás pensando. Sigamos construyendo.`,
-        `¡Maravillosa reflexión! Cada palabra que compartes construye tu conocimiento. Avancemos al siguiente nivel.`,
-        `¡Brillante! Estás demostrando verdadera comprensión. Esto no es memorización, es construcción de pensamiento.`,
+        `¡Excelente, ${student.name}! Tu aporte demuestra que estás pensando activamente. Sigamos construyendo.`,
+        `¡Maravillosa reflexión! Cada palabra que compartes construye tu conocimiento genuino. Avancemos.`,
+        `¡Brillante! Estás demostrando verdadera comprensión. Esto no es memorización: es construcción de pensamiento.`,
         `¡Impecable, ${student.name}! Tu razonamiento es sólido. La curiosidad es el motor del aprendizaje.`,
-        `¡Qué alegría ver tu dedicación! Lo que acabas de compartir revela comprensión genuina. Continuemos.`,
+        `¡Qué alegría ver tu dedicación! Lo que acabas de compartir revela comprensión profunda. Continuemos.`,
       ];
       celebrateAndContinue(celebrations[Math.floor(Math.random() * celebrations.length)]);
     } else {
-      // The response is too short; this is not "wrong" but an invitation to deepen.
       guideWithHints(
         isPrimary
-          ? `¡Buen comienzo! ${teacher.name} cree que puedes explayarte un poquito más. Cuéntame con más detalle: ¿qué más piensas o sientes sobre esto?`
-          : `${student.name}, tu intuición es un excelente punto de partida. Te invito a profundizar: amplía tu idea con un ejemplo o justificación. Si lo necesitas, activa las 💡 pistas socráticas.`
+          ? `¡Buen comienzo! ${teacher.name} cree que puedes explayarte un poquito más. Cuéntame con más detalle.`
+          : `${student.name}, tu intuición es un excelente punto de partida. Amplía tu idea con un ejemplo o justificación.`
       );
     }
   };
@@ -177,7 +257,6 @@ export const InteractiveLessonView: React.FC<InteractiveLessonViewProps> = ({ te
   const handleNextLevel = () => {
     setFeedback('idle');
     setSelectedOption(null);
-    setTextAnswer('');
     setTextAnswer('');
     setShowHint(false);
     setAiMessage('');
@@ -189,7 +268,6 @@ export const InteractiveLessonView: React.FC<InteractiveLessonViewProps> = ({ te
     setShowHint(true);
   };
 
-  // Stop voice when component unmounts
   useEffect(() => {
     return () => {
       if ('speechSynthesis' in window) window.speechSynthesis.cancel();
@@ -244,6 +322,17 @@ export const InteractiveLessonView: React.FC<InteractiveLessonViewProps> = ({ te
           {completedNodes.size}/{LESSON_NODES.length}
         </span>
       </div>
+
+      {/* CONCEPTO TEÓRICO (solo en Paso 1 y 2) */}
+      {currentNode.conceptContent && (
+        <div className="p-5 rounded-2xl bg-indigo-950/30 border border-indigo-500/30 space-y-2 animate-fade-in">
+          <div className="flex items-center gap-2 text-xs font-bold text-indigo-300 mb-2">
+            <BookOpen className="w-4 h-4" />
+            {currentNodeIndex === 0 ? '📖 Concepto fundamental' : '📖 Profundización'}
+          </div>
+          <p className="text-sm text-slate-200 leading-relaxed">{currentNode.conceptContent}</p>
+        </div>
+      )}
 
       {/* ÁREA DEL PROFESOR Y DIÁLOGO */}
       <div className="flex items-start gap-4 sm:gap-6">
