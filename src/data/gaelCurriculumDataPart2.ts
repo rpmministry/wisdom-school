@@ -51,7 +51,7 @@ export const GAEL_PE_UNITS: CurriculumUnit[] = [
         dynamicActivity: 'El Detective del Pulso: Gael aprende a tomarse el pulso en el cuello. Corre en el sitio por 1 minuto y compara latidos en reposo vs. en actividad.',
         verifiedResource: { title: 'GoNoodle: Maximo (Heart Rate)', url: 'https://www.gonoodle.com/', platform: 'GoNoodle' },
         classId: 'class-pe-gael-01',
-        status: 'completed',
+        status: 'upcoming',
       },
       {
         id: 'pe-g-02',
@@ -63,7 +63,7 @@ export const GAEL_PE_UNITS: CurriculumUnit[] = [
         dynamicActivity: 'El Robot Oxidado: Realizar movilidad articular cefalocaudal (cabeza a pies). Gael debe moverse primero "congelado" y luego fluido tras "ponerse aceite".',
         verifiedResource: { title: 'Pino Profesor: Rutina para Niños', url: 'https://www.youtube.com/', platform: 'YouTube' },
         classId: 'class-pe-gael-02',
-        status: 'completed',
+        status: 'upcoming',
       },
       {
         id: 'pe-g-03',
@@ -264,7 +264,7 @@ export const GAEL_SOC_UNITS: CurriculumUnit[] = [
         dynamicActivity: 'Explorador espacial: Usar Google Earth para "volar" desde la Amazonía al centro de Quito.',
         verifiedResource: { title: 'Google Earth (Web)', url: 'https://earth.google.com/web/', platform: 'Google Earth' },
         classId: 'class-soc-gael-01',
-        status: 'completed',
+        status: 'upcoming',
       },
       {
         id: 'soc-g-02',
@@ -276,7 +276,7 @@ export const GAEL_SOC_UNITS: CurriculumUnit[] = [
         dynamicActivity: 'Lluvia de necesidades: Dinámica de post-its. Gael lista lo que la gente necesitará (hospitales, escuelas, parques).',
         verifiedResource: { title: 'PBS Kids: City Creator', url: 'https://pbskids.org/', platform: 'PBS Kids' },
         classId: 'class-soc-gael-02',
-        status: 'completed',
+        status: 'upcoming',
       },
       {
         id: 'soc-g-03',
@@ -288,7 +288,7 @@ export const GAEL_SOC_UNITS: CurriculumUnit[] = [
         dynamicActivity: 'Zonificación: Usar un mapa de cuadrícula en blanco para ubicar zonas residenciales e industriales.',
         verifiedResource: { title: 'National Geographic: MapMaker', url: 'https://mapmaker.nationalgeographic.org/', platform: 'NatGeo' },
         classId: 'class-soc-gael-03',
-        status: 'completed',
+        status: 'upcoming',
       },
       {
         id: 'soc-g-04',

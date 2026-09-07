@@ -57,7 +57,7 @@ export const AVRIL_ECA_UNITS: CurriculumUnit[] = [
         dynamicActivity: 'Creación física de la bitácora personal. Indagación libre sobre la definición de arte.',
         verifiedResource: { title: 'Google Arts: Art Camera', url: 'https://artsandculture.google.com', platform: 'Google Arts' },
         classId: 'class-eca-avril-01',
-        status: 'completed',
+        status: 'upcoming',
       },
       {
         id: 'eca-a-02',
@@ -69,7 +69,7 @@ export const AVRIL_ECA_UNITS: CurriculumUnit[] = [
         dynamicActivity: 'Bocetado experimental del propio rostro usando proporciones áureas simples.',
         verifiedResource: { title: 'Smarthistory: El Canon y las Proporciones', url: 'https://smarthistory.org', platform: 'Smarthistory' },
         classId: 'class-eca-avril-02',
-        status: 'completed',
+        status: 'upcoming',
       },
       {
         id: 'eca-a-03',
@@ -426,7 +426,7 @@ export const AVRIL_PE_UNITS: CurriculumUnit[] = [
         dynamicActivity: 'Tomar el pulso en reposo, tras 1 min de caminata y tras 1 min de saltos. Crear un gráfico simple de la experiencia.',
         verifiedResource: { title: 'KidsHealth: Easy Exercises and Heart Rate', url: 'https://kidshealth.org/es/teens/easy-exercises.html', platform: 'KidsHealth' },
         classId: 'class-pe-avril-01',
-        status: 'completed',
+        status: 'upcoming',
       },
       {
         id: 'pe-a-02',
@@ -438,7 +438,7 @@ export const AVRIL_PE_UNITS: CurriculumUnit[] = [
         dynamicActivity: 'Prueba de plancha isométrica corta respirando normalmente vs. respiración superficial. Reflexionar sobre la fatiga.',
         verifiedResource: { title: 'Tu Canal de Salud: Respiración y Músculos', url: 'https://www.tucanaldesalud.es', platform: 'Tu Canal de Salud' },
         classId: 'class-pe-avril-02',
-        status: 'completed',
+        status: 'upcoming',
       },
       {
         id: 'pe-a-03',
@@ -723,7 +723,7 @@ export const AVRIL_SOC_UNITS: CurriculumUnit[] = [
         dynamicActivity: 'Avril explorará el mapa interactivo del Big History Project para comprimir el tiempo cósmico y ubicar la aparición humana.',
         verifiedResource: { title: 'Big History Project: Timeline', url: 'https://www.bighistoryproject.com', platform: 'Big History Project' },
         classId: 'class-soc-avril-01',
-        status: 'completed',
+        status: 'upcoming',
       },
       {
         id: 'soc-a-02',
@@ -735,7 +735,7 @@ export const AVRIL_SOC_UNITS: CurriculumUnit[] = [
         dynamicActivity: 'Recorrido virtual 3D por la sala de orígenes humanos del Instituto Smithsonian para comparar cráneos homínidos.',
         verifiedResource: { title: 'Smithsonian 3D: Human Origins', url: 'https://humanorigins.si.edu/3d-collection', platform: 'Smithsonian 3D' },
         classId: 'class-soc-avril-02',
-        status: 'completed',
+        status: 'upcoming',
       },
       {
         id: 'soc-a-03',

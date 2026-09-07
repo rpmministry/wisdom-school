@@ -120,8 +120,8 @@ export function createNewStudentProfile(input: NewStudentInput): {
       ...sub,
       id: subId,
       studentId: studentId,
-      progressPercentage: 5,
-      classesCompleted: 1,
+      progressPercentage: 0,
+      classesCompleted: 0,
     };
   });
 

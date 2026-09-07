@@ -38,13 +38,13 @@ export const ScheduleView: React.FC = () => {
   const [activeSubTab, setActiveSubTab] = useState<'horario' | 'cronograma' | 'proyectos'>('horario');
   const [selectedDay, setSelectedDay] = useState<'Todos' | 'Lunes' | 'Martes' | 'Miércoles' | 'Jueves' | 'Viernes'>('Todos');
 
-  const scheduleDays: { day: 'Lunes' | 'Martes' | 'Miércoles' | 'Jueves' | 'Viernes'; date: string; isRepaso?: boolean; isStart?: boolean }[] = [
-    { day: 'Martes', date: '01 Sep', isRepaso: true },
-    { day: 'Miércoles', date: '02 Sep', isRepaso: true },
-    { day: 'Jueves', date: '03 Sep', isRepaso: true },
-    { day: 'Viernes', date: '04 Sep', isRepaso: true },
-    { day: 'Lunes', date: '07 Sep', isStart: true },
-  ];
+const scheduleDays: { day: 'Lunes' | 'Martes' | 'Miércoles' | 'Jueves' | 'Viernes'; date: string; isRepaso?: boolean; isStart?: boolean }[] = [
+     { day: 'Lunes', date: '07 Sep', isStart: true },
+     { day: 'Martes', date: '08 Sep', isRepaso: false },
+     { day: 'Miércoles', date: '09 Sep', isRepaso: false },
+     { day: 'Jueves', date: '10 Sep', isRepaso: false },
+     { day: 'Viernes', date: '11 Sep', isRepaso: false },
+   ];
 
   const plan = currentStudent.academicPlan;
   const scheduleSlots = currentStudent.id === 'avril' ? AVRIL_SCHEDULE_SLOTS : GAEL_SCHEDULE_SLOTS;
@@ -228,33 +228,31 @@ export const ScheduleView: React.FC = () => {
                     <thead>
                       <tr className="bg-slate-800/90 border-b border-slate-700 text-xs font-extrabold uppercase text-slate-300">
                         <th className="py-3.5 px-4 text-slate-400 w-32 border-r border-slate-700/60">Hora</th>
-                        <th className="py-3.5 px-4 border-r border-slate-700/60">
-                          <div>Martes</div>
-                          <div className="text-[10px] text-slate-400 font-normal font-mono normal-case">01 Sep</div>
-                          <div className="text-[9px] px-1 rounded bg-emerald-500/20 text-emerald-300 font-bold">REPASO</div>
-                        </th>
-                        <th className="py-3.5 px-4 border-r border-slate-700/60">
-                          <div>Miércoles</div>
-                          <div className="text-[10px] text-slate-400 font-normal font-mono normal-case">02 Sep</div>
-                          <div className="text-[9px] px-1 rounded bg-emerald-500/20 text-emerald-300 font-bold">REPASO</div>
-                        </th>
-                        <th className="py-3.5 px-4 border-r border-slate-700/60">
-                          <div>Jueves</div>
-                          <div className="text-[10px] text-slate-400 font-normal font-mono normal-case">03 Sep</div>
-                          <div className="text-[9px] px-1 rounded bg-emerald-500/20 text-emerald-300 font-bold">REPASO</div>
-                        </th>
-                        <th className="py-3.5 px-4 border-r border-slate-700/60">
-                          <div>Viernes</div>
-                          <div className="text-[10px] text-slate-400 font-normal font-mono normal-case">04 Sep</div>
-                          <div className="text-[9px] px-1 rounded bg-emerald-500/20 text-emerald-300 font-bold">REPASO</div>
-                        </th>
-                        <th className="py-3.5 px-4 border-r border-slate-700/60 bg-indigo-950/40">
-                          <div className="flex items-center gap-1 text-indigo-300">
-                            <span>Lunes</span>
-                            <span className="text-[9px] px-1 rounded bg-emerald-500/20 text-emerald-300 font-bold">PRIMER DÍA</span>
-                          </div>
-                          <div className="text-[10px] text-indigo-200 font-normal font-mono normal-case">07 Sep 2026</div>
-                        </th>
+<th className="py-3.5 px-4 border-r border-slate-700/60">
+                           <div className="flex items-center gap-1 text-indigo-300">
+                             <span>Lunes</span>
+                             <span className="text-[9px] px-1 rounded bg-emerald-500/20 text-emerald-300 font-bold">PRIMER DÍA</span>
+                           </div>
+                           <div className="text-[10px] text-indigo-200 font-normal font-mono normal-case">07 Sep 2026</div>
+                         </th>
+                         <th className="py-3.5 px-4 border-r border-slate-700/60">
+                           <div>Martes</div>
+                           <div className="text-[10px] text-slate-400 font-normal font-mono normal-case">08 Sep</div>
+                         </th>
+                         <th className="py-3.5 px-4 border-r border-slate-700/60">
+                           <div>Miércoles</div>
+                           <div className="text-[10px] text-slate-400 font-normal font-mono normal-case">09 Sep</div>
+                         </th>
+                         <th className="py-3.5 px-4 border-r border-slate-700/60">
+                           <div>Jueves</div>
+                           <div className="text-[10px] text-slate-400 font-normal font-mono normal-case">10 Sep</div>
+                         </th>
+                         <th className="py-3.5 px-4">
+                           <div className="flex items-center gap-1 text-amber-300">
+                             <span>Viernes</span>
+                           </div>
+                           <div className="text-[10px] text-amber-200 font-normal font-mono normal-case">11 Sep 2026</div>
+                         </th>
                       </tr>
                     </thead>
                 <tbody className="divide-y divide-slate-800 text-xs">
@@ -329,52 +327,65 @@ export const ScheduleView: React.FC = () => {
                   <span className="text-xs uppercase font-extrabold text-indigo-300 tracking-wider">Horario de</span>
                   <h3 className="text-lg font-bold text-white">{selectedDay}</h3>
                 </div>
-                {selectedDay === 'Martes' && (
-                  <span className="text-xs font-bold px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                    PRIMER DÍA DE CLASES (01 SEP 2026)
-                  </span>
-                )}
-                {selectedDay === 'Viernes' && (
-                  <span className="text-xs font-bold px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                    JORNADA DE HOY
-                  </span>
-                )}
+{selectedDay === 'Lunes' && (
+                   <span className="text-xs font-bold px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1.5">
+                     <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                     PRIMER DÍA DE CLASES (07 SEP 2026)
+                   </span>
+                 )}
+                 {selectedDay === 'Viernes' && (
+                   <span className="text-xs font-bold px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                     JORNADA DE HOY
+                   </span>
+                 )}
               </div>
 
-              {studentSchedule
-                .filter((s) => s.dayOfWeek === selectedDay)
-                .map((entry) => (
-                  <div
-                    key={entry.id}
-                    onClick={() => !entry.isRecess && handleOpenClass(entry.classId, entry.subjectId)}
-                    className={`p-4 rounded-2xl border transition-all ${
-                      entry.isRecess
-                        ? 'bg-amber-950/20 border-amber-500/30 text-amber-300'
-                        : 'bg-slate-800/80 border-slate-700 hover:border-indigo-500/50 cursor-pointer shadow-sm group'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="flex items-center gap-1.5 text-slate-400 font-mono font-medium">
-                        <Clock className="w-3.5 h-3.5 text-indigo-400" />
-                        {entry.startTime} - {entry.endTime}
-                      </span>
-                      {entry.classId && (
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                          Clase Activa
-                        </span>
-                      )}
-                    </div>
-                    <div className="mt-2 flex items-center justify-between">
-                      <h4 className="text-sm font-bold text-white group-hover:text-indigo-300 transition-colors">
-                        {entry.subjectName}
-                      </h4>
-                      {!entry.isRecess && (
-                        <ArrowRight className="w-4 h-4 text-slate-500 group-hover:text-indigo-400 group-hover:translate-x-1 transition-all" />
-                      )}
-                    </div>
-                  </div>
-                ))}
+{(studentSchedule.filter((s) => s.dayOfWeek === selectedDay).length > 0
+                 ? studentSchedule.filter((s) => s.dayOfWeek === selectedDay)
+                 : todayClasses.map((cls) => ({
+                     id: cls.id,
+                     studentId: cls.studentId,
+                     subjectId: cls.subjectId,
+                     subjectName: studentSubjects.find((s) => s.id === cls.subjectId)?.name || '',
+                     dayOfWeek: cls.dayOfWeek,
+                     startTime: cls.scheduleTime?.split(' - ')[0] || '08:00',
+                     endTime: cls.scheduleTime?.split(' - ')[1]?.split(' ')[0] || '09:30',
+                     color: 'indigo',
+                     iconName: 'BookOpen',
+                     classId: cls.id,
+                     isRecess: false,
+                   }))
+                ).map((entry) => (
+                   <div
+                     key={entry.id}
+                     onClick={() => !entry.isRecess && handleOpenClass(entry.classId, entry.subjectId)}
+                     className={`p-4 rounded-2xl border transition-all ${
+                       entry.isRecess
+                         ? 'bg-amber-950/20 border-amber-500/30 text-amber-300'
+                         : 'bg-slate-800/80 border-slate-700 hover:border-indigo-500/50 cursor-pointer shadow-sm group'
+                     }`}
+                   >
+                     <div className="flex items-center justify-between text-xs">
+                       <span className="flex items-center gap-1.5 text-slate-400 font-mono font-medium">
+                         <Clock className="w-3.5 h-3.5 text-indigo-400" />
+                         {entry.startTime} - {entry.endTime}
+                       </span>
+                       {entry.classId && (
+                         <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                           Clase Activa
+                         </span>
+                       )}
+                     </div>
+                     <div className="mt-2 flex items-center justify-between">
+                       <h4 className="text-sm font-bold text-white group-hover:text-indigo-300 transition-colors">
+                         {entry.subjectName}
+                       </h4>
+                       {!entry.isRecess && (
+                         <ArrowRight className="w-4 h-4 text-slate-500 group-hover:text-indigo-400 group-hover:translate-x-1 transition-all" />
+                       )}
+                     </div>
+                   </div>
+                 ))}
             </div>
           )}
 

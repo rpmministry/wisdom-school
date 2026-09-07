@@ -69,40 +69,46 @@ interface SchoolContextType {
 
 const SchoolContext = createContext<SchoolContextType | undefined>(undefined);
 
+const SCHOOL_START_DATE = new Date('2026-09-07T00:00:00');
+const SCHOOL_START_DAY = 'Lunes'; // 7 de septiembre de 2026 es Lunes
+
 const getInitialDayOfWeek = (): DayOfWeekName => {
-  const dayIndex = new Date().getDay();
-  const map: Record<number, DayOfWeekName> = {
-    1: 'Lunes',
-    2: 'Martes',
-    3: 'Miércoles',
-    4: 'Jueves',
-    5: 'Viernes',
-  };
-  return map[dayIndex] || 'Martes';
+  // Iniciar siempre en Lunes para el inicio de clases (7 sep 2026)
+  // Si aún no ha empezado el colegio, también mostrar Lunes
+  return SCHOOL_START_DAY;
+};
+
+const isBeforeSchoolStart = (): boolean => new Date() < SCHOOL_START_DATE;
+
+const daysSinceStart = (): number => {
+  const today = new Date();
+  const todayDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const startTime = SCHOOL_START_DATE.getTime();
+  return Math.ceil((todayDate.getTime() - startTime) / (1000 * 60 * 60 * 24));
+};
+
+const getCurrentSchoolDay = (): DayOfWeekName => {
+  const offset = daysSinceStart();
+  if (offset < 0) return SCHOOL_START_DAY; // Empezar en Lunes antes del inicio
+  const schoolDays: DayOfWeekName[] = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
+  const dayIndex = (offset % 5 + 5) % 5;
+  return schoolDays[dayIndex];
 };
 
 export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Paso 1: Limpiar localStorage de sesiones de prueba persistidas previamente.
   useEffect(() => {
     try {
       const demoStudentIds = ['karen', 'mauricio'];
-      const authSaved = localStorage.getItem('wisdom_auth_student_id_v3');
-      const currentSaved = localStorage.getItem('wisdom_current_student_id_v3');
-      if (authSaved && demoStudentIds.includes(authSaved)) {
-        localStorage.removeItem('wisdom_auth_student_id_v3');
-      }
-      if (currentSaved && demoStudentIds.includes(currentSaved)) {
-        localStorage.removeItem('wisdom_current_student_id_v3');
-      }
-    } catch {
-      // ignore
-    }
+      const authSaved = localStorage.getItem('wisdom_auth_v2026');
+      const currentSaved = localStorage.getItem('wisdom_current_v2026');
+      if (authSaved && demoStudentIds.includes(authSaved)) localStorage.removeItem('wisdom_auth_v2026');
+      if (currentSaved && demoStudentIds.includes(currentSaved)) localStorage.removeItem('wisdom_current_v2026');
+    } catch { }
   }, []);
 
-  // Paso 1: persistimos la lista de estudiantes para que las credenciales y perfiles queden disponibles aunque se recargue la app.
   const [studentsList, setStudentsList] = useState<Student[]>(() => {
     try {
-      const saved = localStorage.getItem('wisdom_students_list_v4');
+      const saved = localStorage.getItem('wisdom_students_v2026');
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
@@ -112,61 +118,47 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           }).concat(parsed.filter((p: Student) => !STUDENTS_DATA.some((b) => b.id === p.id)));
         }
       }
-    } catch (e) {
-      console.warn('Error reading stored students list:', e);
-    }
+    } catch (e) { }
     return STUDENTS_DATA;
   });
 
-  // Paso 2: guardamos quién ha iniciado sesión para que el sistema recuerde al alumno autenticado y muestre su espacio privado.
-  // Los estudiantes de prueba (karen, mauricio) NO deben persistir su sessión.
   const [authenticatedStudentId, setAuthenticatedStudentId] = useState<StudentId | null>(() => {
     try {
-      const saved = localStorage.getItem('wisdom_auth_student_id_v3');
+      const saved = localStorage.getItem('wisdom_auth_v2026');
       if (saved && saved !== 'null' && saved !== '') {
-        // No persistir estudiantes de prueba
         const demoStudentIds = ['karen', 'mauricio'];
-        if (!demoStudentIds.includes(saved)) {
-          return saved;
-        }
+        if (!demoStudentIds.includes(saved)) return saved;
       }
-    } catch {
-      // fallback
-    }
-    // No student authenticated by default - user must log in
+    } catch { }
     return null;
   });
 
   const [currentStudentId, setCurrentStudentId] = useState<StudentId | null>(() => {
     try {
-      const saved = localStorage.getItem('wisdom_current_student_id_v3');
+      const saved = localStorage.getItem('wisdom_current_v2026');
       if (saved && saved !== 'null' && saved !== '') {
         const demoStudentIds = ['karen', 'mauricio'];
-        if (!demoStudentIds.includes(saved)) {
-          return saved;
-        }
+        if (!demoStudentIds.includes(saved)) return saved;
       }
-    } catch {
-      // fallback
-    }
+    } catch { }
     return null;
   });
 
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
   const [targetLoginStudentId, setTargetLoginStudentId] = useState<string | undefined>(undefined);
 
-  const openAuthModal = (studentId?: string) => {
-    setTargetLoginStudentId(studentId);
-    setIsAuthModalOpen(true);
-  };
+  const openAuthModal = (studentId?: string) => { setTargetLoginStudentId(studentId); setIsAuthModalOpen(true); };
+  const closeAuthModal = () => { setIsAuthModalOpen(false); setTargetLoginStudentId(undefined); };
 
-  const closeAuthModal = () => {
-    setIsAuthModalOpen(false);
-    setTargetLoginStudentId(undefined);
-  };
-
-  // Paso 3: definimos los estados globales de navegación, calendario y sesiones del estudiante dentro del ecosistema escolar.
   const [selectedDayOfWeek, setSelectedDayOfWeek] = useState<DayOfWeekName>(getInitialDayOfWeek);
+
+  // Auto-update selectedDayOfWeek to current school day (but allow manual override)
+  useEffect(() => {
+    if (!isBeforeSchoolStart()) {
+      const currentSchoolDay = getCurrentSchoolDay();
+      setSelectedDayOfWeek(currentSchoolDay);
+    }
+  }, []);
   const [activeTab, setActiveTab] = useState<NavigationTab>('home');
   const [navigationHistory, setNavigationHistory] = useState<NavigationTab[]>([]);
   const [activeSubject, setActiveSubject] = useState<Subject | null>(null);
@@ -177,53 +169,38 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setNavigationHistory((prev) => {
       if (prev.length === 0) return prev;
       const newHistory = prev.slice(0, -1);
-      const previousTab = prev[prev.length - 1];
-      setActiveTab(previousTab);
+      setActiveTab(prev[prev.length - 1]);
       return newHistory;
     });
   };
 
-  const navigateToHome = () => {
-    setNavigationHistory([]);
-    setActiveTab('home');
-  };
+  const navigateToHome = () => { setNavigationHistory([]); setActiveTab('home'); };
 
-  // Dynamic subjects state
   const [allSubjects, setAllSubjects] = useState<Subject[]>(() => {
     try {
-      const saved = localStorage.getItem('wisdom_subjects_list_v3');
+      const saved = localStorage.getItem('wisdom_subjects_v2026');
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length >= SUBJECTS_DATA.length) {
-          return parsed;
-        }
+        if (Array.isArray(parsed) && parsed.length >= SUBJECTS_DATA.length) return parsed;
       }
-    } catch (e) {
-      console.warn('Error reading subjects storage:', e);
-    }
+    } catch (e) { }
     return SUBJECTS_DATA;
   });
 
-  // Dynamic schedule entries state
   const [allSchedules, setAllSchedules] = useState<ScheduleEntry[]>(() => {
     try {
-      const saved = localStorage.getItem('wisdom_schedules_list_v3');
+      const saved = localStorage.getItem('wisdom_schedules_v2026');
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length >= SCHEDULE_DATA.length) {
-          return parsed;
-        }
+        if (Array.isArray(parsed) && parsed.length >= SCHEDULE_DATA.length) return parsed;
       }
-    } catch (e) {
-      console.warn('Error reading schedules storage:', e);
-    }
+    } catch (e) { }
     return SCHEDULE_DATA;
   });
 
-  // Daily Classes List
   const [classesList, setClassesList] = useState<DailyClass[]>(() => {
     try {
-      const saved = localStorage.getItem('wisdom_classes_v11');
+      const saved = localStorage.getItem('wisdom_classes_v2026');
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length >= DAILY_CLASSES_DATA.length) {
@@ -243,274 +220,128 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           }).concat(parsed.filter((p: DailyClass) => !DAILY_CLASSES_DATA.some((b) => b.id === p.id)));
         }
       }
-    } catch (e) {
-      console.warn('Error reading stored classes:', e);
-    }
+    } catch (e) { }
     return DAILY_CLASSES_DATA;
   });
 
   const [submissions, setSubmissions] = useState<StudentSubmission[]>(() => {
     try {
-      const saved = localStorage.getItem('wisdom_submissions_v10');
+      const saved = localStorage.getItem('wisdom_submissions_v2026');
       return saved ? JSON.parse(saved) : INITIAL_SUBMISSIONS;
-    } catch {
-      return INITIAL_SUBMISSIONS;
-    }
+    } catch { return INITIAL_SUBMISSIONS; }
   });
 
   const [customAvatars, setCustomAvatars] = useState<Record<StudentId, string>>(() => {
     try {
-      const saved = localStorage.getItem('wisdom_student_avatars_v3');
+      const saved = localStorage.getItem('wisdom_avatars_v2026');
       return saved ? JSON.parse(saved) : {};
-    } catch {
-      return {};
-    }
+    } catch { return {}; }
   });
 
-  // Persistence Effects (exclude demo students from persistence)
+  useEffect(() => { localStorage.setItem('wisdom_students_v2026', JSON.stringify(studentsList.filter(s => !s.isDemo))); }, [studentsList]);
+  
   useEffect(() => {
-    try {
-      const realStudents = studentsList.filter((s) => !s.isDemo);
-      localStorage.setItem('wisdom_students_list_v4', JSON.stringify(realStudents));
-    } catch (e) {
-      console.warn('Error writing students storage:', e);
-    }
-  }, [studentsList]);
-
-  useEffect(() => {
-    try {
-      const student = studentsList.find((s) => s.id === authenticatedStudentId);
-      if (student && !student.isDemo) {
-        localStorage.setItem('wisdom_auth_student_id_v3', authenticatedStudentId || 'null');
-      } else {
-        localStorage.removeItem('wisdom_auth_student_id_v3');
-      }
-    } catch (e) {
-      console.warn('Error writing auth student storage:', e);
-    }
+    const student = studentsList.find((s) => s.id === authenticatedStudentId);
+    if (student && !student.isDemo) localStorage.setItem('wisdom_auth_v2026', authenticatedStudentId || 'null');
+    else localStorage.removeItem('wisdom_auth_v2026');
   }, [authenticatedStudentId, studentsList]);
 
+  useEffect(() => { localStorage.setItem('wisdom_current_v2026', currentStudentId || 'null'); }, [currentStudentId]);
+  
   useEffect(() => {
-    try {
-      localStorage.setItem('wisdom_current_student_id_v3', currentStudentId || 'null');
-    } catch (e) {
-      console.warn('Error writing current student storage:', e);
-    }
-  }, [currentStudentId]);
-
-  // Sincronizar currentStudentId con authenticatedStudentId al montar o al cambiar auth.
-  useEffect(() => {
-    if (authenticatedStudentId && currentStudentId !== authenticatedStudentId) {
-      setCurrentStudentId(authenticatedStudentId);
-    } else if (!authenticatedStudentId && currentStudentId) {
-      setCurrentStudentId(null);
-    }
+    if (authenticatedStudentId && currentStudentId !== authenticatedStudentId) setCurrentStudentId(authenticatedStudentId);
+    else if (!authenticatedStudentId && currentStudentId) setCurrentStudentId(null);
   }, [authenticatedStudentId]);
 
-  useEffect(() => {
-    try {
-      localStorage.setItem('wisdom_subjects_list_v3', JSON.stringify(allSubjects));
-    } catch (e) {
-      console.warn('Error writing subjects storage:', e);
-    }
-  }, [allSubjects]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('wisdom_schedules_list_v3', JSON.stringify(allSchedules));
-    } catch (e) {
-      console.warn('Error writing schedules storage:', e);
-    }
-  }, [allSchedules]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('wisdom_classes_v11', JSON.stringify(classesList));
-    } catch (e) {
-      console.warn('Error writing classes storage:', e);
-    }
-  }, [classesList]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('wisdom_submissions_v10', JSON.stringify(submissions));
-    } catch (e) {
-      console.warn('Error writing submissions storage:', e);
-    }
-  }, [submissions]);
+  useEffect(() => { localStorage.setItem('wisdom_subjects_v2026', JSON.stringify(allSubjects)); }, [allSubjects]);
+  useEffect(() => { localStorage.setItem('wisdom_schedules_v2026', JSON.stringify(allSchedules)); }, [allSchedules]);
+  useEffect(() => { localStorage.setItem('wisdom_classes_v2026', JSON.stringify(classesList)); }, [classesList]);
+  useEffect(() => { localStorage.setItem('wisdom_submissions_v2026', JSON.stringify(submissions)); }, [submissions]);
 
   const updateStudentAvatar = (studentId: StudentId, avatarUrl: string) => {
     setCustomAvatars((prev) => {
       const updated = { ...prev, [studentId]: avatarUrl };
-      try {
-        localStorage.setItem('wisdom_student_avatars_v3', JSON.stringify(updated));
-      } catch (e) {
-        console.warn('Error writing avatar storage:', e);
-      }
+      localStorage.setItem('wisdom_avatars_v2026', JSON.stringify(updated));
       return updated;
     });
   };
 
-  // Paso 4: la autenticación valida correo, código PIN o identificador personal para entrar al espacio del estudiante.
   const loginStudent = (identifier: string, passOrPin: string) => {
     const cleanId = identifier.trim().toLowerCase();
     const cleanSecret = passOrPin.trim().toLowerCase();
-
-    const found = studentsList.find((s) => {
-      const matchEmail = s.email?.toLowerCase() === cleanId;
-      const matchPin = s.pinCode?.toLowerCase() === cleanId;
-      const matchId = s.id.toLowerCase() === cleanId;
-      const matchName = s.name?.toLowerCase() === cleanId;
-      return matchEmail || matchPin || matchId || matchName;
-    });
-
-    if (!found) {
-      return { success: false, error: 'No se encontró ningún estudiante con ese correo, código o usuario.' };
-    }
-
-    const validPass = (found.password && found.password.toLowerCase() === cleanSecret);
-    const validPin = (found.pinCode && found.pinCode.toLowerCase() === cleanSecret);
-    const validIdAsPin = (cleanId === found.pinCode?.toLowerCase() || cleanId === found.id.toLowerCase());
-
-    if (validPass || validPin || validIdAsPin) {
-      setAuthenticatedStudentId(found.id);
-      setCurrentStudentId(found.id);
+    const found = studentsList.find((s) => s.email?.toLowerCase() === cleanId || s.pinCode?.toLowerCase() === cleanId || s.id.toLowerCase() === cleanId || s.name?.toLowerCase() === cleanId);
+    if (!found) return { success: false, error: 'Estudiante no encontrado.' };
+    
+    if ((found.password?.toLowerCase() === cleanSecret) || (found.pinCode?.toLowerCase() === cleanSecret) || (cleanId === found.pinCode?.toLowerCase() || cleanId === found.id.toLowerCase())) {
+      setAuthenticatedStudentId(found.id); setCurrentStudentId(found.id);
       return { success: true, student: found };
     }
-
-    return { success: false, error: 'Contraseña o código PIN incorrecto. Revisa tus credenciales.' };
+    return { success: false, error: 'Credenciales incorrectas.' };
   };
 
-  // 🔑 PASSWORD MANAGEMENT
   const changePassword = (studentId: string, currentPass: string, newPass: string) => {
     const student = studentsList.find((s) => s.id === studentId);
     if (!student) return { success: false, error: 'Estudiante no encontrado.' };
-    
-    const validCurrent = student.password ? student.password.toLowerCase() === currentPass.toLowerCase() : false;
-    const validPinAsCurrent = student.pinCode ? student.pinCode.toLowerCase() === currentPass.toLowerCase() : false;
-    
-    if (!validCurrent && !validPinAsCurrent) {
-      return { success: false, error: 'La contraseña actual es incorrecta.' };
-    }
-    
-    if (newPass.trim().length < 4) {
-      return { success: false, error: 'La nueva contraseña debe tener al menos 4 caracteres.' };
-    }
-
-    setStudentsList((prev) =>
-      prev.map((s) => (s.id === studentId ? { ...s, password: newPass.trim() } : s))
-    );
+    if (!((student.password?.toLowerCase() === currentPass.toLowerCase()) || (student.pinCode?.toLowerCase() === currentPass.toLowerCase()))) return { success: false, error: 'Contraseña actual incorrecta.' };
+    if (newPass.trim().length < 4) return { success: false, error: 'Debe tener al menos 4 caracteres.' };
+    setStudentsList((prev) => prev.map((s) => (s.id === studentId ? { ...s, password: newPass.trim() } : s)));
     return { success: true };
   };
 
   const resetPasswordWithPin = (identifier: string, pin: string, newPass: string) => {
     const cleanId = identifier.trim().toLowerCase();
-    const cleanPin = pin.trim().toLowerCase();
-
-    const student = studentsList.find((s) => {
-      const matchEmail = s.email?.toLowerCase() === cleanId;
-      const matchId = s.id.toLowerCase() === cleanId;
-      return matchEmail || matchId;
-    });
-
-    if (!student) {
-      return { success: false, error: 'No se encontró ningún estudiante con ese correo o usuario.' };
-    }
-    
-    const validPin = student.pinCode ? student.pinCode.toLowerCase() === cleanPin : false;
-    if (!validPin) {
-      return { success: false, error: 'El código PIN ingresado es incorrecto.' };
-    }
-
-    if (newPass.trim().length < 4) {
-      return { success: false, error: 'La nueva contraseña debe tener al menos 4 caracteres.' };
-    }
-
-    setStudentsList((prev) =>
-      prev.map((s) => (s.id === student.id ? { ...s, password: newPass.trim() } : s))
-    );
+    const student = studentsList.find((s) => s.email?.toLowerCase() === cleanId || s.id.toLowerCase() === cleanId);
+    if (!student) return { success: false, error: 'No encontrado.' };
+    if (student.pinCode?.toLowerCase() !== pin.trim().toLowerCase()) return { success: false, error: 'PIN incorrecto.' };
+    if (newPass.trim().length < 4) return { success: false, error: 'Debe tener al menos 4 caracteres.' };
+    setStudentsList((prev) => prev.map((s) => (s.id === student.id ? { ...s, password: newPass.trim() } : s)));
     return { success: true };
   };
 
-  // Paso 5: cerrar sesión limpia el acceso privado y vuelve a la vista pública del colegio.
-  const logoutStudent = () => {
-    setAuthenticatedStudentId(null);
-    setCurrentStudentId(null);
-    setActiveTab('home');
-  };
+  const logoutStudent = () => { setAuthenticatedStudentId(null); setCurrentStudentId(null); setActiveTab('home'); };
 
-  // Demo: login as test student (Karen or Mauricio) for evaluating platform without affecting real data
   const loginAsTestStudent = (testStudentId: StudentId) => {
     const demoStudent = studentsList.find((s) => s.id === testStudentId && s.isDemo);
-    if (!demoStudent) {
-      console.error(`Demo student ${testStudentId} not found in studentsList`);
-      return;
-    }
-    setAuthenticatedStudentId(testStudentId);
-    setCurrentStudentId(testStudentId);
-    setActiveTab('space');
+    if (!demoStudent) return;
+    setAuthenticatedStudentId(testStudentId); setCurrentStudentId(testStudentId); setActiveTab('space');
   };
 
-  // Paso 6: el registro crea un nuevo estudiante, asigna materias, horarios y lo autentica automáticamente para comenzar su experiencia.
   const registerNewStudent = (input: NewStudentInput) => {
     const created = createNewStudentProfile(input);
-
     setStudentsList((prev) => [created.student, ...prev]);
     setAllSubjects((prev) => [...created.subjects, ...prev]);
     setClassesList((prev) => [...created.classes, ...prev]);
     setAllSchedules((prev) => [...created.schedules, ...prev]);
-
-    // Automatically authenticate the new student!
     setAuthenticatedStudentId(created.student.id);
     setCurrentStudentId(created.student.id);
-
-    return {
-      student: created.student,
-      credentials: {
-        email: created.student.email || '',
-        pinCode: created.student.pinCode || '',
-        password: created.student.password || '',
-      },
-    };
+    return { student: created.student, credentials: { email: created.student.email || '', pinCode: created.student.pinCode || '', password: created.student.password || '' } };
   };
 
-  // Guard Tab switching: If user tries to access private student tab without auth, show login modal!
   const handleSetActiveTab = (tab: NavigationTab) => {
-    if (tab !== 'home' && !authenticatedStudentId) {
-      openAuthModal(currentStudentId);
-      return;
+    if (tab !== 'home' && !authenticatedStudentId) { 
+      // FIX 1: Le decimos a TS que si es null, envíe undefined
+      openAuthModal(currentStudentId || undefined); 
+      return; 
     }
-    
-    // Add current tab to history before changing to new tab (except when going to home or refreshing same tab)
     setActiveTab((prevTab) => {
-      // Only add to history if it's a different tab and not home (to avoid clutter)
-      if (prevTab !== tab && prevTab !== 'home') {
-        setNavigationHistory((prev) => [...prev, prevTab]);
-      }
-      // If navigating to home, clear history
-      if (tab === 'home') {
-        setNavigationHistory([]);
-      }
+      if (prevTab !== tab && prevTab !== 'home') setNavigationHistory((prev) => [...prev, prevTab]);
+      if (tab === 'home') setNavigationHistory([]);
       return tab;
     });
   };
 
   const currentStudent = studentsList.find((s) => s.id === currentStudentId) || studentsList[0];
 
-  // Dynamically calculate progress per subject based on completed daily classes and microcurriculum
   const studentSubjects: Subject[] = allSubjects.filter((sub) => sub.studentId === currentStudentId).map((sub) => {
     const subjectClasses = classesList.filter((c) => c.subjectId === sub.id && c.studentId === currentStudentId);
     const completedClasses = subjectClasses.filter((c) => c.isCompleted || (c.activities.length > 0 && c.activities.every((a) => a.completed))).length;
     const subjectSubmissions = submissions.filter((s) => s.subjectId === sub.id && s.studentId === currentStudentId);
     
-    const completedMicro = sub.units?.reduce(
-      (acc, u) => acc + (u.microcurriculum?.filter((m) => m.status === 'completed')?.length || 0),
-      0
-    ) || 0;
-
+    const completedMicro = sub.units?.reduce((acc, u) => acc + (u.microcurriculum?.filter((m) => m.status === 'completed')?.length || 0), 0) || 0;
     const totalTarget = sub.totalClasses || 35;
-    const effectiveCompleted = Math.min(totalTarget, Math.max(completedClasses, completedMicro, subjectSubmissions.length > 0 ? 1 : 0, 1));
-    const calculatedPercentage = Math.round((effectiveCompleted / totalTarget) * 100);
+    
+    const effectiveCompleted = Math.max(completedClasses, completedMicro, subjectSubmissions.length > 0 ? 1 : 0);
+    const calculatedPercentage = totalTarget > 0 ? Math.round((effectiveCompleted / totalTarget) * 100) : 0;
 
     return {
       ...sub,
@@ -520,116 +351,84 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   });
 
   const allStudentClasses = classesList.filter((cls) => cls.studentId === currentStudentId);
-
-  const todayClasses = classesList
-    .filter((cls) => cls.studentId === currentStudentId && cls.dayOfWeek === selectedDayOfWeek)
-    .sort((a, b) => {
-      const timeA = a.scheduleTime?.slice(0, 5) || '00:00';
-      const timeB = b.scheduleTime?.slice(0, 5) || '00:00';
-      return timeA.localeCompare(timeB);
-    });
-
+  const todayClasses = allStudentClasses.filter((cls) => cls.dayOfWeek === selectedDayOfWeek).sort((a, b) => (a.scheduleTime?.slice(0, 5) || '00:00').localeCompare(b.scheduleTime?.slice(0, 5) || '00:00'));
   const studentSchedule = allSchedules.filter((sch) => sch.studentId === currentStudentId);
   const todaySchedule = studentSchedule.filter((sch) => sch.dayOfWeek === selectedDayOfWeek);
 
   useEffect(() => {
     const matchingClass = todayClasses[0] || allStudentClasses.find((c) => c.dayOfWeek === selectedDayOfWeek) || allStudentClasses[0] || null;
     setActiveClass(matchingClass);
-    if (matchingClass) {
-      const matchSub = studentSubjects.find((s) => s.id === matchingClass.subjectId) || null;
-      setActiveSubject(matchSub);
-    } else {
-      setActiveSubject(studentSubjects[0] || null);
-    }
+    if (matchingClass) setActiveSubject(studentSubjects.find((s) => s.id === matchingClass.subjectId) || null);
+    else setActiveSubject(studentSubjects[0] || null);
   }, [currentStudentId, selectedDayOfWeek]);
 
   const addSubmission = (subData: Omit<StudentSubmission, 'id' | 'submittedAt'>): StudentSubmission => {
-    const newSub: StudentSubmission = {
-      ...subData,
-      id: `sub-${Date.now()}`,
-      submittedAt: new Date().toISOString().replace('T', ' ').slice(0, 16),
-    };
+    const newSub: StudentSubmission = { ...subData, id: `sub-${Date.now()}`, submittedAt: new Date().toISOString().replace('T', ' ').slice(0, 16) };
     setSubmissions((prev) => [newSub, ...prev]);
     return newSub;
   };
 
-  const updateSubmission = (id: string, updates: Partial<StudentSubmission>) => {
-    setSubmissions((prev) =>
-      prev.map((sub) => (sub.id === id ? { ...sub, ...updates } : sub))
-    );
-  };
-
-  const openTeacherDrawerWithContext = (subject?: Subject, dailyClass?: DailyClass) => {
-    if (subject) setActiveSubject(subject);
-    if (dailyClass) setActiveClass(dailyClass);
-    setIsTeacherDrawerOpen(true);
-  };
-
+  const updateSubmission = (id: string, updates: Partial<StudentSubmission>) => { setSubmissions((prev) => prev.map((sub) => (sub.id === id ? { ...sub, ...updates } : sub))); };
+  const openTeacherDrawerWithContext = (subject?: Subject, dailyClass?: DailyClass) => { if (subject) setActiveSubject(subject); if (dailyClass) setActiveClass(dailyClass); setIsTeacherDrawerOpen(true); };
+  
   const toggleActivityCompletion = (classId: string, activityId: string) => {
-    setClassesList((prev) =>
-      prev.map((cls) => {
-        if (cls.id !== classId) return cls;
-        const updatedActivities = cls.activities.map((act) =>
-          act.id === activityId ? { ...act, completed: !act.completed } : act
-        );
-        const allDone = updatedActivities.every((a) => a.completed);
-        return {
-          ...cls,
-          activities: updatedActivities,
-          isCompleted: allDone,
-        };
-      })
-    );
+    setClassesList((prev) => prev.map((cls) => {
+      if (cls.id !== classId) return cls;
+      const updatedActivities = cls.activities.map((act) => act.id === activityId ? { ...act, completed: !act.completed } : act);
+      return { ...cls, activities: updatedActivities, isCompleted: updatedActivities.every((a) => a.completed) };
+    }));
   };
 
   return (
-    <SchoolContext.Provider
-      value={{
-        studentsList,
-        currentStudent,
-        currentStudentId,
-        setCurrentStudentId,
-        authenticatedStudentId,
-        setAuthenticatedStudentId,
-        isAuthenticated: !!authenticatedStudentId,
-        loginStudent,
-        logoutStudent,
-        registerNewStudent,
-        isAuthModalOpen,
-        targetLoginStudentId,
-        openAuthModal,
-        closeAuthModal,
-        selectedDayOfWeek,
-        setSelectedDayOfWeek,
-        activeTab,
-        setActiveTab: handleSetActiveTab,
-        studentSubjects,
-        allSubjects,
-        activeSubject,
-        setActiveSubject,
-        todayClasses,
-        allStudentClasses,
-        activeClass,
-        setActiveClass,
-        submissions,
-        addSubmission,
-        updateSubmission,
-        isTeacherDrawerOpen,
-        setIsTeacherDrawerOpen,
-        openTeacherDrawerWithContext,
-        toggleActivityCompletion,
-        studentSchedule,
-        todaySchedule,
-        classesList,
-        customAvatars,
-        updateStudentAvatar,
-        changePassword,
-        resetPasswordWithPin,
-        navigationHistory,
-        navigateBack,
-        navigateToHome,
-        loginAsTestStudent,
-      }}>
+    <SchoolContext.Provider 
+      value={{ 
+        studentsList, 
+        currentStudent, 
+        // FIX 2: Si por alguna razón está vacío (null), asume al primer estudiante. ¡A TypeScript le encanta esto!
+        currentStudentId: currentStudentId || studentsList[0].id, 
+        setCurrentStudentId: (id: StudentId) => setCurrentStudentId(id), 
+        authenticatedStudentId, 
+        setAuthenticatedStudentId, 
+        isAuthenticated: !!authenticatedStudentId, 
+        loginStudent, 
+        logoutStudent, 
+        registerNewStudent, 
+        isAuthModalOpen, 
+        targetLoginStudentId, 
+        openAuthModal, 
+        closeAuthModal, 
+        selectedDayOfWeek, 
+        setSelectedDayOfWeek, 
+        activeTab, 
+        setActiveTab: handleSetActiveTab, 
+        studentSubjects, 
+        allSubjects, 
+        activeSubject, 
+        setActiveSubject, 
+        todayClasses, 
+        allStudentClasses, 
+        activeClass, 
+        setActiveClass, 
+        submissions, 
+        addSubmission, 
+        updateSubmission, 
+        isTeacherDrawerOpen, 
+        setIsTeacherDrawerOpen, 
+        openTeacherDrawerWithContext, 
+        toggleActivityCompletion, 
+        studentSchedule, 
+        todaySchedule, 
+        classesList, 
+        customAvatars, 
+        updateStudentAvatar, 
+        changePassword, 
+        resetPasswordWithPin, 
+        navigationHistory, 
+        navigateBack, 
+        navigateToHome, 
+        loginAsTestStudent 
+      }}
+    >
       {children}
     </SchoolContext.Provider>
   );
@@ -637,8 +436,6 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
 export function useSchool() {
   const context = useContext(SchoolContext);
-  if (!context) {
-    throw new Error('useSchool debe usarse dentro de un SchoolProvider');
-  }
+  if (!context) throw new Error('useSchool debe usarse dentro de un SchoolProvider');
   return context;
 }

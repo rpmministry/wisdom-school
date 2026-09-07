@@ -57,7 +57,7 @@ export const AVRIL_ADM_UNITS: CurriculumUnit[] = [
         dynamicActivity: 'Mapeo de necesidades: Observar objetos del aula y debatir qué necesidad emocional o física resuelven.',
         verifiedResource: { title: 'TED-Ed: What is a Startup', url: 'https://ed.ted.com/lessons/what-is-a-startup', platform: 'TED-Ed' },
         classId: 'class-adm-avril-01',
-        status: 'completed',
+        status: 'upcoming',
       },
       {
         id: 'adm-a-02',
@@ -69,7 +69,7 @@ export const AVRIL_ADM_UNITS: CurriculumUnit[] = [
         dynamicActivity: 'Técnica de los "5 Porqués". Dibujar un árbol de problemas en una pizarra digital.',
         verifiedResource: { title: 'Miro: Plantillas Árbol de Problemas', url: 'https://miro.com/es/plantillas', platform: 'Miro' },
         classId: 'class-adm-avril-02',
-        status: 'completed',
+        status: 'upcoming',
       },
       {
         id: 'adm-a-03',
@@ -702,7 +702,7 @@ export const AVRIL_SCI_UNITS: CurriculumUnit[] = [
         dynamicActivity: 'Debate de criterios vitales. Clasificación interactiva de objetos límite.',
         verifiedResource: { title: 'Khan Academy: Características de la Vida', url: 'https://es.khanacademy.org/science/biology', platform: 'Khan Academy' },
         classId: 'class-sci-avril-01',
-        status: 'completed',
+        status: 'upcoming',
       },
       {
         id: 'sci-a-02',
@@ -714,7 +714,7 @@ export const AVRIL_SCI_UNITS: CurriculumUnit[] = [
         dynamicActivity: 'Exploración del mundo microscópico mediante un laboratorio virtual.',
         verifiedResource: { title: 'NCBioNetwork: Microscopio Virtual 3D', url: 'https://ncbionetwork.org/interactive-microscope', platform: 'NCBioNetwork' },
         classId: 'class-sci-avril-02',
-        status: 'completed',
+        status: 'upcoming',
       },
       {
         id: 'sci-a-03',
@@ -1251,7 +1251,7 @@ export const AVRIL_POL_UNITS: CurriculumUnit[] = [
         dynamicActivity: 'Simulación: "Isla Desierta". Crear las 3 reglas vitales de supervivencia en grupos.',
         verifiedResource: { title: 'Kiddle: Sociedad y Convivencia', url: 'https://kids.kiddle.co/Society', platform: 'Kiddle' },
         classId: 'class-pol-avril-01',
-        status: 'completed',
+        status: 'upcoming',
       },
       {
         id: 'pol-a-02',
@@ -1263,7 +1263,7 @@ export const AVRIL_POL_UNITS: CurriculumUnit[] = [
         dynamicActivity: 'Debate: ¿Aceptarías un trato donde cedes un derecho por seguridad?',
         verifiedResource: { title: 'Kiddle: Reglas y Leyes', url: 'https://kids.kiddle.co/Law', platform: 'Kiddle' },
         classId: 'class-pol-avril-02',
-        status: 'completed',
+        status: 'upcoming',
       },
       {
         id: 'pol-a-03',

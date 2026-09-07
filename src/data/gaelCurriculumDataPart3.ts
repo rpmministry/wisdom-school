@@ -51,7 +51,7 @@ export const GAEL_ENG_UNITS: CurriculumUnit[] = [
         dynamicActivity: 'The Sound Decoder: Ver episodio de Alphablocks. Gael no dice el nombre de la letra, sino el sonido que hace, saltando al pronunciarlo.',
         verifiedResource: { title: 'Alphablocks: Phonics (YouTube)', url: 'https://www.youtube.com/results?search_query=alphablocks+phonics', platform: 'Alphablocks' },
         classId: 'class-ing-gael-01',
-        status: 'completed',
+        status: 'upcoming',
       },
       {
         id: 'eng-g-02',
@@ -63,7 +63,7 @@ export const GAEL_ENG_UNITS: CurriculumUnit[] = [
         dynamicActivity: 'Size Sort: Agrupar tarjetas visuales de animales (frog, lizard, spider, hippo) por tamaño sin usar español, usando gestos.',
         verifiedResource: { title: 'Khan Academy Kids (App)', url: 'https://learn.khanacademy.org/khan-academy-kids/', platform: 'Khan Kids' },
         classId: 'class-ing-gael-02',
-        status: 'completed',
+        status: 'upcoming',
       },
       {
         id: 'eng-g-03',
@@ -75,7 +75,7 @@ export const GAEL_ENG_UNITS: CurriculumUnit[] = [
         dynamicActivity: 'TPR Body Simon Says: Entrenamiento con Jack Hartmann. Gael debe tocar partes de su cuerpo (hand, face, foot) al ritmo de la música.',
         verifiedResource: { title: 'Jack Hartmann: Parts of the Body', url: 'https://www.youtube.com/', platform: 'Jack Hartmann' },
         classId: 'class-ing-gael-03',
-        status: 'completed',
+        status: 'upcoming',
       },
       {
         id: 'eng-g-04',
@@ -528,7 +528,7 @@ export const GAEL_LANG_UNITS: CurriculumUnit[] = [
         dynamicActivity: 'El objeto misterioso: Presentar una caja cerrada. Gael debe imaginar y relatar qué hay dentro usando pistas sonoras, deduciendo por qué narramos.',
         verifiedResource: { title: 'StoryWeaver: Cuentos Interactivos', url: 'https://storyweaver.org.in/', platform: 'StoryWeaver' },
         classId: 'class-len-gael-01',
-        status: 'completed',
+        status: 'upcoming',
       },
       {
         id: 'lang-g-02',
@@ -540,7 +540,7 @@ export const GAEL_LANG_UNITS: CurriculumUnit[] = [
         dynamicActivity: 'Deconstrucción visual: Entregar un cuento impreso cortado en 3 partes. Gael debe armarlo sin leer, guiándose solo por la lógica de las imágenes.',
         verifiedResource: { title: 'Mundo Primaria: Cuentos Cortos', url: 'https://www.mundoprimaria.com/cuentos-infantiles-cortos', platform: 'Mundo Primaria' },
         classId: 'class-len-gael-02',
-        status: 'completed',
+        status: 'upcoming',
       },
       {
         id: 'lang-g-03',
@@ -552,7 +552,7 @@ export const GAEL_LANG_UNITS: CurriculumUnit[] = [
         dynamicActivity: 'Viaje a ciegas: Gael escucha sonidos de la naturaleza andina y amazónica, y dibuja el escenario donde transcurrirá su propio cuento.',
         verifiedResource: { title: 'Smile&Learn: Ecosistemas', url: 'https://smileandlearn.com/', platform: 'Smile&Learn' },
         classId: 'class-len-gael-03',
-        status: 'completed',
+        status: 'upcoming',
       },
       {
         id: 'lang-g-04',
@@ -564,7 +564,7 @@ export const GAEL_LANG_UNITS: CurriculumUnit[] = [
         dynamicActivity: 'Laboratorio de ADN: Fusión creativa de animales del Ecuador (ej. cabeza de mono, cuerpo de tortuga) para crear al protagonista principal.',
         verifiedResource: { title: 'Árbol ABC: Rompecabezas', url: 'https://arbolabc.com/', platform: 'Árbol ABC' },
         classId: 'class-len-gael-04',
-        status: 'completed',
+        status: 'upcoming',
       },
       {
         id: 'lang-g-05',
@@ -576,7 +576,7 @@ export const GAEL_LANG_UNITS: CurriculumUnit[] = [
         dynamicActivity: 'Caza de etiquetas: Poner "post-its" a objetos de la sala (Sust. comunes) y coronar a los entes únicos (Sust. propios) para los personajes.',
         verifiedResource: { title: 'Educaplay: Sustantivos', url: 'https://www.educaplay.com/', platform: 'Educaplay' },
         classId: 'class-len-gael-05',
-        status: 'completed',
+        status: 'upcoming',
       },
       {
         id: 'lang-g-06',
@@ -588,7 +588,7 @@ export const GAEL_LANG_UNITS: CurriculumUnit[] = [
         dynamicActivity: 'La bolsa mágica: Tocar objetos con los ojos vendados y describirlos usando 5 adjetivos exactos antes de poder verlos.',
         verifiedResource: { title: 'Wordwall: Ruleta de Adjetivos', url: 'https://wordwall.net/', platform: 'Wordwall' },
         classId: 'class-len-gael-06',
-        status: 'completed',
+        status: 'upcoming',
       },
       {
         id: 'lang-g-07',
@@ -600,7 +600,7 @@ export const GAEL_LANG_UNITS: CurriculumUnit[] = [
         dynamicActivity: 'El cirujano literario: Reparar oraciones "enfermas" (ej. "Las puma rápidos") usando pinzas y reconectando palabras para mantener la coherencia.',
         verifiedResource: { title: 'Mundo Primaria: Gramática', url: 'https://www.mundoprimaria.com/', platform: 'Mundo Primaria' },
         classId: 'class-len-gael-07',
-        status: 'completed',
+        status: 'upcoming',
       },
       {
         id: 'lang-g-08',

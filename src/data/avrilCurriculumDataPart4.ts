@@ -57,7 +57,7 @@ export const AVRIL_MATH_UNITS: CurriculumUnit[] = [
         dynamicActivity: 'Clasificar números en grupos visuales. Discutir qué pasa con el número Pi observando círculos físicos.',
         verifiedResource: { title: 'Khan Academy: Conjuntos Numéricos', url: 'https://es.khanacademy.org/math', platform: 'Khan Academy' },
         classId: 'class-mat-avril-01',
-        status: 'completed',
+        status: 'upcoming',
       },
       {
         id: 'mat-a-02',
@@ -69,7 +69,7 @@ export const AVRIL_MATH_UNITS: CurriculumUnit[] = [
         dynamicActivity: 'Usar el simulador para construir fracciones y observar en tiempo real su representación gráfica y decimal.',
         verifiedResource: { title: 'PhET: Fraction Matcher', url: 'https://phet.colorado.edu/sims/html/fraction-matcher/latest/fraction-matcher_all.html', platform: 'PhET' },
         classId: 'class-mat-avril-02',
-        status: 'completed',
+        status: 'upcoming',
       },
       {
         id: 'mat-a-03',
@@ -366,7 +366,7 @@ export const AVRIL_REL_UNITS: CurriculumUnit[] = [
         dynamicActivity: 'Leer Génesis 1:27. Hacer un "inventario de valor": escribir 3 cosas que el mundo valora vs. 3 cosas que Dios valora en ti.',
         verifiedResource: { title: 'Bible.com: Génesis 1:27 RVR1960', url: 'https://www.bible.com/es/bible/149/GEN.1.27.RVR1960', platform: 'YouVersion' },
         classId: 'class-rel-avril-01',
-        status: 'completed',
+        status: 'upcoming',
       },
       {
         id: 'rel-a-02',
@@ -378,7 +378,7 @@ export const AVRIL_REL_UNITS: CurriculumUnit[] = [
         dynamicActivity: 'Reflexión sobre Génesis 2:7. Ejercicio de respiración consciente agradeciendo a Dios por la capacidad de amar.',
         verifiedResource: { title: 'Bible.com: Génesis 2:7 RVR1960', url: 'https://www.bible.com/es/bible/149/GEN.2.7.RVR1960', platform: 'YouVersion' },
         classId: 'class-rel-avril-02',
-        status: 'completed',
+        status: 'upcoming',
       },
       {
         id: 'rel-a-03',
@@ -627,7 +627,7 @@ export const AVRIL_SOFT_UNITS: CurriculumUnit[] = [
         dynamicActivity: 'Lluvia de ideas clasificando objetos del hogar en hardware tonto vs inteligente.',
         verifiedResource: { title: 'GCFGlobal: Informática Básica', url: 'https://edu.gcfglobal.org/es/informatica-basica/', platform: 'GCFGlobal' },
         classId: 'class-soft-avril-01',
-        status: 'completed',
+        status: 'upcoming',
       },
       {
         id: 'soft-a-02',
@@ -639,7 +639,7 @@ export const AVRIL_SOFT_UNITS: CurriculumUnit[] = [
         dynamicActivity: 'Juego de roles "El Robot Ciego": Avril ejecuta comandos exactos para dibujar.',
         verifiedResource: { title: 'CS Unplugged: Introducción al Pensamiento Computacional', url: 'https://www.csunplugged.org', platform: 'CS Unplugged' },
         classId: 'class-soft-avril-02',
-        status: 'completed',
+        status: 'upcoming',
       },
       {
         id: 'soft-a-03',

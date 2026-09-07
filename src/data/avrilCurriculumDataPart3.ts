@@ -57,7 +57,7 @@ export const AVRIL_ENG_UNITS: CurriculumUnit[] = [
         dynamicActivity: 'Brainstorming de problemas comunitarios en mapas mentales.',
         verifiedResource: { title: 'TED-Ed: Entrepreneurship Concepts', url: 'https://ed.ted.com/lessons', platform: 'TED-Ed' },
         classId: 'class-ing-avril-01',
-        status: 'completed',
+        status: 'upcoming',
       },
       {
         id: 'eng-a-02',
@@ -69,7 +69,7 @@ export const AVRIL_ENG_UNITS: CurriculumUnit[] = [
         dynamicActivity: 'Redacción colaborativa de un "Elevator Pitch" inverso.',
         verifiedResource: { title: 'British Council: Speaking Skills', url: 'https://learnenglishteens.britishcouncil.org', platform: 'British Council' },
         classId: 'class-ing-avril-02',
-        status: 'completed',
+        status: 'upcoming',
       },
       {
         id: 'eng-a-03',
@@ -366,7 +366,7 @@ export const AVRIL_LANG_UNITS: CurriculumUnit[] = [
         dynamicActivity: 'Explorar el video de Khan. Deducir por qué los primeros registros fueron contables en Sumeria.',
         verifiedResource: { title: 'Khan Academy: Origen de la Escritura', url: 'https://es.khanacademy.org', platform: 'Khan Academy' },
         classId: 'class-len-avril-01',
-        status: 'completed',
+        status: 'upcoming',
       },
       {
         id: 'lang-a-02',
@@ -378,7 +378,7 @@ export const AVRIL_LANG_UNITS: CurriculumUnit[] = [
         dynamicActivity: 'Análisis visual del Principio del Rebus. Crear un código propio usando emojis lógicos.',
         verifiedResource: { title: 'Khan Academy: Del Dibujo a la Letra', url: 'https://es.khanacademy.org', platform: 'Khan Academy' },
         classId: 'class-len-avril-02',
-        status: 'completed',
+        status: 'upcoming',
       },
       {
         id: 'lang-a-03',

@@ -51,7 +51,7 @@ export const GAEL_ECA_UNITS: CurriculumUnit[] = [
         dynamicActivity: 'Moodboard Arquitectónico: Buscar imágenes de ciudades reales y fantásticas. Recortar y pegar lo que le guste para definir el "estilo" de su ciudad.',
         verifiedResource: { title: 'Google Arts & Culture: Architecture', url: 'https://artsandculture.google.com/category/architecture', platform: 'Google Arts' },
         classId: 'class-eca-g-01',
-        status: 'completed',
+        status: 'upcoming',
       },
       {
         id: 'eca-g-02',
@@ -63,7 +63,7 @@ export const GAEL_ECA_UNITS: CurriculumUnit[] = [
         dynamicActivity: 'La paleta de la ciudad: Crear muestras de color mezclando témperas para decidir el código de colores de las zonas residenciales vs. comerciales.',
         verifiedResource: { title: 'Tate Kids: Spin the Color Wheel', url: 'https://www.tate.org.uk/kids/games-quizzes/colour-wheel', platform: 'Tate Kids' },
         classId: 'class-eca-g-02',
-        status: 'completed',
+        status: 'upcoming',
       },
       {
         id: 'eca-g-03',
@@ -75,7 +75,7 @@ export const GAEL_ECA_UNITS: CurriculumUnit[] = [
         dynamicActivity: 'Caza de tesoros reciclados: Recolectar rollos de papel, cajas, tapas y botellas. Clasificarlos por su potencial forma arquitectónica.',
         verifiedResource: { title: 'Tate Kids: Make a Cardboard City', url: 'https://www.tate.org.uk/kids/make/sculpture/cardboard-city', platform: 'Tate Kids' },
         classId: 'class-eca-g-03',
-        status: 'completed',
+        status: 'upcoming',
       },
       {
         id: 'eca-g-04',
@@ -240,7 +240,7 @@ export const GAEL_SCI_UNITS: CurriculumUnit[] = [
         dynamicActivity: 'El Tribunal de la Vida: Defender ante el "juez" si imágenes confusas (fuego, coral, un robot) cumplen las funciones vitales.',
         verifiedResource: { title: 'PBS Kids: Plum Landing (Ecosistemas)', url: 'https://pbskids.org/plumlanding/', platform: 'PBS Kids' },
         classId: 'class-sci-gael-01',
-        status: 'completed',
+        status: 'upcoming',
       },
       {
         id: 'sci-g-02',
@@ -252,7 +252,7 @@ export const GAEL_SCI_UNITS: CurriculumUnit[] = [
         dynamicActivity: 'Simulador de Supervivencia: Alterar variables (agua, luz, aire) de una planta y un animal para deducir qué necesitan para no extinguirse.',
         verifiedResource: { title: 'NatGeo Kids: Science (Plants)', url: 'https://kids.nationalgeographic.com/nature', platform: 'NatGeo Kids' },
         classId: 'class-sci-gael-02',
-        status: 'completed',
+        status: 'upcoming',
       },
       {
         id: 'sci-g-03',
@@ -264,7 +264,7 @@ export const GAEL_SCI_UNITS: CurriculumUnit[] = [
         dynamicActivity: 'Arquitectos de Hogares: Arrastrar elementos bióticos y abióticos para construir el hábitat perfecto basado en la temperatura.',
         verifiedResource: { title: 'Smithsonian: Animal Habitats', url: 'https://nationalzoo.si.edu/education', platform: 'Smithsonian' },
         classId: 'class-sci-gael-03',
-        status: 'completed',
+        status: 'upcoming',
       },
       {
         id: 'sci-g-04',
@@ -276,7 +276,7 @@ export const GAEL_SCI_UNITS: CurriculumUnit[] = [
         dynamicActivity: 'La Fábrica Verde: Experimento físico. Colocar una hoja sumergida en agua bajo el sol directo y observar las burbujas (fotosíntesis).',
         verifiedResource: { title: 'PhET: Eating and Exercise (Energía)', url: 'https://phet.colorado.edu/', platform: 'PhET' },
         classId: 'class-sci-gael-04',
-        status: 'completed',
+        status: 'upcoming',
       },
       {
         id: 'sci-g-05',
@@ -288,7 +288,7 @@ export const GAEL_SCI_UNITS: CurriculumUnit[] = [
         dynamicActivity: 'Colapso del Ecosistema: Juego de simulación donde Gael debe balancear la cantidad de depredadores y presas para que el bosque no muera.',
         verifiedResource: { title: 'Simulador Red Trófica (PBS)', url: 'https://pbslearningmedia.org/', platform: 'PBS' },
         classId: 'class-sci-gael-05',
-        status: 'completed',
+        status: 'upcoming',
       },
       {
         id: 'sci-g-06',
@@ -300,7 +300,7 @@ export const GAEL_SCI_UNITS: CurriculumUnit[] = [
         dynamicActivity: 'El Cazador Daltónico: Minijuego de encontrar polillas camufladas en cortezas vs. ranas aposemáticas (colores de advertencia).',
         verifiedResource: { title: 'BioWeb Ecuador: Anfibios', url: 'https://bioweb.bio/', platform: 'BioWeb Ecuador' },
         classId: 'class-sci-gael-06',
-        status: 'completed',
+        status: 'upcoming',
       },
       {
         id: 'sci-g-07',
@@ -312,7 +312,7 @@ export const GAEL_SCI_UNITS: CurriculumUnit[] = [
         dynamicActivity: 'Vuelo sobre los 4 Mundos: Uso de Google Earth Timelapse para volar desde el Pacífico hasta la Amazonía, notando los cambios de color y relieve.',
         verifiedResource: { title: 'Google Earth Timelapse', url: 'https://earthengine.google.com/timelapse/', platform: 'Google Earth' },
         classId: 'class-sci-gael-07',
-        status: 'completed',
+        status: 'upcoming',
       },
       {
         id: 'sci-g-08',
@@ -324,7 +324,7 @@ export const GAEL_SCI_UNITS: CurriculumUnit[] = [
         dynamicActivity: 'Las Capas de la Selva: Crear un diorama 3D (dosel, sotobosque). Entender la competencia a muerte de las plantas por alcanzar la luz solar.',
         verifiedResource: { title: 'WWF Wild Classroom: Amazon', url: 'https://www.worldwildlife.org/teaching-resources', platform: 'WWF' },
         classId: 'class-sci-gael-08',
-        status: 'completed',
+        status: 'upcoming',
       },
       {
         id: 'sci-g-09',
@@ -336,7 +336,7 @@ export const GAEL_SCI_UNITS: CurriculumUnit[] = [
         dynamicActivity: 'Filtros Naturales: Experimento tocando hojas con "vellosidades" (pelusas) probando cómo retienen el calor y la humedad sin congelarse.',
         verifiedResource: { title: 'INABIO: Biodiversidad Ecuatoriana', url: 'http://inabio.biodiversidad.gob.ec/', platform: 'INABIO' },
         classId: 'class-sci-gael-09',
-        status: 'completed',
+        status: 'upcoming',
       },
       {
         id: 'sci-g-10',

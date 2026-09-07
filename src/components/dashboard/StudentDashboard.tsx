@@ -22,16 +22,15 @@ import {
 } from 'lucide-react';
 
 const DAYS_CONFIG: { day: DayOfWeekName; date: string; isStart?: boolean }[] = [
-  { day: 'Martes', date: '01 Sep', isStart: true },
-  { day: 'Miércoles', date: '02 Sep' },
-  { day: 'Jueves', date: '03 Sep' },
-  { day: 'Viernes', date: '04 Sep' },
-  { day: 'Lunes', date: '07 Sep' },
-];
+   { day: 'Lunes', date: '07 Sep', isStart: true },
+   { day: 'Martes', date: '08 Sep' },
+   { day: 'Miércoles', date: '09 Sep' },
+   { day: 'Jueves', date: '10 Sep' },
+   { day: 'Viernes', date: '11 Sep' },
+ ];
 
 export const StudentDashboard: React.FC = () => {
-  // FORZAMOS LA VARIABLE A TRUE PARA IGNORAR EL RELOJ DE TU PC EN ESTA PRUEBA
-  const isReviewWeek = true; 
+  const isReviewWeek = new Date() < new Date('2026-09-07T00:00:00');
   const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {

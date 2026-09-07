@@ -51,7 +51,7 @@ export const GAEL_MATH_UNITS: CurriculumUnit[] = [
         dynamicActivity: 'Trazado de Calles: Usar cinta adhesiva en el suelo para crear una red vial con líneas paralelas (avenidas) y perpendiculares (cruces).',
         verifiedResource: { title: 'Geogebra: Geometría Básica', url: 'https://www.geogebra.org/geometry', platform: 'Geogebra' },
         classId: 'class-mat-gael-01',
-        status: 'completed',
+        status: 'upcoming',
       },
       {
         id: 'mat-g-02',
@@ -63,7 +63,7 @@ export const GAEL_MATH_UNITS: CurriculumUnit[] = [
         dynamicActivity: 'El Geoplano Virtual: Construir triángulos, cuadriláteros y pentágonos en un geoplano virtual, contando lados y esquinas (vértices).',
         verifiedResource: { title: 'ToyTheater: Geoboard', url: 'https://toytheater.com/geoboard/', platform: 'ToyTheater' },
         classId: 'class-mat-gael-02',
-        status: 'completed',
+        status: 'upcoming',
       },
       {
         id: 'mat-g-03',
@@ -75,7 +75,7 @@ export const GAEL_MATH_UNITS: CurriculumUnit[] = [
         dynamicActivity: 'El Cazador de Ángulos Rectos: Gael usa una escuadra para buscar ángulos rectos en puertas, ventanas y cajas de su casa.',
         verifiedResource: { title: 'Mathigon: Polypad (Ángulos)', url: 'https://mathigon.org/polypad', platform: 'Mathigon' },
         classId: 'class-mat-gael-03',
-        status: 'completed',
+        status: 'upcoming',
       },
       {
         id: 'mat-g-04',
@@ -528,7 +528,7 @@ export const GAEL_REL_UNITS: CurriculumUnit[] = [
         dynamicActivity: 'El Espejo del Corazón: Ver el cortometraje "Snack Attack". Reflexionar sobre los prejuicios y practicar cómo ponerse en los zapatos de una anciana incomprendida.',
         verifiedResource: { title: 'Corto Animado: Snack Attack', url: 'https://www.youtube.com/watch?v=38y_1EWIE9I', platform: 'YouTube' },
         classId: 'class-rel-gael-01',
-        status: 'completed',
+        status: 'upcoming',
       },
       {
         id: 'rel-g-02',
@@ -540,7 +540,7 @@ export const GAEL_REL_UNITS: CurriculumUnit[] = [
         dynamicActivity: 'Teatro de Sombras del Samaritano: Dramatizar la parábola usando siluetas de papel. Gael asume el rol del samaritano que cura las heridas sin esperar nada a cambio.',
         verifiedResource: { title: 'Superbook: El Buen Samaritano', url: 'https://superbook.cbn.com/', platform: 'Superbook' },
         classId: 'class-rel-gael-02',
-        status: 'completed',
+        status: 'upcoming',
       },
       {
         id: 'rel-g-03',
@@ -693,7 +693,7 @@ export const GAEL_SOFT_UNITS: CurriculumUnit[] = [
         dynamicActivity: 'El Robot Humano (Unplugged): Gael le da instrucciones verbales paso a paso a su profesor/papá con los ojos vendados para cepillarse los dientes.',
         verifiedResource: { title: 'Code.org: Pensamiento Computacional', url: 'https://code.org/', platform: 'Code.org' },
         classId: 'class-soft-gael-01',
-        status: 'completed',
+        status: 'upcoming',
       },
       {
         id: 'soft-g-02',
@@ -705,7 +705,7 @@ export const GAEL_SOFT_UNITS: CurriculumUnit[] = [
         dynamicActivity: 'Explorando el Escenario: Crear una cuenta en Scratch. Borrar al gato y cargar un fondo de selva amazónica y un sprite de tucán.',
         verifiedResource: { title: 'Scratch 3.0 (Web Oficial)', url: 'https://scratch.mit.edu/', platform: 'Scratch' },
         classId: 'class-soft-gael-02',
-        status: 'completed',
+        status: 'upcoming',
       },
       {
         id: 'soft-g-03',
@@ -717,7 +717,7 @@ export const GAEL_SOFT_UNITS: CurriculumUnit[] = [
         dynamicActivity: 'Angry Birds en Code.org: Resolver los primeros 5 laberintos de Code.org organizando bloques de Avanzar y Girar en estricto orden lógico.',
         verifiedResource: { title: 'Code.org: Curso 2 (Laberinto)', url: 'https://studio.code.org/s/course2', platform: 'Code.org' },
         classId: 'class-soft-gael-03',
-        status: 'completed',
+        status: 'upcoming',
       },
       {
         id: 'soft-g-04',
