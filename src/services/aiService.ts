@@ -164,14 +164,35 @@ export async function askAITeacher(req: TeacherChatRequest): Promise<string> {
       }
       
       // Si la API de Gemini responde con un error oficial
-      if (geminiData.error) {
-         throw new Error(`Error oficial de Google: ${geminiData.error.message}`);
-      }
-      throw new Error("Respuesta inválida o vacía de Gemini");
+if (geminiData.error) {
+          throw new Error(`Error oficial de Google: ${geminiData.error.message}`);
+        }
+        throw new Error("Respuesta inválida o vacía de Gemini");
 
     } catch (geminiError: any) {
       primaryErrorMsg = geminiError.name === 'AbortError' ? 'Tiempo de espera agotado (Timeout)' : geminiError.message;
       console.warn(`[Red Neural] ⚠️ Motor primario falló. Motivo: ${primaryErrorMsg}`);
+
+      // FALLBACK LOCAL: Si no hay API keys configuradas, usar respuestas locales
+      const GEMINI_KEY_AVAILABLE = !!import.meta.env.VITE_GEMINI_API_KEY && import.meta.env.VITE_GEMINI_API_KEY !== "TU_CLAVE_AQUI";
+      const OPENROUTER_KEY_AVAILABLE = !!import.meta.env.VITE_OPENROUTER_API_KEY && import.meta.env.VITE_OPENROUTER_API_KEY !== "PEGA_AQUI_TU_CLAVE_OPENROUTER";
+      
+      if (!GEMINI_KEY_AVAILABLE && !OPENROUTER_KEY_AVAILABLE) {
+        console.warn("[Modo Demo] API keys no configuradas. Usando IA pedagógica local.");
+        
+        // Respuestas de fallback basadas en el tema actual - pedagogía socrática
+        const fallbackResponses = {
+          'Modelado algebraico': `Excelente pregunta, ${req.student.name}. Vamos a pensar en esto juntos: si tuvieras que contar alguna historia con números, ¿qué parte te gustaría contar primero? La ecuación es como una historia matemática: tenemos una historia que contar (el resultado) y queremos descubrir qué pasó antes. ¿Cuál sería el primer paso para reconstruir esa historia?`,
+          'Estructura celular': `¡Qué interesante que quieras saber sobre células, ${req.student.name}! Imagina que una célula es como una casita muy pequeñita. ¿Qué crees que necesitaría para funcionar bien? Piensa en los ingredientes que necesitaría para "vivir" y organizarse. Cada parte de la casita tiene un trabajo especial.`,
+          'Fotosíntesis': `${req.student.name}, qué buena intuición sobre las plantas. Imagina que las hojas son como pequeñas fábricas. ¿Qué ingredientes crees que necesitan para producir algo? La luz es como el "combustible", el agua es como la "materia prima", y el oxígeno es lo que "sobrante" producen. ¿Te imaginas una fábrica que solo produce algo cuando tiene luz?`,
+          'default': `${req.student.name}, excelente reflexión. Según la pedagogía socrática, no se busca una respuesta clave, sino construir pensamiento. ¿Podrías profundizar: qué ejemplo concreto de tu vida cotidiana podrías usar para ilustrar este concepto? Cada conexión que haces es un paso hacia el verdadero aprendizaje.`
+        };
+        
+        const theme = req.dailyClass?.theme || '';
+        const response = fallbackResponses[theme as keyof typeof fallbackResponses] || fallbackResponses.default;
+        return `${response}\n\n¿Te gustaría explorar otro aspecto o conectar esto con algo más que ya sabes?`;
+      }
+
       console.log(`[Red Neural] 🔄 Activando IA Auxiliar (OpenRouter)...`);
       
       if (OPENROUTER_API_KEY === "PEGA_AQUI_TU_CLAVE_OPENROUTER" || !OPENROUTER_API_KEY) {
