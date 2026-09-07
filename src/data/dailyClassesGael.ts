@@ -105,7 +105,7 @@ export const GAEL_DAILY_CLASSES: DailyClass[] = [
     studentId: 'gael',
     date: '2026-09-08',
     dayOfWeek: 'Martes',
-    scheduleTime: '10:00 - 10:45 (45 min)',
+    scheduleTime: '10:45 - 11:30 (45 min)',
     unit: 'Unidad 1: Fonética',
     theme: 'Aprendizaje lúdico de fonética',
     objective: 'Identificar sonidos iniciales en inglés',

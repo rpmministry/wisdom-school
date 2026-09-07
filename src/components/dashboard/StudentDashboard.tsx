@@ -267,9 +267,7 @@ export const StudentDashboard: React.FC = () => {
 
                       <div className="flex items-center gap-2 w-full sm:w-auto">
                         
-                        {/* ETIQUETA 'A' REEMPLAZA AL BUTTON */}
-                        <a
-                          href={`/aula/${currentStudent.id}`}
+                        <button
                           onClick={() => handleStartClass(cls)}
                           className={`flex-1 sm:flex-initial px-4 py-2 rounded-xl text-xs font-black shadow-md transition-all flex items-center justify-center gap-2 ${
                             isAvril
@@ -279,7 +277,7 @@ export const StudentDashboard: React.FC = () => {
                         >
                           <Play className="w-3.5 h-3.5 fill-current" />
                           <span>Entrar a Clase</span>
-                        </a>
+                        </button>
 
                         {sub && (
                           <button

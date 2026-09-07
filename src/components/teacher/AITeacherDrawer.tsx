@@ -244,17 +244,46 @@ export const AITeacherDrawer: React.FC = () => {
     }
   };
 
-  // 4. PUENTE DE TELEPATÍA
+  // Referencia para progresión automática de la clase
+  const lastActivityRef = useRef(Date.now());
+  const classIntervalRef = useRef<any>(null);
+
+// 4. PUENTE DE TELEPATÍA
   useEffect(() => {
     if (isTeacherDrawerOpen) {
+      lastActivityRef.current = Date.now();
       const pendingPrompt = localStorage.getItem('pending_socratic_prompt');
       if (pendingPrompt) {
         localStorage.removeItem('pending_socratic_prompt');
-        // Un retraso pequeño para que el drawer se anime antes de disparar
         setTimeout(() => handleSendMessage(pendingPrompt), 300);
       }
     }
   }, [isTeacherDrawerOpen]);
+
+  // 5. PROGRESIÓN AUTOMÁTICA: El profesor avanza la clase si hay inactividad
+  useEffect(() => {
+    if (!isTeacherDrawerOpen || isLoading) return;
+    
+    classIntervalRef.current = setInterval(() => {
+      const inactiveMs = Date.now() - lastActivityRef.current;
+      // Si han pasado 90 segundos sin actividad y hay mensajes (no es el saludo inicial)
+      if (inactiveMs > 90000 && messages.length > 1) {
+        const followUpPrompts = [
+          `Profesor, ¿podrías darme otro ejemplo para entender mejor "${dailyClass?.theme || 'el tema'}"?`,
+          `¿Cómo se conecta esto con lo que aprendimos antes?`,
+          `¿Qué aplicaciones prácticas tiene esto en la vida real?`,
+          `Profesor, ¿me puedes plantear otro reto para seguir profundizando?`,
+        ];
+        const randomPrompt = followUpPrompts[Math.floor(Math.random() * followUpPrompts.length)];
+        handleSendMessage(randomPrompt);
+        lastActivityRef.current = Date.now();
+      }
+    }, 30000); // Revisar cada 30 segundos
+    
+    return () => {
+      if (classIntervalRef.current) clearInterval(classIntervalRef.current);
+    };
+  }, [isTeacherDrawerOpen, isLoading, messages.length, dailyClass?.theme]);
 
   if (!isTeacherDrawerOpen || !teacher || !subject) return null;
 

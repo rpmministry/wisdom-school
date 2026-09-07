@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AITeacher, Student } from '../../types';
 import { Bot, CheckCircle2, XCircle, ArrowRight, Volume2, Trophy } from 'lucide-react';
 
@@ -56,9 +56,67 @@ export const InteractiveLessonView: React.FC<InteractiveLessonViewProps> = ({ te
   const [feedback, setFeedback] = useState<'idle' | 'correct' | 'incorrect'>('idle');
   const [aiCorrection, setAiCorrection] = useState('');
 
-  const currentNode = MOCK_NODES[currentNodeIndex];
-  const progressPercentage = ((currentNodeIndex) / MOCK_NODES.length) * 100;
-  const isFinished = currentNodeIndex >= MOCK_NODES.length;
+  // Generate dynamic lesson nodes based on theme and student level
+  const isPrimaryStudent = student.grade?.toLowerCase().includes('elemental') || student.age < 10;
+  const DYNAMIC_NODES: LessonNode[] = [
+    {
+      id: 'node-1',
+      type: 'concept',
+      title: `Nivel 1: Explorando "${theme}"`,
+      teacherDialogue: `¡Hola ${student.name}! Vamos a explorar juntos el tema de "${theme}". Primero, cuéntame: ¿Qué sabes sobre esto? ¿Has escuchado esta palabra antes?`,
+      question: isPrimaryStudent 
+        ? `¿Qué te imaginas cuando escuchas "${theme}"? Dibuja o describe lo que piensas.`
+        : `¿Cuál es tu conocimiento previo sobre "${theme}"? Describe brevemente tu comprensión inicial.`,
+      options: isPrimaryStudent ? [
+        'Sé algo, ¡cuéntame más!',
+        'Nunca lo he escuchado',
+        'Creo que es sobre algo de la naturaleza'
+      ] : [
+        'Tengo un conocimiento sólido del tema',
+        'Conozco algunos conceptos básicos',
+        'No estoy seguro/a de mi conocimiento',
+        'Es la primera vez que escucho este tema'
+      ],
+      correctAnswer: isPrimaryStudent ? 'Sé algo, ¡cuéntame más!' : 'Tengo un conocimiento sólido del tema',
+    },
+    {
+      id: 'node-2',
+      type: 'concept',
+      title: `Nivel 2: Profundizando en "${theme}"`,
+      teacherDialogue: `¡Excelente! Ahora vamos más a fondo. ${isPrimaryStudent 
+        ? `Imagina que "${theme}" es como un juego o una aventura. ¿Qué personajes o situaciones encontraríamos?`
+        : `¿Cómo se relaciona "${theme}" con algo que ya conoces? Piensa en un ejemplo de la vida real.`}`,
+      question: isPrimaryStudent
+        ? `¿Por qué crees que es importante aprender sobre "${theme}" en tu vida diaria?`
+        : `Explica cómo "${theme}" se aplica en un contexto real o profesional. Usa un ejemplo específico.`,
+      options: isPrimaryStudent ? [
+        'Para entender mejor el mundo',
+        'Porque me gusta aprender cosas nuevas',
+        'No estoy seguro de por qué'
+      ] : [
+        'Se aplica en situaciones laborales cotidianas',
+        'Tiene relevancia social y ambiental',
+        'Es fundamental para la toma de decisiones',
+        'No veo una aplicación práctica inmediata'
+      ],
+      correctAnswer: isPrimaryStudent ? 'Para entender mejor el mundo' : 'Se aplica en situaciones laborales cotidianas',
+    },
+    {
+      id: 'node-3',
+      type: 'boss',
+      title: `Reto Final: Dominando "${theme}"`,
+      teacherDialogue: `¡Impresionante razonamiento! Ahora el desafío final. ${isPrimaryStudent 
+        ? `Demuestra que eres un experto: Explica "${theme}" como si le enseñaras a un amigo o familiar.`
+        : `Conecta todos los conceptos: Elabora una explicación completa de "${theme}" integrando los知识点 que hemos discutido.`}`,
+      question: isPrimaryStudent
+        ? `Explica "${theme}" con tus propias palabras como si le hablaras a un niño/a más pequeño/a.`
+        : `Redacta un párrafo argumentativo explicando por qué "${theme}" es relevante en el contexto educativo actual. Justifica tu postura.`,
+    }
+  ];
+
+  const currentNode = DYNAMIC_NODES[currentNodeIndex];
+  const progressPercentage = ((currentNodeIndex) / DYNAMIC_NODES.length) * 100;
+  const isFinished = currentNodeIndex >= DYNAMIC_NODES.length;
 
   const handleVerify = () => {
     // Si es de opciones

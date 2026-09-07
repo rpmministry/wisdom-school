@@ -14,11 +14,11 @@ import {
 } from 'lucide-react';
 
 const DAYS_CONFIG: { day: DayOfWeekName; date: string; isStart?: boolean }[] = [
-  { day: 'Martes', date: '01 Sep', isStart: true },
-  { day: 'Miércoles', date: '02 Sep' },
-  { day: 'Jueves', date: '03 Sep' },
-  { day: 'Viernes', date: '04 Sep' },
-  { day: 'Lunes', date: '07 Sep' },
+  { day: 'Lunes', date: '07 Sep', isStart: true },
+  { day: 'Martes', date: '08 Sep' },
+  { day: 'Miércoles', date: '09 Sep' },
+  { day: 'Jueves', date: '10 Sep' },
+  { day: 'Viernes', date: '11 Sep' },
 ];
 
 const forceSpanishUrl = (url: string) => {
