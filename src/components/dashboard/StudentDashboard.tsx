@@ -77,7 +77,7 @@ export const StudentDashboard: React.FC = () => {
   if (!isMounted) return null;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 sm:space-y-8">
       
       {/* Student Movie World Banner */}
       <WorldHeaderBanner

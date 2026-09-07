@@ -43,7 +43,7 @@ export const Sidebar: React.FC = () => {
   const isAvril = currentStudent.id === 'avril' || currentStudent.id === 'karen';
 
   return (
-    <aside className={`w-64 border-r p-4 flex flex-col justify-between hidden md:flex shrink-0 transition-colors duration-300 ${
+    <aside className={`w-64 min-w-[16rem] max-w-[20rem] border-r p-4 flex flex-col justify-between hidden md:flex shrink-0 transition-colors duration-300 min-w-0 ${
       isAvril
         ? 'bg-slate-900/95 border-amber-500/20'
         : 'bg-slate-900/95 border-red-500/20'

@@ -33,12 +33,12 @@ export const Navbar: React.FC = () => {
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
 
   return (
-    <header className={`sticky top-0 z-30 backdrop-blur-md text-slate-100 transition-colors duration-300 ${
+    <header className={`sticky top-0 z-30 backdrop-blur-md text-slate-100 transition-colors duration-300 border-b border-slate-800/50 ${
       isAvril
         ? 'bg-gradient-to-r from-slate-900 via-indigo-950/40 to-slate-900'
         : 'bg-gradient-to-r from-slate-900 via-amber-950/40 to-slate-900'
     }`}>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-2">
+      <div className="max-w-[100vw] px-4 sm:px-6 lg:px-8 mx-auto h-14 sm:h-16 flex items-center justify-between gap-2">
 
         
         {/* Paso 2: la marca del colegio y el logo se mantienen visibles para reforzar identidad institucional. */}

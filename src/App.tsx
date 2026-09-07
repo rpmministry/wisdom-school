@@ -69,11 +69,13 @@ const MainContent: React.FC = () => {
     <div className="min-h-screen flex flex-col bg-slate-950 text-slate-100 selection:bg-indigo-500 selection:text-white">
       <Navbar />
 
-      <div className="flex-1 flex max-w-7xl w-full mx-auto">
+      <div className="flex-1 flex w-full max-w-[100vw] overflow-x-hidden">
         {activeTab !== 'home' && <Sidebar />}
 
-        <main className="flex-1 px-0 pt-0 pb-24 md:pb-8 overflow-y-auto">
-          {renderActiveView()}
+        <main className="flex-1 px-4 sm:px-6 lg:px-8 pt-0 pb-24 md:pb-8 overflow-y-auto overflow-x-hidden">
+          <div className="max-w-7xl mx-auto w-full">
+            {renderActiveView()}
+          </div>
         </main>
       </div>
 
