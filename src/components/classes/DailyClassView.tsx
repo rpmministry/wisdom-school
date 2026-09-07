@@ -3,6 +3,7 @@ import { useSchool, DayOfWeekName } from '../../context/SchoolContext';
 import { DailyClass, ClassActivity } from '../../types';
 import { formatYouTubeEmbedUrl, getYouTubeWatchUrl, getYouTubeSearchUrl } from '../../utils/youtube';
 import { downloadClassGuide } from '../../utils/guideGenerator';
+import { downloadConsolidatedDailyGuide } from '../../utils/consolidatedGuideGenerator';
 import { ActivityDetailModal } from '../activities/ActivityDetailModal';
 import { ClassVideoPlayer } from './ClassVideoPlayer';
 import { InteractiveLessonView } from './InteractiveLessonView';
@@ -70,9 +71,27 @@ export const DailyClassView: React.FC = () => {
     setActiveSubTab('content'); setViewMode('focus'); window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleDownloadGuide = () => {
-    if (currentClass) downloadClassGuide(currentClass, subject, currentStudent.name, currentStudent.grade);
-    setDownloadSuccess(true); setTimeout(() => setDownloadSuccess(false), 4000);
+  const handleDownloadGuide = (mode?: 'single' | 'consolidated') => {
+    if (mode === 'consolidated' || (mode === undefined && todayClasses.length > 1)) {
+      renderConsolidatedGuide();
+    } else if (currentClass) {
+      downloadClassGuide(currentClass, subject, currentStudent.name, currentStudent.grade);
+    }
+    setDownloadSuccess(true);
+    setTimeout(() => setDownloadSuccess(false), 4000);
+  };
+
+  const renderConsolidatedGuide = () => {
+    const dayClasses = todayClasses.filter((c: any) => c.studentId === currentStudent.id);
+    const daySubjects = studentSubjects.filter((s: any) => dayClasses.some((c: any) => c.subjectId === s.id));
+    const date = selectedDayOfWeek === 'Lunes' ? '07 Sep' : selectedDayOfWeek === 'Martes' ? '08 Sep' : selectedDayOfWeek === 'Miércoles' ? '09 Sep' : selectedDayOfWeek === 'Jueves' ? '10 Sep' : '11 Sep';
+    downloadConsolidatedDailyGuide({
+      student: currentStudent,
+      dayClasses,
+      daySubjects,
+      selectedDay: selectedDayOfWeek,
+      dateStr: date
+    });
   };
 
   const handleAskSocraticTeacher = (promptText: string) => {
