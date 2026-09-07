@@ -105,11 +105,13 @@ export interface ClassResource {
   order: number;
 }
 
+export type ClassActivityType = 'reflection' | 'practice' | 'quiz' | 'project' | 'experiment' | 'observation' | 'research' | 'writing' | 'analysis' | 'speaking' | 'debugging';
+
 export interface ClassActivity {
   id: string;
   title: string;
   description: string;
-  type: 'reflection' | 'practice' | 'quiz' | 'project' | 'experiment';
+  type: ClassActivityType;
   points: number;
   completed?: boolean;
 }
@@ -137,6 +139,74 @@ export interface DailyClass {
   homeworkTask: string;
   reflectionPrompt: string;
   isCompleted?: boolean;
+  /** Progressive learning-path stages for the Gamified Masterclass */
+  learningPath?: LearningPathStage[];
+  /** Curated verified video resources for the Digital Laboratory */
+  digitalResources?: DigitalResource[];
+  /** Socratic pause prompts placed at key moments in the flow */
+  socraticPauses?: SocraticPause[];
+  /** Evidence criteria aligned with each learning-path stage */
+  evidenceCriteria?: EvidenceCriterion[];
+}
+
+/** Progressive path stage: concept → deepen → apply → create */
+export interface LearningPathStage {
+  id: string;
+  order: number;
+  title: string;
+  type: 'concept' | 'deepen' | 'apply' | 'create';
+  /** Core concept content presented visually and narratively */
+  coreConcept: {
+    summary: string;
+    detailedExplanation: string;
+    visualAnalogy?: string;
+    keyTakeaways: string[];
+  };
+  /** Guiding question to verify comprehension before advancing */
+  guidingQuestion: string;
+  /** Scaffolded hints if student struggles */
+  socraticHints?: string[];
+  /** Expected response depth indicator */
+  minResponseLength?: number;
+  /** Advance signal text shown when ready to proceed */
+  advanceSignal: string;
+  /** Estimated minutes for this stage */
+  estimatedMinutes: number;
+}
+
+/** Verified digital resource (video, simulator, article) */
+export type DigitalResourceType = 'video' | 'simulator' | 'interactive' | 'article' | 'document';
+
+export interface DigitalResource {
+  id: string;
+  title: string;
+  type: DigitalResourceType;
+  url: string;
+  platform: string;
+  language: 'es' | 'en' | 'both';
+  durationMinutes?: number;
+  verifiedAt: string; // ISO date
+  isAccessible: boolean;
+  description: string;
+  alignsWithStages: string[]; // learningPathStage ids
+}
+
+/** Socratic pause embedded at specific flow moments */
+export interface SocraticPause {
+  id: string;
+  trigger: 'afterStage' | 'beforeStage' | 'midStage';
+  targetStageId: string;
+  prompt: string;
+  followUpQuestion?: string;
+  reflectionPrompt: string;
+}
+
+/** Evidence criterion tied to a learning-path stage */
+export interface EvidenceCriterion {
+  stageId: string;
+  criterion: string;
+  indicator: string; // observable evidence
+  weight: number; // 1-5
 }
 
 export interface VerifiedResource {
