@@ -8,30 +8,26 @@ interface ConsolidatedGuideOptions {
   dateStr: string;
 }
 
-function getThemeVars(student: Student) {
-  if (student.id === 'avril') {
-    return {
-      accent: '#6366f1', accentLight: '#818cf8', accentDark: '#4f46e5',
-      bgGrad: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 50%, #a855f7 100%)',
-      cardBg: '#faf5ff', cardBorder: '#c4b5fd', cardTitle: '#5b21b6',
-      sectionBg: '#eef2ff', sectionBorder: '#a5b4fc', badgeBg: '#ede9fe',
-      quoteBg: '#f5f3ff', quoteBorder: '#c4b5fd',
-      worldEmoji: '🐶', worldName: 'SNOOPY & PEANUTS', methodLabel: 'Montessori & Charlotte Mason',
-    };
-  }
-  if (student.id === 'gael') {
-    return {
-      accent: '#f59e0b', accentLight: '#fbbf24', accentDark: '#d97706',
-      bgGrad: 'linear-gradient(135deg, #d97706 0%, #f59e0b 50%, #fbbf24 100%)',
-      cardBg: '#fffbeb', cardBorder: '#fcd34d', cardTitle: '#92400e',
-      sectionBg: '#fffbeb', sectionBorder: '#fcd34d', badgeBg: '#fef3c7',
-      quoteBg: '#fffbeb', quoteBorder: '#fcd34d',
-      worldEmoji: '🍄', worldName: 'SUPER MARIO BROS KINGDOM', methodLabel: 'Método Montessori & Charlotte Mason',
-    };
-  }
+function getThemeVars(student?: Student) {
+  if (student) return {
+    accent: student.id === 'avril' ? '#6366f1' : student.id === 'gael' ? '#f59e0b' : '#6366f1',
+    accentLight: student.id === 'avril' ? '#818cf8' : student.id === 'gael' ? '#fbbf24' : '#818cf8',
+    accentDark: student.id === 'avril' ? '#4f46e5' : student.id === 'gael' ? '#d97706' : '#4f46e5',
+    bgGrad: student.id === 'avril' ? 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 50%, #a855f7 100%)' : student.id === 'gael' ? 'linear-gradient(135deg, #d97706 0%, #f59e0b 50%, #fbbf24 100%)' : 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 50%, #a855f7 100%)',
+    cardBg: student.id === 'avril' ? '#faf5ff' : student.id === 'gael' ? '#fffbeb' : '#faf5ff',
+    cardBorder: student.id === 'avril' ? '#c4b5fd' : student.id === 'gael' ? '#fcd34d' : '#c4b5fd',
+    cardTitle: student.id === 'avril' ? '#5b21b6' : student.id === 'gael' ? '#92400e' : '#5b21b6',
+    sectionBg: student.id === 'avril' ? '#eef2ff' : student.id === 'gael' ? '#fffbeb' : '#eef2ff',
+    sectionBorder: student.id === 'avril' ? '#a5b4fc' : student.id === 'gael' ? '#fcd34d' : '#a5b4fc',
+    badgeBg: student.id === 'avril' ? '#ede9fe' : student.id === 'gael' ? '#fef3c7' : '#ede9fe',
+    quoteBg: student.id === 'avril' ? '#f5f3ff' : student.id === 'gael' ? '#fffbeb' : '#f5f3ff',
+    quoteBorder: student.id === 'avril' ? '#c4b5fd' : student.id === 'gael' ? '#fcd34d' : '#c4b5fd',
+    worldEmoji: student.id === 'avril' ? '🐶' : student.id === 'gael' ? '🍄' : '🎓',
+    worldName: student.id === 'avril' ? 'SNOOPY & PEANUTS' : student.id === 'gael' ? 'SUPER MARIO BROS KINGDOM' : 'WISDOM SCHOOL',
+    methodLabel: student.id === 'avril' ? 'Montessori & Charlotte Mason' : student.id === 'gael' ? 'Método Montessori & Charlotte Mason' : 'Montessori & Charlotte Mason',
+  };
   return {
-    accent: '#6366f1', accentLight: '#818cf8', accentDark: '#4f46e5',
-    bgGrad: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)',
+    accent: '#6366f1', accentLight: '#818cf8', accentDark: '#4f46e5', bgGrad: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 50%, #a855f7 100%)',
     cardBg: '#faf5ff', cardBorder: '#c4b5fd', cardTitle: '#5b21b6',
     sectionBg: '#eef2ff', sectionBorder: '#a5b4fc', badgeBg: '#ede9fe',
     quoteBg: '#f5f3ff', quoteBorder: '#c4b5fd',
@@ -177,10 +173,7 @@ function buildClassChapter(cls: DailyClass, subject?: Subject, student?: Student
     </div>`;
 }
 
-function getThemeVars(student?: Student) {
-  if (!student) return { accent: '#6366f1', accentLight: '#818cf8', accentDark: '#4f46e5', bgGrad: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 50%, #a855f7 100%)', cardBg: '#faf5ff', cardBorder: '#c4b5fd', cardTitle: '#5b21b6', sectionBg: '#eef2ff', sectionBorder: '#a5b4fc', badgeBg: '#ede9fe', quoteBg: '#f5f3ff', quoteBorder: '#c4b5fd', worldEmoji: '🎓', worldName: 'WISDOM SCHOOL', methodLabel: 'Montessori & Charlotte Mason' };
-  return getThemeVars(student);
-}
+
 
 export function generateConsolidatedDailyGuideHTML(opts: ConsolidatedGuideOptions): string {
   const { student, dayClasses, daySubjects, selectedDay, dateStr } = opts;
