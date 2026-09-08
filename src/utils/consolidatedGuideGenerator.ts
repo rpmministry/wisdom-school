@@ -1,4 +1,9 @@
 import { DailyClass, Subject, Student } from '../types';
+import {
+  obtenerContextoTema,
+  arreglarUrlRecurso,
+  LAB_RESOURCES
+} from '../data/pedagogicalContent';
 
 interface ConsolidatedGuideOptions {
   student: Student;
@@ -124,12 +129,48 @@ function buildClassChapter(cls: DailyClass, subject?: Subject, student?: Student
       </div>
     </div>`).join('');
 
-  const socraticHtml = (cls.socraticQuestions || []).map((q: string, idx: number) => `
-    <div style="background:#eef2ff;border-left:3px solid #6366f1;padding:8px 12px;margin-bottom:8px;border-radius:0 6px 6px 0;font-size:11px;">
-      <strong>Pregunta ${idx + 1}:</strong> "${escapeHtml(q)}"
-      <div style="border-bottom:1px solid #cbd5e1;height:20px;margin-top:4px;"></div>
-      <div style="border-bottom:1px solid #cbd5e1;height:20px;margin-top:2px;"></div>
-    </div>`).join('');
+  const temaContexto = obtenerContextoTema(cls.theme);
+  const observado = temaContexto ? `<div style="background:#eef7ff;border:1px solid #93c5fc;border-radius:8px;padding:10px 14px;margin-bottom:10px;font-size:11px;color:#1e3a8a;font-weight:bold;">${temaContexto.observacion}</div>` : '';
+  const explicacionContexto = temaContexto ? `<div style="font-size:10px;color:#475569;margin-top:4px;margin-bottom:8px;">${temaContexto.explicacion}</div>` : '';
+  const instruccionContexto = temaContexto ? `<div style="font-size:10px;color:#6366f1;margin-top:4px;font-style:italic;">${temaContexto.instruccion}</div>` : '';
+  const simuladorInfo = temaContexto?.simuladorUrl ? ` <a href="${temaContexto.simuladorUrl}" target="_blank" style="color:#6366f1;text-decoration:none;font-size:10px;">🔗 ${temaContexto.simuladorNombre || 'Laboratorio'}</a>` : '';
+  const labNote = !temaContexto?.simuladorUrl && !cls.simulatorUrl ? '<div style="font-size:10px;color:#94a3b8;">Disponible en la plataforma.</div>' : '';
+
+  const contextoTemaHtml = temaContexto ? `
+    <div style="background:#eef7ff;border:1px solid #93c5fd;border-radius:8px;padding:12px 14px;margin-bottom:12px;font-size:11px;color:#1e3a8a;">
+      <strong>📖 Contexto del Tema / Observa y Analiza:</strong> ${temaContexto.observacion}
+      <div style="margin-top:6px;color:#475569;">${temaContexto.explicacion}</div>
+      ${temaContexto.instruccion ? `<div style="margin-top:4px;color:#6366f1;font-style:italic;">${temaContexto.instruccion}</div>` : ''}
+      ${temaContexto.simuladorUrl ? `<div style="margin-top:6px;"><a href="${temaContexto.simuladorUrl}" target="_blank" style="color:#6366f1;text-decoration:none;font-size:10px;">🔗 ${temaContexto.simuladorNombre || 'Laboratorio'}</a></div>` : ''}
+    </div>
+  ` : '';
+
+  const socraticHtml = (cls.socraticQuestions && cls.socraticQuestions.length > 0)
+    ? cls.socraticQuestions.map((q: string, idx: number) => `
+      <div style="background:#eef2ff;border-left:3px solid #6366f1;padding:8px 12px;border-radius:0 6px 6px 0;font-size:11px;margin-bottom:8px;">
+        <strong>Pregunta de Reflexión #${idx + 1}:</strong> "${escapeHtml(q)}"
+        <div style="border-bottom:1px solid #cbd5e1;height:20px;margin-top:4px;"></div>
+      </div>
+    `).join('')
+    : `<div style="background:#eef2ff;border-left:3px solid #6366f1;padding:8px 12px;border-radius:0 6px 6px 0;font-size:11px;"><strong>Pregunta de Reflexión:</strong> "${escapeHtml(cls.reflectionPrompt || '¿Cómo aplicas este concepto en tu vida cotidiana?')}"<div style="border-bottom:1px solid #cbd5e1;height:20px;margin-top:4px;"></div></div>`;
+
+  const correctedResources = (cls.resources || []).map(r => {
+    const corrected = arreglarUrlRecurso(r.url, cls.theme);
+    return { ...r, url: corrected.url, description: corrected.sitio || r.description };
+  });
+
+  const labSectionHtml = correctedResources.length > 0 || cls.simulatorUrl ? `
+    <div style="font-size:13px;font-weight:bold;color:#1e3a8a;background:#e0e7ff;padding:6px 12px;border-left:4px solid #3b82f6;border-radius:0 6px 6px 0;text-transform:uppercase;margin-top:14px;margin-bottom:10px;">VI. LABORATORIO DIGITAL INTERACTIVO</div>
+    <div style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:11px;color:#475569;">
+      ${correctedResources.map(r => `
+        <div style="margin-bottom:8px;display:flex;align-items:center;gap:6px;">
+          <span style="font-weight:bold;">${r.title}:</span>
+          ${r.url ? `<a href="${r.url}" target="_blank" style="color:#6366f1;text-decoration:none;">${r.description || 'Acceder'}</a>` : `<span style="font-size:10px;color:#94a3b8;">${r.description || 'No disponible'}</span>`}
+        </div>
+      `).join('')}
+      ${labNote}
+    </div>
+  ` : '';
 
   const breaksHtml = (cls.timeBreakdown || []).map((tb: any) => `
     <tr style="border-bottom:1px solid #e2e8f0;">
@@ -141,18 +182,35 @@ function buildClassChapter(cls: DailyClass, subject?: Subject, student?: Student
   return `
     <div style="page-break-before:always;padding:20px;">
       ${worldBanner}
-      <div style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:8px;padding:12px 16px;margin-bottom:12px;font-size:11px;display:grid;grid-template-columns:1fr 1fr;gap:6px;">
-        <div><strong>Estudiante:</strong> ${escapeHtml(student?.name || 'Estudiante')}</div>
-        <div><strong>Nivel:</strong> ${escapeHtml(student?.gradeLong || student?.grade || 'EGB')}</div>
-        <div><strong>Materia:</strong> ${escapeHtml(subject?.name || 'Materia')}</div>
-        <div><strong>Docente:</strong> ${escapeHtml(subject?.teacher?.name || 'Docente Asignado')}</div>
-        <div><strong>Unidad:</strong> ${escapeHtml(cls.unit)}</div>
-        <div><strong>Horario:</strong> ${escapeHtml(cls.scheduleTime || 'Sesión')}</div>
-      </div>
-      <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:10px 14px;font-size:11px;color:#166534;margin-bottom:14px;">
-        <strong>🎯 OBJETIVO:</strong> ${escapeHtml(cls.objective)}
-      </div>
-      ${buildPedagogicalRoute()}
+<div style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:8px;padding:12px 16px;margin-bottom:12px;font-size:11px;display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+      <div><strong>Estudiante:</strong> ${escapeHtml(student?.name || 'Estudiante')}</div>
+      <div><strong>Nivel:</strong> ${escapeHtml(student?.gradeLong || student?.grade || 'EGB')}</div>
+      <div><strong>Materia:</strong> ${escapeHtml(subject?.name || 'Materia')}</div>
+      <div><strong>Docente:</strong> ${escapeHtml(subject?.teacher?.name || 'Docente Asignado')}</div>
+      <div><strong>Unidad:</strong> ${escapeHtml(cls.unit)}</div>
+      <div><strong>Horario:</strong> ${escapeHtml(cls.scheduleTime || 'Sesión')}</div>
+    </div>
+    <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:10px 14px;font-size:11px;color:#166534;margin-bottom:14px;">
+      <strong>🎯 OBJETIVO:</strong> ${escapeHtml(cls.objective)}
+    </div>
+    <div style="background:#e0f2fe;border:1px solid #bae6fd;border-radius:8px;padding:12px 16px;font-size:11px;color:#0c4a6e;margin-bottom:14px;">
+    <strong>🚀 RESULTADOS DE LA CLASE:</strong>
+  </div>
+  <div style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:8px;padding:12px 16px;margin-bottom:12px;font-size:11px;display:grid;grid-template-columns:1fr;gap:6px;">
+    <div class="info-item"><span class="info-label">Ideas Clave:</span> 
+      ${(cls.learningPath?.[0]?.coreConcept?.keyTakeaways || []).map((takeaway: string) => escapeHtml(takeaway)).join('; ')}
+    </div>
+  </div>
+  <div style="background:#fffbeb;border:1px solid #fef3c7;border-left:4px solid #f59e0b;padding:12px;border-radius:6px;font-size:11px;color:#78350f;margin-bottom:14px;">
+    <strong>📌 Criterios de Evaluación:</strong> ${ 
+      (cls.evidenceCriteria || [])
+        .map((ec: any) => `${escapeHtml(ec.criterion)} (${escapeHtml(ec.indicator)})`)
+        .join('; ')
+    }
+  </div>
+  ${buildPedagogicalRoute()}
+  ${contextoTemaHtml}
+  ${labSectionHtml}
       <div style="font-size:13px;font-weight:bold;color:#1e3a8a;background:#e0e7ff;padding:6px 12px;border-left:4px solid #3b82f6;border-radius:0 6px 6px 0;text-transform:uppercase;margin-top:14px;margin-bottom:10px;">I. INTRODUCCIÓN Y PASO A PASO EXPLICATIVO</div>
       <div style="font-size:11px;margin-bottom:12px;text-align:justify;line-height:1.6;">${escapeHtml(cls.introduction || 'Bienvenido a esta lección.')}</div>
       ${breaksHtml ? `<table style="width:100%;border-collapse:collapse;margin-bottom:14px;font-size:10px;"><thead><tr style="background:#1e293b;color:#fff;"><th style="padding:5px 8px;text-align:left;width:25%;">Momento</th><th style="padding:5px 8px;text-align:left;width:15%;">Tiempo</th><th style="padding:5px 8px;text-align:left;">Descripción</th></tr></thead><tbody>${breaksHtml}</tbody></table>` : ''}
