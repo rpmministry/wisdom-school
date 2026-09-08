@@ -207,27 +207,76 @@ export const AITeacherDrawer: React.FC = () => {
                   </div>
 
                   {!isUser && !isSystemError && (
-                    <div className="mt-2 w-full max-w-xs p-2 rounded-xl bg-slate-900 border border-slate-700 flex items-center justify-between shadow-inner">
-                      <div className="flex items-center gap-2">
-                        {isActiveSpeech && !isPaused ? (
-                          <button onClick={handlePauseVoice} className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-amber-500 text-amber-950 hover:bg-amber-400 font-black text-[10px] sm:text-xs shadow-md active:scale-95 transition-all">
-                            <Pause className="w-3.5 h-3.5 fill-current" /> PAUSAR
-                          </button>
-                        ) : (
-                          <button onClick={() => handlePlayVoice(msg.content, msg.id)} className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-500 text-emerald-950 hover:bg-emerald-400 font-black text-[10px] sm:text-xs shadow-md active:scale-95 transition-all">
-                            <Play className="w-3.5 h-3.5 fill-current" /> 
-                            {isPaused ? 'REANUDAR' : 'ESCUCHAR'}
-                          </button>
-                        )}
-                        {isActiveSpeech && (
-                          <button onClick={handleStopVoice} className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-rose-500 text-white hover:bg-rose-400 font-black text-[10px] sm:text-xs shadow-md active:scale-95 transition-all">
-                            <StopCircle className="w-4 h-4 fill-current" /> PARAR
-                          </button>
-                        )}
+                    <div className="mt-2 w-full max-w-sm p-2.5 rounded-xl bg-slate-950 border border-slate-800 flex flex-col gap-2 shadow-inner">
+                      <div className="flex items-center justify-between border-b border-slate-800/60 pb-1.5 px-1">
+                        <span className="text-[10px] font-bold text-slate-400 tracking-wide uppercase">Controles de Audio</span>
+                        <div className="flex items-center gap-1.5">
+                          {isActiveSpeech && !isPaused && (
+                            <span className="text-[9px] font-bold text-emerald-400 uppercase tracking-wider animate-pulse flex items-center gap-1">
+                              <Volume2 className="w-3 h-3" /> Reproduciendo
+                            </span>
+                          )}
+                          {isActiveSpeech && isPaused && (
+                            <span className="text-[9px] font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1">
+                              <Pause className="w-3 h-3" /> Pausado
+                            </span>
+                          )}
+                          <span className="text-[9px] text-slate-500 font-mono">{msg.timestamp}</span>
+                        </div>
                       </div>
-                      <div className="flex flex-col items-end">
-                        {isActiveSpeech && !isPaused && <span className="text-[9px] font-bold text-emerald-400 uppercase tracking-wider animate-pulse flex items-center gap-1"><Volume2 className="w-3 h-3" /> LEYENDO</span>}
-                        <span className="text-[9px] text-slate-500 font-mono mt-0.5">{msg.timestamp}</span>
+                      
+                      <div className="flex items-center gap-1.5">
+                        {/* Botón Reproducir / Reanudar */}
+                        <button
+                          onClick={() => {
+                            if (isActiveSpeech && isPaused) {
+                              ttsService.resume();
+                              setIsPaused(false);
+                            } else {
+                              handlePlayVoice(msg.content, msg.id);
+                            }
+                          }}
+                          className={`flex-1 flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg font-bold text-[10px] sm:text-xs transition-all active:scale-95 ${
+                            isActiveSpeech && !isPaused
+                              ? 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700/30'
+                              : 'bg-emerald-600 text-white hover:bg-emerald-500 shadow-md border border-emerald-500/20'
+                          }`}
+                          disabled={isActiveSpeech && !isPaused}
+                          title={isActiveSpeech && isPaused ? 'Reanudar audio' : 'Reproducir audio'}
+                        >
+                          <Play className="w-3.5 h-3.5 fill-current" />
+                          <span>{isActiveSpeech && isPaused ? 'REANUDAR' : 'REPRODUCIR'}</span>
+                        </button>
+
+                        {/* Botón Pausar */}
+                        <button
+                          onClick={handlePauseVoice}
+                          className={`flex-1 flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg font-bold text-[10px] sm:text-xs transition-all active:scale-95 ${
+                            isActiveSpeech && !isPaused
+                              ? 'bg-amber-600 text-white hover:bg-amber-500 shadow-md border border-amber-500/20'
+                              : 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700/30'
+                          }`}
+                          disabled={!isActiveSpeech || isPaused}
+                          title="Pausar audio"
+                        >
+                          <Pause className="w-3.5 h-3.5 fill-current" />
+                          <span>PAUSAR</span>
+                        </button>
+
+                        {/* Botón Detener */}
+                        <button
+                          onClick={handleStopVoice}
+                          className={`flex-1 flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg font-bold text-[10px] sm:text-xs transition-all active:scale-95 ${
+                            isActiveSpeech
+                              ? 'bg-rose-600 text-white hover:bg-rose-500 shadow-md border border-rose-500/20'
+                              : 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700/30'
+                          }`}
+                          disabled={!isActiveSpeech}
+                          title="Detener audio"
+                        >
+                          <StopCircle className="w-3.5 h-3.5 fill-current" />
+                          <span>DETENER</span>
+                        </button>
                       </div>
                     </div>
                   )}
