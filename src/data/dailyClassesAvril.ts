@@ -14,8 +14,8 @@ export const AVRIL_DAILY_CLASSES: DailyClass[] = [
     "introduction": "Bienvenidos al curso de Álgebra. Hoy iniciaremos con la resolución de ecuaciones.",
     "reading": "Ejercicios del libro página 10-15",
     "socraticQuestions": [
-      "¿Qué observas en esta ecuación?",
-      "¿Cómo aplicarías esto a un problema cotidiano?"
+      "Observa la ecuación de ejemplo del contexto: **x + 5 = 12**. ¿Qué representa cada elemento (x, +, 5, =, 12)?",
+      "¿Cómo aplicarías el método de la balanza (restar 5 en ambos lados) a un problema cotidiano?"
     ],
     "resources": [
       {
@@ -85,7 +85,7 @@ export const AVRIL_DAILY_CLASSES: DailyClass[] = [
             "Relacionar el concepto con ejemplos de la vida cotidiana."
           ]
         },
-        "guidingQuestion": "¿Qué observas en esta ecuación?",
+        "guidingQuestion": "Observa la ecuación de ejemplo del contexto: **x + 5 = 12**. ¿Qué representa cada elemento (x, +, 5, =, 12)?",
         "socraticHints": [
           "Piensa en cómo se aplica esto en tu día a día.",
           "Observa los detalles en el material de lectura."
@@ -185,7 +185,7 @@ export const AVRIL_DAILY_CLASSES: DailyClass[] = [
         "id": "class-mat-avril-01-pause-1",
         "trigger": "afterStage",
         "targetStageId": "class-mat-avril-01-stage-1",
-        "prompt": "¿Qué observas en esta ecuación?",
+        "prompt": "Observa la ecuación de ejemplo del contexto: **x + 5 = 12**. ¿Qué representa cada elemento (x, +, 5, =, 12)?",
         "followUpQuestion": "¿Por qué crees que este concepto es relevante en tu vida escolar?",
         "reflectionPrompt": "Tómate un momento para pensar antes de responder."
       },
@@ -649,8 +649,8 @@ export const AVRIL_DAILY_CLASSES: DailyClass[] = [
     "introduction": "Hoy practicamos la escritura argumentativa con estructura sólida.",
     "reading": "Modelo de ensayo argumentativo",
     "socraticQuestions": [
-      "¿Cuál es tu postura sobre el tema?",
-      "¿Qué evidencia respalda tu argumento?"
+      "Usa la estructura del contexto (Tesis → Argumentos → Evidencias → Conclusión). ¿Cuál es tu postura (tesis) sobre un tema que elijas?",
+      "¿Qué evidencias concretas usarías para respaldar tu argumento según la estructura?"
     ],
     "resources": [
       {
@@ -719,7 +719,7 @@ export const AVRIL_DAILY_CLASSES: DailyClass[] = [
             "Relacionar el concepto con ejemplos de la vida cotidiana."
           ]
         },
-        "guidingQuestion": "¿Cuál es tu postura sobre el tema?",
+        "guidingQuestion": "Usa la estructura del contexto (Tesis → Argumentos → Evidencias → Conclusión). ¿Cuál es tu postura (tesis) sobre un tema que elijas?",
         "socraticHints": [
           "Piensa en cómo se aplica esto en tu día a día.",
           "Observa los detalles en el material de lectura."
@@ -742,7 +742,7 @@ export const AVRIL_DAILY_CLASSES: DailyClass[] = [
             "Validar hipótesis mediante preguntas de reflexión."
           ]
         },
-        "guidingQuestion": "¿Qué evidencia respalda tu argumento?",
+        "guidingQuestion": "¿Qué evidencias concretas usarías para respaldar tu argumento según la estructura (Tesis → Argumentos → Evidencias → Conclusión)?",
         "socraticHints": [
           "Compara las semejanzas y diferencias.",
           "Intenta explicarlo con tus propias palabras."
@@ -819,7 +819,7 @@ export const AVRIL_DAILY_CLASSES: DailyClass[] = [
         "id": "class-len-avril-lunes-01-pause-1",
         "trigger": "afterStage",
         "targetStageId": "class-len-avril-lunes-01-stage-1",
-        "prompt": "¿Cuál es tu postura sobre el tema?",
+        "prompt": "Usa la estructura del contexto (Tesis → Argumentos → Evidencias → Conclusión). ¿Cuál es tu postura (tesis) sobre un tema que elijas?",
         "followUpQuestion": "¿Por qué crees que este concepto es relevante en tu vida escolar?",
         "reflectionPrompt": "Tómate un momento para pensar antes de responder."
       },
@@ -827,7 +827,7 @@ export const AVRIL_DAILY_CLASSES: DailyClass[] = [
         "id": "class-len-avril-lunes-01-pause-2",
         "trigger": "midStage",
         "targetStageId": "class-len-avril-lunes-01-stage-3",
-        "prompt": "¿Qué evidencia respalda tu argumento?",
+        "prompt": "¿Qué evidencias concretas usarías para respaldar tu argumento según la estructura (Tesis → Argumentos → Evidencias → Conclusión)?",
         "followUpQuestion": "¿Qué estrategia te ayudó a superarla?",
         "reflectionPrompt": "Escribe una breve reflexión en tu libreta o comparte con tu profesor IA."
       }
@@ -860,8 +860,8 @@ export const AVRIL_DAILY_CLASSES: DailyClass[] = [
     "introduction": "Hoy trabajaremos la lectura comprensiva y el ensayo.",
     "reading": "Texto modelo: \"El poder de la palabra\"",
     "socraticQuestions": [
-      "¿Cuál es la tesis principal del texto?",
-      "¿Qué argumentos presenta el autor?"
+      "Aplica el método del contexto: lee el texto y pregúntate: ¿qué dice?, ¿por qué lo dice?, ¿qué quiere que yo piense? ¿Cuál es la idea central (tesis)?",
+      "Identifica una razón/argumento del autor y explica cómo te diste cuenta."
     ],
     "resources": [
       {
@@ -930,7 +930,7 @@ export const AVRIL_DAILY_CLASSES: DailyClass[] = [
             "Relacionar el concepto con ejemplos de la vida cotidiana."
           ]
         },
-        "guidingQuestion": "¿Cuál es la tesis principal del texto?",
+        "guidingQuestion": "Aplica el método del contexto: lee el texto y pregúntate: ¿qué dice?, ¿por qué lo dice?, ¿qué quiere que yo piense? ¿Cuál es la idea central (tesis)?",
         "socraticHints": [
           "Piensa en cómo se aplica esto en tu día a día.",
           "Observa los detalles en el material de lectura."
@@ -953,7 +953,7 @@ export const AVRIL_DAILY_CLASSES: DailyClass[] = [
             "Validar hipótesis mediante preguntas de reflexión."
           ]
         },
-        "guidingQuestion": "¿Qué argumentos presenta el autor?",
+        "guidingQuestion": "Identifica una razón/argumento del autor y explica cómo te diste cuenta (usa el método: ¿qué dice?, ¿por qué lo dice?, ¿qué quiere que yo piense?).",
         "socraticHints": [
           "Compara las semejanzas y diferencias.",
           "Intenta explicarlo con tus propias palabras."
@@ -1030,7 +1030,7 @@ export const AVRIL_DAILY_CLASSES: DailyClass[] = [
         "id": "class-len-avril-01-pause-1",
         "trigger": "afterStage",
         "targetStageId": "class-len-avril-01-stage-1",
-        "prompt": "¿Cuál es la tesis principal del texto?",
+        "prompt": "Aplica el método del contexto: lee el texto y pregúntate: ¿qué dice?, ¿por qué lo dice?, ¿qué quiere que yo piense? ¿Cuál es la idea central (tesis)?",
         "followUpQuestion": "¿Por qué crees que este concepto es relevante en tu vida escolar?",
         "reflectionPrompt": "Tómate un momento para pensar antes de responder."
       },
@@ -1038,7 +1038,7 @@ export const AVRIL_DAILY_CLASSES: DailyClass[] = [
         "id": "class-len-avril-01-pause-2",
         "trigger": "midStage",
         "targetStageId": "class-len-avril-01-stage-3",
-        "prompt": "¿Qué argumentos presenta el autor?",
+        "prompt": "Identifica una razón/argumento del autor y explica cómo te diste cuenta (usa el método: ¿qué dice?, ¿por qué lo dice?, ¿qué quiere que yo piense?).",
         "followUpQuestion": "¿Qué estrategia te ayudó a superarla?",
         "reflectionPrompt": "Escribe una breve reflexión en tu libreta o comparte con tu profesor IA."
       }
@@ -1917,8 +1917,8 @@ export const AVRIL_DAILY_CLASSES: DailyClass[] = [
     "introduction": "Hoy profundizamos en la lectura y escritura argumentativa.",
     "reading": "Texto modelo: \"La educación en el siglo XXI\"",
     "socraticQuestions": [
-      "¿Cuál es la tesis principal del texto?",
-      "¿Qué evidencia presenta el autor?"
+      "Usa la estructura del contexto (Tesis → Argumento → Evidencia). ¿Cuál es la tesis principal que identificarías en el texto?",
+      "¿Qué evidencia concreta presentaría el autor para sostener su argumento?"
     ],
     "resources": [
       {
@@ -1987,7 +1987,7 @@ export const AVRIL_DAILY_CLASSES: DailyClass[] = [
             "Relacionar el concepto con ejemplos de la vida cotidiana."
           ]
         },
-        "guidingQuestion": "¿Cuál es la tesis principal del texto?",
+        "guidingQuestion": "Usa la estructura del contexto (Tesis → Argumento → Evidencia). ¿Cuál es la tesis principal que identificarías en el texto?",
         "socraticHints": [
           "Piensa en cómo se aplica esto en tu día a día.",
           "Observa los detalles en el material de lectura."
@@ -2010,7 +2010,7 @@ export const AVRIL_DAILY_CLASSES: DailyClass[] = [
             "Validar hipótesis mediante preguntas de reflexión."
           ]
         },
-        "guidingQuestion": "¿Qué evidencia presenta el autor?",
+        "guidingQuestion": "¿Qué evidencia concreta presentaría el autor para sostener su argumento (estructura Tesis → Argumento → Evidencia)?",
         "socraticHints": [
           "Compara las semejanzas y diferencias.",
           "Intenta explicarlo con tus propias palabras."
@@ -2087,7 +2087,7 @@ export const AVRIL_DAILY_CLASSES: DailyClass[] = [
         "id": "class-len-avril-02-pause-1",
         "trigger": "afterStage",
         "targetStageId": "class-len-avril-02-stage-1",
-        "prompt": "¿Cuál es la tesis principal del texto?",
+        "prompt": "Usa la estructura del contexto (Tesis → Argumento → Evidencia). ¿Cuál es la tesis principal que identificarías en el texto?",
         "followUpQuestion": "¿Por qué crees que este concepto es relevante en tu vida escolar?",
         "reflectionPrompt": "Tómate un momento para pensar antes de responder."
       },
@@ -2095,7 +2095,7 @@ export const AVRIL_DAILY_CLASSES: DailyClass[] = [
         "id": "class-len-avril-02-pause-2",
         "trigger": "midStage",
         "targetStageId": "class-len-avril-02-stage-3",
-        "prompt": "¿Qué evidencia presenta el autor?",
+        "prompt": "¿Qué evidencia concreta presentaría el autor para sostener su argumento (estructura Tesis → Argumento → Evidencia)?",
         "followUpQuestion": "¿Qué estrategia te ayudó a superarla?",
         "reflectionPrompt": "Escribe una breve reflexión en tu libreta o comparte con tu profesor IA."
       }
@@ -2128,8 +2128,8 @@ export const AVRIL_DAILY_CLASSES: DailyClass[] = [
     "introduction": "Continuamos con álgebra: ecuaciones cuadráticas.",
     "reading": "Fórmula general y ejemplos",
     "socraticQuestions": [
-      "¿Qué es una ecuación cuadrática?",
-      "¿Cuántas soluciones puede tener?"
+      "Observa la ecuación de ejemplo del contexto: **x² + 4x − 12 = 0**. Identifica los coeficientes a, b y c.",
+      "¿Cuántas soluciones puede tener una ecuación cuadrática y cómo lo sabes?"
     ],
     "resources": [
       {
@@ -2199,7 +2199,7 @@ export const AVRIL_DAILY_CLASSES: DailyClass[] = [
             "Relacionar el concepto con ejemplos de la vida cotidiana."
           ]
         },
-        "guidingQuestion": "¿Qué es una ecuación cuadrática?",
+        "guidingQuestion": "Observa la ecuación de ejemplo del contexto: **x² + 4x − 12 = 0**. Identifica los coeficientes a, b y c.",
         "socraticHints": [
           "Piensa en cómo se aplica esto en tu día a día.",
           "Observa los detalles en el material de lectura."
@@ -2222,7 +2222,7 @@ export const AVRIL_DAILY_CLASSES: DailyClass[] = [
             "Validar hipótesis mediante preguntas de reflexión."
           ]
         },
-        "guidingQuestion": "¿Cuántas soluciones puede tener?",
+        "guidingQuestion": "¿Cuántas soluciones puede tener una ecuación cuadrática y cómo lo sabes (discriminante)?",
         "socraticHints": [
           "Compara las semejanzas y diferencias.",
           "Intenta explicarlo con tus propias palabras."
@@ -2299,7 +2299,7 @@ export const AVRIL_DAILY_CLASSES: DailyClass[] = [
         "id": "class-mat-avril-02-pause-1",
         "trigger": "afterStage",
         "targetStageId": "class-mat-avril-02-stage-1",
-        "prompt": "¿Qué es una ecuación cuadrática?",
+        "prompt": "Observa la ecuación de ejemplo del contexto: **x² + 4x − 12 = 0**. Identifica los coeficientes a, b y c.",
         "followUpQuestion": "¿Por qué crees que este concepto es relevante en tu vida escolar?",
         "reflectionPrompt": "Tómate un momento para pensar antes de responder."
       },
@@ -2307,7 +2307,7 @@ export const AVRIL_DAILY_CLASSES: DailyClass[] = [
         "id": "class-mat-avril-02-pause-2",
         "trigger": "midStage",
         "targetStageId": "class-mat-avril-02-stage-3",
-        "prompt": "¿Cuántas soluciones puede tener?",
+        "prompt": "¿Cuántas soluciones puede tener una ecuación cuadrática y cómo lo sabes (discriminante)?",
         "followUpQuestion": "¿Qué estrategia te ayudó a superarla?",
         "reflectionPrompt": "Escribe una breve reflexión en tu libreta o comparte con tu profesor IA."
       }
@@ -3185,8 +3185,8 @@ export const AVRIL_DAILY_CLASSES: DailyClass[] = [
     "introduction": "Hoy practicamos la escritura argumentativa con estructura sólida.",
     "reading": "Modelo de ensayo argumentativo",
     "socraticQuestions": [
-      "¿Cuál es tu postura sobre el tema?",
-      "¿Qué evidencia respalda tu argumento?"
+      "Usa la estructura del contexto (Tesis → Argumentos → Evidencias → Conclusión). ¿Cuál es tu postura (tesis) sobre un tema que elijas?",
+      "¿Qué evidencias concretas usarías para respaldar tu argumento según la estructura?"
     ],
     "resources": [
       {
@@ -3255,7 +3255,7 @@ export const AVRIL_DAILY_CLASSES: DailyClass[] = [
             "Relacionar el concepto con ejemplos de la vida cotidiana."
           ]
         },
-        "guidingQuestion": "¿Cuál es tu postura sobre el tema?",
+        "guidingQuestion": "Usa la estructura del contexto (Tesis → Argumentos → Evidencias → Conclusión). ¿Cuál es tu postura (tesis) sobre un tema que elijas?",
         "socraticHints": [
           "Piensa en cómo se aplica esto en tu día a día.",
           "Observa los detalles en el material de lectura."
@@ -3278,7 +3278,7 @@ export const AVRIL_DAILY_CLASSES: DailyClass[] = [
             "Validar hipótesis mediante preguntas de reflexión."
           ]
         },
-        "guidingQuestion": "¿Qué evidencia respalda tu argumento?",
+        "guidingQuestion": "¿Qué evidencias concretas usarías para respaldar tu argumento según la estructura (Tesis → Argumentos → Evidencias → Conclusión)?",
         "socraticHints": [
           "Compara las semejanzas y diferencias.",
           "Intenta explicarlo con tus propias palabras."
@@ -3355,7 +3355,7 @@ export const AVRIL_DAILY_CLASSES: DailyClass[] = [
         "id": "class-len-avril-03-pause-1",
         "trigger": "afterStage",
         "targetStageId": "class-len-avril-03-stage-1",
-        "prompt": "¿Cuál es tu postura sobre el tema?",
+        "prompt": "Usa la estructura del contexto (Tesis → Argumentos → Evidencias → Conclusión). ¿Cuál es tu postura (tesis) sobre un tema que elijas?",
         "followUpQuestion": "¿Por qué crees que este concepto es relevante en tu vida escolar?",
         "reflectionPrompt": "Tómate un momento para pensar antes de responder."
       },
@@ -3363,7 +3363,7 @@ export const AVRIL_DAILY_CLASSES: DailyClass[] = [
         "id": "class-len-avril-03-pause-2",
         "trigger": "midStage",
         "targetStageId": "class-len-avril-03-stage-3",
-        "prompt": "¿Qué evidencia respalda tu argumento?",
+        "prompt": "¿Qué evidencias concretas usarías para respaldar tu argumento según la estructura (Tesis → Argumentos → Evidencias → Conclusión)?",
         "followUpQuestion": "¿Qué estrategia te ayudó a superarla?",
         "reflectionPrompt": "Escribe una breve reflexión en tu libreta o comparte con tu profesor IA."
       }

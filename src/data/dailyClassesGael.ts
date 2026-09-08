@@ -435,10 +435,10 @@ export const GAEL_DAILY_CLASSES: DailyClass[] = [
     "theme": "Valores y empatía",
     "objective": "Identificar emociones y valores",
     "introduction": "Hoy hablaremos de sentimientos y cómo tratamos a los demás.",
-    "reading": "Historia: \"El niño invisible\"",
+    "reading": "Historia: \"El niño invisible\" — Un niño que se siente solo en el recreo hasta que alguien lo invita a jugar.",
     "socraticQuestions": [
-      "¿Cómo se sintió el niño?",
-      "¿Qué harías tú en su lugar?"
+      "Según el contexto, la empatía es 'ponerte al servicio del otro'. ¿Cómo crees que se sintió el niño invisible antes y después de que lo invitaran?",
+      "¿Qué acción amable (como compartir, esperar tu turno, ayudar) harías tú para que alguien se sienta incluido?"
     ],
     "resources": [
       {
@@ -507,7 +507,7 @@ export const GAEL_DAILY_CLASSES: DailyClass[] = [
             "Relacionar el concepto con ejemplos de la vida cotidiana."
           ]
         },
-        "guidingQuestion": "¿Cómo se sintió el niño?",
+        "guidingQuestion": "Según el contexto, la empatía es 'ponerte al servicio del otro'. ¿Cómo crees que se sintió el niño invisible antes y después de que lo invitaran a jugar?",
         "socraticHints": [
           "Piensa en cómo se aplica esto en tu día a día.",
           "Observa los detalles en el material de lectura."
@@ -530,7 +530,7 @@ export const GAEL_DAILY_CLASSES: DailyClass[] = [
             "Validar hipótesis mediante preguntas de reflexión."
           ]
         },
-        "guidingQuestion": "¿Qué harías tú en su lugar?",
+        "guidingQuestion": "¿Qué acción amable (como compartir, esperar tu turno, ayudar) harías tú para que alguien se sienta incluido, según el contexto?",
         "socraticHints": [
           "Compara las semejanzas y diferencias.",
           "Intenta explicarlo con tus propias palabras."
@@ -607,7 +607,7 @@ export const GAEL_DAILY_CLASSES: DailyClass[] = [
         "id": "class-rel-gael-01-pause-1",
         "trigger": "afterStage",
         "targetStageId": "class-rel-gael-01-stage-1",
-        "prompt": "¿Cómo se sintió el niño?",
+        "prompt": "Según el contexto, la empatía es 'ponerte al servicio del otro'. ¿Cómo crees que se sintió el niño invisible antes y después de que lo invitaran a jugar?",
         "followUpQuestion": "¿Por qué crees que este concepto es relevante en tu vida escolar?",
         "reflectionPrompt": "Tómate un momento para pensar antes de responder."
       },
@@ -615,7 +615,7 @@ export const GAEL_DAILY_CLASSES: DailyClass[] = [
         "id": "class-rel-gael-01-pause-2",
         "trigger": "midStage",
         "targetStageId": "class-rel-gael-01-stage-3",
-        "prompt": "¿Qué harías tú en su lugar?",
+        "prompt": "¿Qué acción amable (como compartir, esperar tu turno, ayudar) harías tú para que alguien se sienta incluido, según el contexto?",
         "followUpQuestion": "¿Qué estrategia te ayudó a superarla?",
         "reflectionPrompt": "Escribe una breve reflexión en tu libreta o comparte con tu profesor IA."
       }
@@ -1283,8 +1283,8 @@ export const GAEL_DAILY_CLASSES: DailyClass[] = [
     "introduction": "Hoy exploraremos la naturaleza que nos rodea.",
     "reading": "Fotos de plantas y animales locales",
     "socraticQuestions": [
-      "¿Qué animales ves en tu jardín?",
-      "¿Qué necesitan las plantas para crecer?"
+      "Según el contexto, una 'planta del patio respira, necesita luz y agua'. ¿Qué seres vivos (plantas o animales) observas cerca de tu casa o escuela?",
+      "¿Qué necesitan las plantas para crecer? (Pista: luz, agua, aire)"
     ],
     "resources": [
       {
@@ -1354,7 +1354,7 @@ export const GAEL_DAILY_CLASSES: DailyClass[] = [
             "Relacionar el concepto con ejemplos de la vida cotidiana."
           ]
         },
-        "guidingQuestion": "¿Qué animales ves en tu jardín?",
+        "guidingQuestion": "Según el contexto, una 'planta del patio respira, necesita luz y agua'. ¿Qué seres vivos (plantas o animales) observas cerca de tu casa o escuela?",
         "socraticHints": [
           "Piensa en cómo se aplica esto en tu día a día.",
           "Observa los detalles en el material de lectura."
@@ -1454,7 +1454,7 @@ export const GAEL_DAILY_CLASSES: DailyClass[] = [
         "id": "class-sci-gael-02-pause-1",
         "trigger": "afterStage",
         "targetStageId": "class-sci-gael-02-stage-1",
-        "prompt": "¿Qué animales ves en tu jardín?",
+        "prompt": "Según el contexto, una 'planta del patio respira, necesita luz y agua'. ¿Qué seres vivos (plantas o animales) observas cerca de tu casa o escuela?",
         "followUpQuestion": "¿Por qué crees que este concepto es relevante en tu vida escolar?",
         "reflectionPrompt": "Tómate un momento para pensar antes de responder."
       },
@@ -1462,7 +1462,7 @@ export const GAEL_DAILY_CLASSES: DailyClass[] = [
         "id": "class-sci-gael-02-pause-2",
         "trigger": "midStage",
         "targetStageId": "class-sci-gael-02-stage-3",
-        "prompt": "¿Qué necesitan las plantas para crecer?",
+        "prompt": "¿Qué necesitan las plantas para crecer? (Pista: luz, agua, aire)",
         "followUpQuestion": "¿Qué estrategia te ayudó a superarla?",
         "reflectionPrompt": "Escribe una breve reflexión en tu libreta o comparte con tu profesor IA."
       }
