@@ -306,7 +306,7 @@ export const InteractiveLessonView: React.FC<InteractiveLessonViewProps> = ({ te
   };
 
   const handleVerify = () => {
-    const hasAnswer = (currentNode.socraticHints && selectedOption) || (!currentNode.socraticHints && textAnswer.trim());
+    const hasAnswer = textAnswer.trim() || (currentNode.socraticHints && selectedOption);
 
     if (!hasAnswer) {
       guideWithHints(
