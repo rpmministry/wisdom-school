@@ -35,19 +35,20 @@ export const AITeacherDrawer: React.FC = () => {
   const [speakingId, setSpeakingId] = useState<string | null>(null);
   const [isPaused, setIsPaused] = useState(false);
 
-  const lastActivityRef = useRef(Date.now());
-  const classIntervalRef = useRef<any>(null);
+const lastActivityRef = useRef(Date.now());
+   const classIntervalRef = useRef<any>(null);
+   const promptTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const handlePlayVoice = async (text: string, messageId: string) => {
-    await ttsService.play({
-      messageId,
-      text,
-      teacherName: teacher?.name || '',
-      onEnd: () => { setSpeakingId(null); setIsPaused(false); },
-      onPause: () => { setIsPaused(true); },
-      onPlay: () => { setSpeakingId(messageId); setIsPaused(false); },
-    });
-  };
+   const handlePlayVoice = async (text: string, messageId: string) => {
+     await ttsService.play({
+       messageId,
+       text,
+       teacherName: teacher?.name || '',
+       onEnd: () => { setSpeakingId(null); setIsPaused(false); },
+       onPause: () => { setIsPaused(true); },
+       onPlay: () => { setSpeakingId(messageId); setIsPaused(false); },
+     });
+   };
 
   const handlePauseVoice = () => {
     ttsService.pause();
@@ -127,14 +128,47 @@ export const AITeacherDrawer: React.FC = () => {
   };
 
   useEffect(() => {
+    if (!isTeacherDrawerOpen || isLoading) return;
+
+    classIntervalRef.current = setInterval(() => {
+      const inactiveMs = Date.now() - lastActivityRef.current;
+      if (inactiveMs > 90000 && messages.length > 0) {
+        const followUpPrompts = [
+          `Profesor, ¿podrías profundizar en "${dailyClass?.theme || 'el tema'}" con otro ejemplo concreto?`,
+          `¿Podrías conectar este aprendizaje con algo que vivamos en el día a día?`,
+          `Profesor, ¿qué otra perspectiva podemos explorar sobre "${dailyClass?.theme || 'este tema'}"?`,
+          `¿Me puedes guiar para aplicar lo aprendido en un problema práctico?`,
+        ];
+        const randomPrompt = followUpPrompts[Math.floor(Math.random() * followUpPrompts.length)];
+        handleSendMessage(randomPrompt);
+        lastActivityRef.current = Date.now();
+      }
+    }, 30000);
+
+    return () => {
+      if (classIntervalRef.current) clearInterval(classIntervalRef.current);
+    };
+  }, [isTeacherDrawerOpen, isLoading, messages.length, dailyClass?.theme]);
+
+  useEffect(() => {
+    if (promptTimeoutRef.current) {
+      clearTimeout(promptTimeoutRef.current);
+      promptTimeoutRef.current = null;
+    }
     if (isTeacherDrawerOpen) {
       lastActivityRef.current = Date.now();
       const pendingPrompt = localStorage.getItem('pending_socratic_prompt');
       if (pendingPrompt) {
         localStorage.removeItem('pending_socratic_prompt');
-        setTimeout(() => handleSendMessage(pendingPrompt), 300);
+        promptTimeoutRef.current = setTimeout(() => handleSendMessage(pendingPrompt), 300);
       }
     }
+    return () => {
+      if (promptTimeoutRef.current) {
+        clearTimeout(promptTimeoutRef.current);
+        promptTimeoutRef.current = null;
+      }
+    };
   }, [isTeacherDrawerOpen]);
 
   useEffect(() => {
