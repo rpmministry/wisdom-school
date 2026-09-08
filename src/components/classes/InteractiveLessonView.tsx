@@ -306,7 +306,9 @@ export const InteractiveLessonView: React.FC<InteractiveLessonViewProps> = ({ te
   };
 
   const handleVerify = () => {
-    const hasAnswer = textAnswer.trim() || (currentNode.socraticHints && selectedOption);
+    const trimmedAnswer = textAnswer.trim();
+    const hasOption = currentNode.socraticHints && selectedOption;
+    const hasAnswer = trimmedAnswer || hasOption;
 
     if (!hasAnswer) {
       guideWithHints(
@@ -317,11 +319,11 @@ export const InteractiveLessonView: React.FC<InteractiveLessonViewProps> = ({ te
       return;
     }
 
-    const studentInput = (selectedOption || textAnswer).trim();
+    const studentInput = (selectedOption || trimmedAnswer).trim();
     const inputLength = studentInput.length;
-    const isEngaged = inputLength >= 5;
+    const isMinimumLength = inputLength >= 5;
 
-    if (isEngaged) {
+    if (isMinimumLength) {
       setCompletedNodes((prev) => new Set(prev).add(currentNodeIndex));
       const celebrations = [
         `¡Excelente, ${student.name}! Tu aporte demuestra que estás pensando activamente en la etapa "${currentNode.title}". Sigamos construyendo.`,
@@ -591,15 +593,14 @@ export const InteractiveLessonView: React.FC<InteractiveLessonViewProps> = ({ te
 
       {/* FEEDBACK / ADVANCE ZONE */}
       <div className="sticky bottom-4 z-10">
-        {feedback === 'idle' ? (
-          <button
-            onClick={handleVerify}
-            disabled={!textAnswer.trim() || textAnswer.trim().length < 5}
-            className="w-full py-4 rounded-2xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 disabled:from-slate-700 disabled:to-slate-700 disabled:text-slate-500 text-white font-black text-lg transition-all shadow-lg active:scale-[0.98]"
-          >
-            ✨ COMPARTIR MI REFLEXIÓN
-          </button>
-        ) : feedback === 'celebration' ? (
+{feedback === 'idle' ? (
+            <button
+              onClick={handleVerify}
+              className="w-full py-4 rounded-2xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-black text-lg transition-all shadow-lg active:scale-[0.98]"
+            >
+              ✨ COMPARTIR MI REFLEXIÓN
+            </button>
+          ) : feedback === 'celebration' ? (
           <div className="p-5 rounded-2xl border-2 bg-gradient-to-r from-emerald-900/95 to-teal-900/95 border-emerald-400 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-2xl animate-fade-in">
             <div className="flex items-start gap-3">
               <CheckCircle2 className="w-8 h-8 text-emerald-300 shrink-0" />
