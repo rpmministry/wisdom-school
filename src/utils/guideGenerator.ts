@@ -116,6 +116,10 @@ export function routeGuideContent(
 
 const esc = (s: string): string => (s || "").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
+// Logo oficial de Wisdom School embebido en línea (mismo emblema de public/logo.svg).
+// Inline = aparece siempre en el PDF, incluso sin conexión y al abrir el HTML guardado.
+const WISDOM_LOGO_SVG = `<svg class="logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" fill="none" aria-label="Wisdom School"><path d="M 16 56 L 16 24 C 33.67 24 48 38.33 48 56 Z" fill="#78C043"/><path d="M 16 56 H 48 V 88 C 30.33 88 16 73.67 16 56 Z" fill="#E5234A"/><path d="M 48 88 V 56 C 65.67 56 80 70.33 80 88 Z" fill="#F37023"/><path d="M 112 56 H 80 C 80 38.33 94.33 24 112 24 Z" fill="#00AEEF"/><path d="M 80 56 H 112 C 112 73.67 97.67 88 80 88 Z" fill="#583F8C"/></svg>`;
+
 export function generateClassGuideHTML(
   currentClass: DailyClass,
   subject?: Subject,
@@ -170,40 +174,72 @@ export function generateClassGuideHTML(
   <meta charset="UTF-8">
   <title>${esc(docTitle)}</title>
   <style>
-    @page { size: letter; margin: 1.9cm 1.7cm; }
+    @page { size: A4; margin: 12mm 12mm; }
     * { box-sizing: border-box; }
-    body { font-family: Georgia, 'Times New Roman', serif; color:#1f2937; line-height:1.55; margin:0 auto; padding:34px 40px; background:#fff; max-width:816px; }
-    .print-btn-bar { position:fixed; top:12px; right:14px; }
+    body { font-family: Georgia, 'Times New Roman', serif; color:#1f2937; line-height:1.5; margin:0 auto; padding:26px 30px; background:#fff; max-width:794px; }
+    .print-btn-bar { position:fixed; top:12px; right:14px; z-index:50; }
     .btn-print { background:#2563eb; color:#fff; border:none; padding:8px 16px; border-radius:6px; font:700 13px 'Segoe UI',Arial; cursor:pointer; }
-    .brand { display:flex; align-items:baseline; justify-content:space-between; border-bottom:3px double #1e3a8a; padding-bottom:6px; }
+    .brand { display:flex; align-items:center; gap:10px; border-bottom:3px double #1e3a8a; padding-bottom:6px; }
+    .brand .logo { width:30px; height:30px; flex:0 0 30px; display:block; }
     .brand .ws { font-size:14px; font-weight:bold; color:#1e3a8a; }
-    .brand small { font-size:9px; color:#64748b; letter-spacing:1px; }
-    h1 { text-align:center; font: bold 17px/1.3 'Segoe UI',Arial,sans-serif; color:#0f172a; margin:14px 0 3px; }
-    .sub { text-align:center; font:600 10.5px 'Segoe UI',Arial,sans-serif; color:#475569; margin-bottom:10px; }
-    .tema { font-size:12.5px; margin:8px 0 4px; } .tema strong{ color:#1e3a8a; }
-    .meta { display:flex; flex-wrap:wrap; gap:14px; font:10.5px 'Segoe UI', Arial; color:#475569; border-bottom:1px solid #cbd5e1; padding-bottom:8px; margin-bottom:12px;}
-    .banner { font:11px 'Segoe UI',Arial; padding:7px 12px; border-radius:7px; margin-bottom:12px; }
-    h2 { font:bold 13px 'Segoe UI',Arial; color:#fff; background:#1e3a8a; display:inline-block; padding:3px 12px; border-radius:4px; margin:14px 0 8px; }
-    .intro { font-size:12.5px; margin:0 0 10px; text-align:justify; }
-    .paso { display:flex; gap:10px; margin:6px 0 8px; font-size:12px; }
-    .paso-n { flex:0 0 66px; font:bold 10px/1.9 'Segoe UI'; color:#1e3a8a; background:#e0e7ff; border-radius:4px; text-align:center; height:fit-content; padding:1px 4px; margin-top:2px; }
+    .brand small { margin-left:auto; font-size:9px; color:#64748b; letter-spacing:1px; }
+    h1 { text-align:center; font: bold 17px/1.3 'Segoe UI',Arial,sans-serif; color:#0f172a; margin:12px 0 3px; }
+    .sub { text-align:center; font:600 10.5px 'Segoe UI',Arial,sans-serif; color:#475569; margin-bottom:9px; }
+    .tema { font-size:12.5px; margin:7px 0 4px; } .tema strong{ color:#1e3a8a; }
+    .meta { display:flex; flex-wrap:wrap; gap:12px; font:10.5px 'Segoe UI', Arial; color:#475569; border-bottom:1px solid #cbd5e1; padding-bottom:7px; margin-bottom:11px;}
+    .banner { font:11px 'Segoe UI',Arial; padding:7px 12px; border-radius:7px; margin-bottom:11px; }
+    h2 { font:bold 13px 'Segoe UI',Arial; color:#fff; background:#1e3a8a; display:inline-block; padding:3px 12px; border-radius:4px; margin:12px 0 7px; }
+    .intro { font-size:12.3px; margin:0 0 9px; text-align:justify; }
+    .paso { display:flex; gap:10px; margin:5px 0 7px; font-size:11.8px; }
+    .paso-n { flex:0 0 62px; font:bold 10px/1.8 'Segoe UI'; color:#1e3a8a; background:#e0e7ff; border-radius:4px; text-align:center; height:fit-content; padding:1px 4px; margin-top:2px; }
     .paso-c strong { display:block; font:700 12px 'Segoe UI'; color:#0f172a; margin-bottom:1px; }
     .paso-c p { margin:0; }
-    .cons { font-size:12.5px; margin:12px 0 6px; }
+    .cons { font-size:12.3px; margin:10px 0 5px; }
     .cons em { color:#1e3a8a; }
-    .caja { border:1.5px dashed #94a3b8; border-radius:6px; padding:10px 14px; margin-bottom:4px; background:#fcfdff; }
-    .raya { border-bottom:1px solid #cbd5e1; height:23px; }
-    .pista { font-size:10.5px; color:#475569; background:#dbeafe; border:1px solid #93c5fd; border-radius:5px; padding:5px 9px; }
-    .fin { display:flex; justify-content:space-between; gap:20px; margin-top:26px; font:10px 'Segoe UI'; color:#475569; }
+    .caja { border:1.5px dashed #94a3b8; border-radius:6px; padding:9px 13px; margin-bottom:4px; background:#fcfdff; }
+    .raya { border-bottom:1px solid #cbd5e1; height:22px; }
+    .pista { font-size:10.4px; color:#475569; background:#dbeafe; border:1px solid #93c5fd; border-radius:5px; padding:5px 9px; }
+    .fin { display:flex; justify-content:space-between; gap:20px; margin-top:22px; font:10px 'Segoe UI'; color:#475569; }
     .firma { flex:1; border-top:1px solid #64748b; padding-top:5px; text-align:center; }
-    @media print { .print-btn-bar{display:none;} body{ padding:0; } }
+
+    /* ==== REGLA ESTRICTA: 1 HOJA = 1 CLASE ==== */
+    .cover { page-break-after: always; break-after: page; }
+    section.guia { page-break-after: always; break-after: page; }
+    section.guia:last-child { page-break-after: auto; break-after: auto; }
+    .brand, h1, h2, .tema, .banner, .paso, .cons, .caja, .pista, .fin { break-inside: avoid; page-break-inside: avoid; }
+
+    @media print {
+      .print-btn-bar { display:none !important; }
+      body { padding:0; max-width:none; }
+      section.guia { max-height: 262mm; overflow: hidden; }   /* cabe en una A4 con márgenes de 12mm */
+      .brand { padding-bottom:4px; }
+      .brand .logo { width:25px; height:25px; flex-basis:25px; }
+      .brand .ws { font-size:12.5px; }
+      .brand small { font-size:8.5px; }
+      h1 { font-size:15px; margin:8px 0 2px; }
+      .sub { font-size:9.4px; margin-bottom:5px; }
+      .tema { font-size:10.8px; margin:4px 0 2px; }
+      .meta { gap:9px; font-size:9.2px; padding-bottom:4px; margin-bottom:7px; }
+      .banner { font-size:9.8px; padding:4px 9px; margin-bottom:7px; }
+      h2 { font-size:11.2px; padding:2px 10px; margin:8px 0 5px; }
+      .intro { font-size:10.6px; line-height:1.38; margin-bottom:6px; }
+      .paso { font-size:10.2px; margin:3px 0 5px; gap:8px; }
+      .paso-n { flex-basis:56px; font-size:8.8px; }
+      .paso-c strong { font-size:10.2px; }
+      .cons { font-size:10.6px; margin:7px 0 3px; }
+      .caja { padding:5px 9px; }
+      .raya { height:17px; }
+      .pista { font-size:9.2px; padding:4px 7px; }
+      .fin { margin-top:10px; font-size:8.6px; }
+    }
   </style>
 </head>
 <body>
   <div class="print-btn-bar"><button class="btn-print" onclick="window.print()">🖨️ Imprimir / Guardar PDF</button></div>
 
   <div class="brand">
-    <span class="ws">☀️ WISDOM SCHOOL</span>
+    ${WISDOM_LOGO_SVG}
+    <span class="ws">WISDOM SCHOOL</span>
     <small>ECUADOR · 2026-2027 · CONFESIÓN EVANGÉLICA</small>
   </div>
   <div style="margin:8px 0 2px;background:#065f46;color:#ecfdf5;border-radius:6px;padding:4px 10px;font:700 9.5px 'Segoe UI',Arial;text-align:center;letter-spacing:.4px;">FORMATO NUEVO v3.0 · una página por asignatura · impresa el ${esc(stampStr)}</div>
@@ -311,7 +347,8 @@ export function generateDailyGuidesBundleHTML(opts: {
   const cover = `
   <section class="cover">
     <div class="brand">
-      <span class="ws">☀️ WISDOM SCHOOL</span>
+      ${WISDOM_LOGO_SVG}
+      <span class="ws">WISDOM SCHOOL</span>
       <small>ECUADOR · 2026-2027 · CONFESIÓN EVANGÉLICA</small>
     </div>
     <h1>Guías Didácticas del Día <span style="color:#64748b">|</span> PDF combinado</h1>
@@ -338,7 +375,7 @@ export function generateDailyGuidesBundleHTML(opts: {
   </section>`;
 
   const sections = parts
-    .map((p, i) => `<section class="guia${i > 0 ? " salto" : ""}" data-index="${i + 1}">${p.body}</section>`)
+    .map((p, i) => `<section class="guia" data-index="${i + 1}">${p.body}</section>`)
     .join("\n");
 
   return `<!DOCTYPE html>
@@ -347,14 +384,17 @@ export function generateDailyGuidesBundleHTML(opts: {
   <meta charset="UTF-8">
   <title>Guías Didácticas del Día — ${esc(dateStr)}</title>
   <style>${css}
-    .cover { page-break-after: always; }
+    .cover { page-break-after: always; break-after: page; }
     .cover h1 { margin-top: 10px; }
     .cover-meta { display:flex; flex-wrap:wrap; gap:14px; font:10.5px 'Segoe UI',Arial; color:#475569; border-bottom:1px solid #cbd5e1; padding-bottom:8px; margin-bottom:12px; }
     .cover-box { border:1.5px solid #cbd5e1; border-radius:8px; padding:10px 16px; margin:10px 0; }
     .cover-list { font:12px 'Segoe UI',Arial; color:#1f2937; margin:6px 0 2px 18px; padding:0; }
     .cover-list li { margin-bottom:4px; }
-    section.guia.salto { page-break-before: always; }
-    section.guia { page-break-inside: auto; }
+    @media print {
+      .cover { max-height: 262mm; overflow: hidden; }
+      .cover-meta { font-size:9.2px; padding-bottom:5px; margin-bottom:8px; }
+      .cover-list { font-size:10.6px; }
+    }
   </style>
 </head>
 <body>
