@@ -1,3 +1,8 @@
+// ⚠️ OBSOLETO (2026) — formato ANTIGUO de "Guía Consolidada" (encabezado "Guía Didáctica y Taller Práctico DE CLASE").
+// Reemplazado por:
+//   · src/utils/guideGenerator.ts → generateClassGuideHTML()   → guía individual "Guía Didáctica y Taller Práctico" (v3.0)
+//   · src/utils/guideGenerator.ts → downloadDailyGuidesBundle() → paquete diario (portada + una página por asignatura)
+// Se conserva solo como referencia histórica; NO tiene llamadores en la aplicación.
 import { DailyClass, Subject, Student } from '../types';
 import {
   obtenerContextoTema,

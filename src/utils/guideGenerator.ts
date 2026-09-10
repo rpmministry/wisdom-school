@@ -124,6 +124,9 @@ export function generateClassGuideHTML(
   ai?: GuideAiContent | null
 ): string {
   const dateStr = currentClass.date || new Date().toLocaleDateString("es-EC");
+  const now = new Date();
+  const stampStr = `${now.toLocaleDateString('es-EC')} ${now.toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit' })}`;
+  const fileStamp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`;
   const subjectName = subject?.name || "Materia General";
   const teacherName = subject?.teacher?.name || "Docente Asignado";
   const theme = currentClass.theme;
@@ -213,6 +216,7 @@ export function generateClassGuideHTML(
     <span><b>Materia:</b> ${esc(subjectName)}</span>
     <span><b>Docente asignado:</b> ${esc(teacherName)}</span>
     <span><b>Fecha:</b> ${esc(dateStr)}</span>
+    <span><b>Formato:</b> v3.0 · ${esc(stampStr)}</span>
     ${content.providerUsed ? `<span><b>Origen contenido:</b> ${esc(content.providerUsed)}</span>` : ""}
   </div>
 
@@ -232,7 +236,7 @@ export function generateClassGuideHTML(
     <div class="firma">Firma del estudiante</div>
     <div class="firma">Firma del representante / docente guía</div>
   </div>
-  <div style="text-align:center;color:#94a3b8;font-size:9px;margin-top:14px;">Wisdom School · Guía Didáctica y Taller Práctico · ${esc(dateStr)}</div>
+  <div style="text-align:center;color:#94a3b8;font-size:9px;margin-top:14px;">Wisdom School · Guía Didáctica y Taller Práctico · v3.0 · ${esc(dateStr)} · generada el ${esc(stampStr)}</div>
 </body>
 </html>`;
 }
@@ -245,10 +249,11 @@ export function downloadClassGuide(
   ai?: GuideAiContent | null
 ): void {
   const html = generateClassGuideHTML(currentClass, subject, studentName, studentGrade, ai ?? null);
-  let raw = currentClass.guideTitle || `Guia_${subject?.code || "clase"}_${currentClass.theme}.html`;
-  raw = raw.replace(/\.pdf$/i, ".html");
-  if (!raw.endsWith(".html")) raw += ".html";
-  downloadHTML(html, raw);
+  // Nombre único con fecha+hora: imposible confundir la guía nueva con una descarga antigua.
+  const n = new Date();
+  const stamp = `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}_${String(n.getHours()).padStart(2, '0')}${String(n.getMinutes()).padStart(2, '0')}`;
+  const base = `Guia_Didactica_${subject?.code || 'GEN'}_${currentClass.id || 'clase'}`;
+  downloadHTML(html, `${base}_${stamp}.html`);
 }
 
 // ============================================================
@@ -295,6 +300,8 @@ export function generateDailyGuidesBundleHTML(opts: {
   items: DailyGuideBundleItem[];
 }): string {
   const { studentName, studentGrade, dateStr, dayLabel } = opts;
+  const bNow = new Date();
+  const bundleStamp = `${bNow.toLocaleDateString('es-EC')} ${bNow.toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit' })}`;
   const items = (opts.items || []).filter((it) => it && it.currentClass);
   const parts = items.map((it) => extractGuideParts(generateClassGuideHTML(it.currentClass, it.subject, studentName, studentGrade, it.ai ?? null)));
   const css = parts[0]?.css || "";
@@ -325,7 +332,7 @@ export function generateDailyGuidesBundleHTML(opts: {
       <div class="firma">Firma del estudiante</div>
       <div class="firma">Firma del representante / docente guía</div>
     </div>
-    <div style="text-align:center;color:#94a3b8;font-size:9px;margin-top:14px;">Wisdom School · Paquete diario de guías didácticas · ${esc(dateStr)}</div>
+    <div style="text-align:center;color:#94a3b8;font-size:9px;margin-top:14px;">Wisdom School · Paquete diario de guías didácticas · v3.0 · ${esc(dateStr)} · generado el ${esc(bundleStamp)}</div>
   </section>`;
 
   const sections = parts
@@ -364,7 +371,9 @@ export function downloadDailyGuidesBundle(opts: {
   items: DailyGuideBundleItem[];
 }): void {
   const html = generateDailyGuidesBundleHTML(opts);
+  const n = new Date();
+  const hhmm = `${String(n.getHours()).padStart(2, '0')}${String(n.getMinutes()).padStart(2, '0')}`;
   const safeDate = (opts.dateStr || "dia").replace(/[^\w\-]+/g, "_");
   const safeStudent = (opts.studentName || "estudiante").split(" ")[0].replace(/[^\w\-]+/g, "");
-  downloadHTML(html, `Guias_Didacticas_${safeDate}_${safeStudent}.html`);
+  downloadHTML(html, `Guias_Didacticas_${safeDate}_${safeStudent}_${hhmm}.html`);
 }
