@@ -6,6 +6,8 @@ import { GoogleGenAI } from '@google/genai';
 import nodemailer from 'nodemailer';
 
 dotenv.config();
+// Las claves del servidor (sin prefijo VITE_) se guardan en .env.local; se cargan sin pisar las variables ya existentes (producción/Vercel las inyecta el entorno).
+dotenv.config({ path: '.env.local' });
 
 // Vercel serverless runtime no soporta import.meta.url en el build CJS generado por esbuild.
 // Usamos process.cwd() como base del proyecto para mantener compatibilidad tanto en local como en Vercel.
@@ -172,13 +174,20 @@ function getGeminiClient(): GoogleGenAI | null {
 }
 
 // Paso 10: el health check sirve como verificación de que el backend está vivo antes de pedir servicios de IA o autenticación.
-app.get('/api/health', (req: Request, res: Response) => {
+app.get('/api/health', async (req: Request, res: Response) => {
+  let hierarchySummary: string[] = [];
+  try {
+    hierarchySummary = (await getAIHierarchy()).map((layer) => `${layer.label}: ${layer.models.slice(0, 3).join(' | ')}${layer.models.length > 3 ? ` (+${layer.models.length - 3} free más)` : ''}`);
+  } catch { /* no debe tumbar el health */ }
   res.json({
     status: 'ok',
     service: 'Wisdom School Backend',
     ai: {
-      geminiConfigured: Boolean(process.env.GEMINI_API_KEY?.trim()),
+      geminiConfigured: isUsableGeminiKey(process.env.GEMINI_API_KEY),
       openRouterConfigured: Boolean(process.env.OPENROUTER_API_KEY?.trim()),
+      openCodeConfigured: Boolean(process.env.OPENCODE_API_KEY?.trim()),
+      freeFirst: true,
+      hierarchy: hierarchySummary,
     },
     time: new Date().toISOString(),
   });
@@ -259,126 +268,433 @@ function buildGeminiContents(
   return contents;
 }
 
+// Extrae el primer objeto JSON balanceado de una respuesta que puede traer prosa o fences de markdown.
+function extractJsonObject(raw: string | null | undefined): string | null {
+  const text = (raw || '').replace(/```json/gi, '').replace(/```/g, '').replace(/<thinking>[\s\S]*?<\/thinking>/gi, '');
+  const start = text.indexOf('{');
+  if (start === -1) return null;
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  for (let i = start; i < text.length; i++) {
+    const ch = text[i];
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (ch === '\\') escaped = true;
+      else if (ch === '"') inString = false;
+      continue;
+    }
+    if (ch === '"') inString = true;
+    else if (ch === '{') depth += 1;
+    else if (ch === '}') {
+      depth -= 1;
+      if (depth === 0) return text.slice(start, i + 1);
+    }
+  }
+  return null;
+}
+
+// Los modelos gratuitos suelen dejar saltos de línea crudos dentro de los strings o comas colgantes:
+// reparamos antes de tirar la toalla. Si aún así falla, devolvemos snippet para diagnóstico.
+function sanitizeJsonText(s: string): string {
+  let out = '';
+  let inString = false;
+  let escaped = false;
+  for (const ch of s) {
+    if (inString) {
+      if (escaped) { out += ch; escaped = false; continue; }
+      if (ch === '\\') { out += ch; escaped = true; continue; }
+      if (ch === '"') { inString = false; out += ch; continue; }
+      if (ch === '\n') { out += '\\n'; continue; }
+      if (ch === '\r') { continue; }
+      if (ch === '\t') { out += '\\t'; continue; }
+      out += ch;
+    } else {
+      if (ch === '"') inString = true;
+      out += ch;
+    }
+  }
+  return out;
+}
+
+function looseParseJson(candidate: string | null): any | null {
+  if (!candidate) return null;
+  const trimmed = candidate.replace(/<\/?CPA_DONE>/gi, '').trim();
+  try { return JSON.parse(trimmed); } catch { /* reparamos */ }
+  try { return JSON.parse(sanitizeJsonText(trimmed).replace(/,\s*([}\]])/g, '$1')); } catch { return null; }
+}
+
+// Los modelos ":free" de razonamiento a veces devuelven en `content` su cadena de pensamiento y, dentro,
+// la respuesta final entre comillas. Extrae la parte útil en español; si no la hay, devuelve null
+// para que el front use SIEMPRE su explicación determinista (nunca queda vacía).
+function cleanReasoningLeak(rawText: string | null | undefined): string | null {
+  const t = (rawText || '').replace(/<\/?CPA_DONE>/gi, '').trim();
+  if (!t) return null;
+  const looksSpanish = (s: string) => /[áéíóúñ¿¡]|no pasa|porque|respuesta|correct|fracci/i.test(s);
+
+  // 1) La respuesta final suele venir entrecomillada (“...” o "...").
+  const quotes = Array.from(t.matchAll(/[“"]([^“”"]{40,})[”"]/g)).map((m) => m[1].trim());
+  const bestQuote = quotes.filter(looksSpanish).sort((a, b) => b.length - a.length)[0];
+  if (bestQuote) return bestQuote;
+
+  // 2) Sin cita clara, corta el preámbulo de razonamiento: toma desde la primera línea en español
+  //    que no sea "meta instructions" del propio modelo.
+  const metaLine = /^(we need|i need|draft[:\s]|count[:\s]|the user|must |should |plan[:\s]|first[,\s])/i;
+  const lines = t.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  const start = lines.findIndex((l) => looksSpanish(l) && !metaLine.test(l));
+  if (start > 0) return lines.slice(start).join(' ').trim();
+  if (start === 0) {
+    // arranca bien pero puede traer un "Draft:" al final: quédate antes de cualquier marker de razonamiento.
+    const cleaned = lines.filter((l) => !metaLine.test(l)).join(' ').trim();
+    return cleaned || null;
+  }
+  // 3) Todo parece razonamiento en inglés sin respuesta explícita: nada fiable.
+  return null;
+}
+
 /**
- * Paso 13: Motor de Resiliencia en Cascada.
+ * Paso 13: Motor de Jerarquía de IA con Respaldo Secuencial — 100% FREE-FIRST.
  *
- * Fase 1: consulta modelos gratuitos de OpenRouter para intentar la opción más económica.
- * Fase 2: prueba cada modelo con timeout y reasignación de tiempo antes de fallar.
- * Fase 3: usa Gemini como respaldo seguro si OpenRouter no responde.
- * Fase final: devuelve un mensaje educativo amable cuando todo falla.
+ * Prioridades (todas sin costo por defecto):
+ *   1) OpenRouter: caza modelos ":free" dinámicamente, probando cada modelo hasta que uno conteste.
+ *   2) OpenCode Zen: catálogo de modelos "-free" (requiere OPENCODE_API_KEY gratuita; sin clave se omite).
+ *   3) Gemini Flash (último recurso, API gratuita de Google AI Studio).
+ * Cada intento de modelo tiene su presupuesto (AI_MODEL_TIMEOUT_MS, defecto 6 s). Si un modelo falla o
+ * calla, se prueba el siguiente modelo free dentro del presupuesto de la capa (AI_TIER_BUDGET_MS).
+ * Errores terminales (clave inválida, 402 sin crédito, 404 modelo) cambian de capa inmediatamente.
+ * Si la última capa falla, se lanza el mensaje pedagógico de contingencia (503).
+ * Opcional de pago: AI_PAID_MODEL (p. ej. 'qwen/qwen3.8-flash') añade una capa premium AL FINAL, solo si se define.
  */
+
+type AIErrorKind = 'timeout' | 'http' | 'empty' | 'network' | 'auth' | 'model';
+
+class AIError extends Error {
+  kind: AIErrorKind;
+  retryable: boolean;
+  status?: number;
+  constructor(kind: AIErrorKind, message: string, retryable: boolean, status?: number) {
+    super(message);
+    this.name = 'AIError';
+    this.kind = kind;
+    this.retryable = retryable;
+    this.status = status;
+  }
+}
+
+interface AIChatLayer {
+  id: string;
+  label: string;
+  provider: 'openai-compatible' | 'gemini';
+  baseUrl?: string;
+  apiKey?: string;
+  models: string[];
+  extraHeaders?: Record<string, string>;
+}
+
+// Formatos: una API key válida de Google empieza con 'AIza' o es del estilo nuevo 'AQ.xxx' de AI Studio.
+// Un OAuth Client ID ('…apps.googleusercontent.com') NO es API key: estas capa se omite en vez de agonizar en reintentos.
+function isUsableGeminiKey(value?: string): boolean {
+  const v = (value || '').trim();
+  if (!v) return false;
+  if (/\.apps\.googleusercontent\.com$/i.test(v)) return false;
+  return /^AIza[0-9A-Za-z_-]{10,}$/.test(v) || /^AQ\.[0-9A-Za-z_-]{10,}$/.test(v) || v.length > 30;
+}
+
+// Descatalogo dinámico de modelos gratuitos de OpenRouter (cacheado 10 min).
+let freeModelsCache: { list: string[]; fetchedAt: number } = { list: [], fetchedAt: 0 };
+const FREE_FALLBACKstaticHint = ['meta-llama/llama-3.3-70b-instruct:free', 'deepseek/deepseek-chat-v3-0324:free'];
+const FREE_FAMILY_PRIORITY = ['qwen', 'google/gemini', 'deepseek', 'meta-llama', 'mistral', 'gemma', 'glm', 'kimi', 'nemotron'];
+
+async function getOpenRouterFreeModels(preferredRaw?: string): Promise<string[]> {
+  const explicit = (preferredRaw || '').split(',').map((s) => s.trim()).filter(Boolean);
+  if (explicit.length > 0) return explicit;
+
+  const fresh = Date.now() - freeModelsCache.fetchedAt < 10 * 60 * 1000;
+  if (fresh && freeModelsCache.list.length > 0) return freeModelsCache.list;
+
+  try {
+    const res = await fetch('https://openrouter.ai/api/v1/models', { signal: AbortSignal.timeout(5000) });
+    const data: any = await res.json();
+    const free = (data?.data || [])
+      .filter((m: any) => typeof m.id === 'string' && m.id.endsWith(':free'))
+      .map((m: any) => m.id as string);
+    if (free.length > 0) {
+      const rank = (id: string) => {
+        const i = FREE_FAMILY_PRIORITY.findIndex((fam) => id.startsWith(fam));
+        return i === -1 ? FREE_FAMILY_PRIORITY.length : i;
+      };
+      free.sort((a: string, b: string) => rank(a) - rank(b));
+      freeModelsCache = { list: free.slice(0, Number(process.env.AI_FREE_MODEL_MAX || 8)), fetchedAt: Date.now() };
+      console.log(`[AI Hierarchy] Caza de modelos free OpenRouter: ${freeModelsCache.list.slice(0, 3).join(', ')}… (${freeModelsCache.list.length} en cola)`);
+      return freeModelsCache.list;
+    }
+  } catch (err: any) {
+    console.warn('[AI Hierarchy] No se pudo listar modelos free de OpenRouter, uso fallback estático:', err?.message || err);
+  }
+  return freeModelsCache.list.length > 0 ? freeModelsCache.list : FREE_FALLBACKstaticHint;
+}
+
+function getOpenCodeFreeModels(): string[] {
+  const explicit = (process.env.AI_TIER2_MODEL || '').split(',').map((s) => s.trim()).filter(Boolean);
+  if (explicit.length > 0) return explicit;
+  // Limitación verificada en vivo: OpenCode Zen bloquea sus modelos "-free" fuera de su propia app
+  // ("OpenCode's free tier can only be used in OpenCode"). Con clave gratuita esta capa falla rápido (400);
+  // solo es útil si tu cuenta OpenCode tiene modelos de pago. Se puede desactivar vaciando OPENCODE_API_KEY.
+  return [
+    'deepseek-v4-flash-free',
+    'mimo-v2.5-free',
+  ];
+}
+
+async function getAIHierarchy(): Promise<AIChatLayer[]> {
+  const openRouterKey = process.env.OPENROUTER_API_KEY?.trim();
+  const openCodeKey = process.env.OPENCODE_API_KEY?.trim();
+  const geminiKey = process.env.GEMINI_API_KEY?.trim();
+
+  const layers: AIChatLayer[] = [];
+
+  if (openRouterKey) {
+    layers.push({
+      id: 'openrouter-free',
+      label: 'OpenRouter (caza de modelos FREE)',
+      provider: 'openai-compatible',
+      baseUrl: 'https://openrouter.ai/api/v1',
+      apiKey: openRouterKey,
+      models: await getOpenRouterFreeModels(process.env.AI_TIER1_MODEL),
+      extraHeaders: {
+        'HTTP-Referer': process.env.APP_URL || 'https://wisdomschool.edu',
+        'X-Title': 'Wisdom School AI Teacher',
+      },
+    });
+  }
+
+  if (openCodeKey) {
+    layers.push({
+      id: 'opencode',
+      label: 'OpenCode Zen (gratuito)',
+      provider: 'openai-compatible',
+      baseUrl: 'https://opencode.ai/zen/v1',
+      apiKey: openCodeKey,
+      models: getOpenCodeFreeModels(),
+    });
+  }
+
+  if (isUsableGeminiKey(geminiKey)) {
+    layers.push({
+      id: 'gemini',
+      label: 'Google Gemini (free tier AI Studio)',
+      provider: 'gemini',
+      apiKey: geminiKey,
+      models: (process.env.AI_TIER3_MODEL || 'gemini-3.7-flash').split(',').map((s) => s.trim()).filter(Boolean),
+    });
+  } else if (geminiKey) {
+    console.warn('[AI Hierarchy] GEMINI_API_KEY parece un OAuth Client ID u otro valor no-válido: capa Gemini omitida. Necesitas una API key de https://aistudio.google.com/apikey');
+  }
+
+  // Capa PREMIUM opcional (por defecto NO existe: el proyecto es 100% gratuito).
+  const premiumModel = (process.env.AI_PAID_MODEL || '').trim();
+  if (premiumModel && openRouterKey) {
+    layers.push({
+      id: 'premium',
+      label: 'OpenRouter (premium opcional)',
+      provider: 'openai-compatible',
+      baseUrl: 'https://openrouter.ai/api/v1',
+      apiKey: openRouterKey,
+      models: [premiumModel],
+      extraHeaders: {
+        'HTTP-Referer': process.env.APP_URL || 'https://wisdomschool.edu',
+        'X-Title': 'Wisdom School AI Teacher',
+      },
+    });
+  }
+
+  return layers;
+}
+
+function buildOpenAIMessages(
+  systemPrompt: string,
+  userMessage: string,
+  conversationHistory: Array<{ role: 'user' | 'model'; content: string }>
+) {
+  return [
+    { role: 'system', content: systemPrompt },
+    ...(conversationHistory || [])
+      .filter((msg) => msg && typeof msg.content === 'string' && msg.content.trim())
+      .map((msg) => ({ role: msg.role === 'model' ? 'assistant' : 'user', content: msg.content.trim() })),
+    { role: 'user', content: userMessage },
+  ];
+}
+
+function classifyHttpStatus(status: number): { kind: AIErrorKind; retryable: boolean } {
+  if (status === 401 || status === 403) return { kind: 'auth', retryable: false };
+  if (status === 402) return { kind: 'http', retryable: false }; // sin crédito: reintentar no ayuda
+  if (status === 404) return { kind: 'model', retryable: false }; // modelo inexistente para esta cuenta
+  if (status === 408 || status === 429 || status >= 500) return { kind: 'http', retryable: true };
+  return { kind: 'http', retryable: false }; // 4xx de petición: no reintentar
+}
+
+// Cuál es la "culpa" de un error determina la transición: si es de CREDENCIALES se abandona la capa entera;
+// si es solo de ESTE MODELO (404/400/503-unavailable) se pasa al siguiente modelo de la misma capa;
+// si es TRANSITORIO (timeout/5xx/congestión) gasta presupuesto de reintento antes de pasar.
+type AIErrorScope = 'layer' | 'model' | 'transient';
+function scopeOfError(kind: AIErrorKind, status?: number): AIErrorScope {
+  if (kind === 'auth') return 'layer';
+  if (kind === 'model') return 'model';
+  if (kind === 'http' && (status === 401 || status === 402 || status === 403)) return 'layer';
+  if (kind === 'timeout' || kind === 'empty' || kind === 'network') return 'transient';
+  if (kind === 'http' && status === 503) return 'transient'; // alta demanda: breve espera y otro intento
+  if (kind === 'http' && status !== undefined && status >= 300 && status < 500) return 'model'; // 400/404/422: este modelo rechaza la petición
+  return 'transient';
+}
+
+async function callOpenAICompatibleLayer(
+  layer: AIChatLayer,
+  model: string,
+  messages: Array<{ role: string; content: string }>,
+  timeoutMs: number,
+  gen?: { maxTokens?: number; temperature?: number }
+): Promise<string> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(`${layer.baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${layer.apiKey}`,
+        'Content-Type': 'application/json',
+        ...(layer.extraHeaders || {}),
+      },
+      signal: controller.signal,
+      body: JSON.stringify({
+        model,
+        messages,
+        temperature: gen?.temperature ?? 0.7,
+        ...(gen?.maxTokens ? { max_tokens: gen.maxTokens } : {}),
+      }),
+    });
+
+    if (!res.ok) {
+      const bodyText = await res.text().catch(() => '');
+      const { kind, retryable } = classifyHttpStatus(res.status);
+      throw new AIError(kind, `${layer.id} respondió ${res.status}: ${bodyText.slice(0, 160)}`, retryable, res.status);
+    }
+
+    const data = await res.json();
+    // Ciertos modelos ":free" de razonamiento devuelven content vacío y dejan el texto en message.reasoning:
+    // si content viene hueco, probamos con reasoning antes de descartar el modelo.
+    const msg = data?.choices?.[0]?.message;
+    const text = (msg?.content && String(msg.content).trim()) || (msg?.reasoning && String(msg.reasoning).trim());
+    if (text && typeof text === 'string' && text.trim()) return text.trim();
+    throw new AIError('empty', `${layer.id} respondió sin contenido útil (finish=${data?.choices?.[0]?.finish_reason || 'n/d'})`, true);
+  } catch (err: any) {
+    if (err instanceof AIError) throw err;
+    if (err?.name === 'AbortError' || err?.code === 20) throw new AIError('timeout', `${layer.id} superó su presupuesto de ${timeoutMs} ms`, true, 408);
+    throw new AIError('network', `${layer.id} fallo de red: ${err?.message || err}`, true);
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+async function callGeminiLayer(
+  layer: AIChatLayer,
+  model: string,
+  systemPrompt: string,
+  userMessage: string,
+  conversationHistory: Array<{ role: 'user' | 'model'; content: string }>,
+  timeoutMs: number,
+  gen?: { maxTokens?: number; temperature?: number }
+): Promise<string> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(layer.apiKey || '')}`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      signal: controller.signal,
+      body: JSON.stringify({
+        contents: buildGeminiContents(conversationHistory, userMessage),
+        systemInstruction: { parts: [{ text: systemPrompt }] },
+        generationConfig: { temperature: gen?.temperature ?? 0.7, ...(gen?.maxTokens ? { maxOutputTokens: gen.maxTokens } : {}) },
+      }),
+    });
+
+    if (!res.ok) {
+      const bodyText = await res.text().catch(() => '');
+      const { kind, retryable } = classifyHttpStatus(res.status);
+      throw new AIError(kind, `${layer.id} respondió ${res.status}: ${bodyText.slice(0, 160)}`, retryable, res.status);
+    }
+
+    const data = await res.json();
+    const parts = data?.candidates?.[0]?.content?.parts;
+    const text = Array.isArray(parts) ? parts.map((p: any) => p?.text || '').filter(Boolean).join('\n') : '';
+    if (text && text.trim()) return text.trim();
+    throw new AIError('empty', `${layer.id} respondió sin contenido útil (finishReason=${data?.candidates?.[0]?.finishReason || 'n/d'})`, true);
+  } catch (err: any) {
+    if (err instanceof AIError) throw err;
+    if (err?.name === 'AbortError' || err?.code === 20) throw new AIError('timeout', `${layer.id} superó su presupuesto de ${timeoutMs} ms`, true, 408);
+    throw new AIError('network', `${layer.id} fallo de red: ${err?.message || err}`, true);
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
 async function executeResilientAIPipeline(params: {
   systemPrompt: string;
   userMessage: string;
   conversationHistory: Array<{ role: 'user' | 'model'; content: string }>;
-}): Promise<{ reply: string; providerUsed: string }> {
+}, opts?: { modelTryMs?: number; tierBudgetMs?: number; lastTierBudgetMs?: number; gen?: { maxTokens?: number; temperature?: number } }): Promise<{ reply: string; providerUsed: string }> {
   const { systemPrompt, userMessage, conversationHistory } = params;
-  const deadline = Date.now() + 8000;
+  const hierarchy = await getAIHierarchy();
 
-  // --------------------------------------------------------------------------
-  // FASE 1 & FASE 2: Búsqueda dinámica de modelos gratuitos e Iteración (OpenRouter)
-  // --------------------------------------------------------------------------
-  const openRouterKey = process.env.OPENROUTER_API_KEY;
-  if (openRouterKey && openRouterKey.trim()) {
-    try {
-      console.log('[Resilience Engine] Fase 1: usando el enrutador gratuito de OpenRouter...');
-      const freeModels = ['openrouter/free'];
+  if (hierarchy.length === 0) {
+    console.error('[AI Hierarchy] Ninguna capa tiene API key configurada (OPENROUTER_API_KEY / OPENCODE_API_KEY / GEMINI_API_KEY).');
+    throw new Error('Disculpa, estoy organizando mis apuntes. ¿Podrías repetirme tu pregunta en unos segundos?');
+  }
 
-      console.log(`[Resilience Engine] Fase 1: Se utilizarán ${freeModels.length} modelos gratuitos:`, freeModels);
+  const modelTryMs = Number(opts?.modelTryMs || process.env.AI_MODEL_TIMEOUT_MS || 6000);
+  const tierBudgetMs = Number(opts?.tierBudgetMs || process.env.AI_TIER_BUDGET_MS || 20000);
+  const lastTierBudgetMs = Number(opts?.lastTierBudgetMs || process.env.AI_LAST_TIER_BUDGET_MS || 12000);
 
-      const messages = [
-        { role: 'system', content: systemPrompt },
-        ...conversationHistory.map((msg) => ({
-          role: msg.role === 'model' ? 'assistant' : 'user',
-          content: msg.content,
-        })),
-        { role: 'user', content: userMessage },
-      ];
+  for (let i = 0; i < hierarchy.length; i++) {
+    const layer = hierarchy[i];
+    const isLast = i === hierarchy.length - 1;
+    const budgetMs = isLast ? lastTierBudgetMs : tierBudgetMs;
+    const deadline = Date.now() + budgetMs;
+    const messages = buildOpenAIMessages(systemPrompt, userMessage, conversationHistory);
 
-      // Fase 2: Iteración sobre modelos gratuitos con timeout de 15s y delay de 2-3s
-      for (const modelId of freeModels) {
-        const remainingMs = deadline - Date.now();
-        if (remainingMs <= 500) break;
+    console.log(`[AI Hierarchy] Capa ${i + 1}/${hierarchy.length} → ${layer.label} · ${layer.models.length} modelo(s) [${layer.models.slice(0, 3).join(', ')}${layer.models.length > 3 ? '…' : ''}] (presupuesto ${budgetMs} ms, máx ${modelTryMs} ms/modelo)`);
 
-        console.log(`[Resilience Engine] Fase 2: Intentando modelo gratuito OpenRouter: ${modelId}...`);
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), Math.min(5000, remainingMs));
+    let abandonLayer = false; // una credencial muerta no debe castigar a los modelos hermanos
+    for (let mi = 0; mi < layer.models.length; mi++) {
+      if (abandonLayer || deadline - Date.now() < 700) break;
+      const model = layer.models[mi];
+      const maxTries = isLast ? 2 : 1; // la última capa tiene una segunda oportunidad por modelo (503 alta demanda)
 
+      for (let t = 0; t < maxTries; t++) {
+        const callTimeout = Math.min(deadline - Date.now(), modelTryMs);
+        if (callTimeout < 600) break;
         try {
-          const openRouterRes = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${openRouterKey.trim()}`,
-              'Content-Type': 'application/json',
-              'HTTP-Referer': process.env.APP_URL || 'https://wisdomschool.edu',
-              'X-Title': 'Wisdom School AI Teacher',
-            },
-            signal: controller.signal,
-            body: JSON.stringify({
-              model: modelId,
-              messages,
-              temperature: 0.7,
-            }),
-          });
-
-          if (!openRouterRes.ok) {
-            const errorBody = await openRouterRes.text().catch(() => '');
-            const descr = errorBody ? ` ${errorBody.slice(0, 200)}` : '';
-            console.warn(`[Resilience Engine] OpenRouter ${modelId} respondió con ${openRouterRes.status}${descr}`);
-            throw new Error(`OpenRouter status ${openRouterRes.status}${descr}`);
-          }
-
-          const data = await openRouterRes.json();
-          const text = data?.choices?.[0]?.message?.content;
-
-          if (text && typeof text === 'string' && text.trim()) {
-            console.log(`[Resilience Engine] ¡Éxito en Fase 2 con modelo OpenRouter ${modelId}!`);
-            return { reply: text.trim(), providerUsed: `OpenRouter Free (${modelId})` };
-          }
-
-          throw new Error(`OpenRouter respondió sin contenido válido para ${modelId}`);
-        } catch (attemptErr: any) {
-          console.warn(`[Resilience Engine] Fallo o timeout de 15s en modelo ${modelId}:`, attemptErr?.message || attemptErr);
-          const delayMs = Math.min(250, Math.max(0, deadline - Date.now()));
-          if (delayMs > 0) await wait(delayMs);
-        } finally {
-          clearTimeout(timeoutId);
+          const reply = layer.provider === 'gemini'
+            ? await callGeminiLayer(layer, model, systemPrompt, userMessage, conversationHistory, callTimeout, opts?.gen)
+            : await callOpenAICompatibleLayer(layer, model, messages, callTimeout, opts?.gen);
+          console.log(`[AI Hierarchy] ✔ ${layer.label} respondió con "${model}"${t > 0 ? ' (tras reintento)' : ''} (${budgetMs - (deadline - Date.now())} ms usados).`);
+          return { reply, providerUsed: `${layer.label} · ${model}` };
+        } catch (err: any) {
+          const aiErr: AIError = err instanceof AIError ? err : new AIError('network', err?.message || String(err), true);
+          const scope = scopeOfError(aiErr.kind, aiErr.status);
+          console.warn(`[AI Hierarchy] ✖ ${layer.label} · ${model} — intento ${t + 1} (${aiErr.kind}${aiErr.status ? ' ' + aiErr.status : ''} → ${scope}): ${aiErr.message}`);
+          if (scope === 'layer') { abandonLayer = true; break; }
+          if (scope === 'model') break; // solo este modelo está roto: pasar al siguiente de la misma capa sin gastar espera
+          if (t + 1 < maxTries && deadline - Date.now() > Math.min(modelTryMs, 3000) + 800) { await wait(800); continue; }
+          break; // transitorio agotado para este modelo → siguiente modelo/capa
         }
       }
-    } catch (openRouterErr: any) {
-      console.warn('[Resilience Engine] Excepción en Fase 1/2 de OpenRouter:', openRouterErr?.message || openRouterErr);
     }
+    console.warn(`[AI Hierarchy] Capa ${layer.label} agotada${isLast ? ' — no quedan capas.' : ', activando siguiente capa.'}`);
   }
 
-  // --------------------------------------------------------------------------
-  // FASE 3: Fallback de Seguridad de Alta Capacidad (Gemini 3.7 / 1.5 / 2.5)
-  // --------------------------------------------------------------------------
-  const ai = getGeminiClient();
-  if (ai && Date.now() < deadline) {
-    try {
-      console.log('[Resilience Engine] Fase 3: Activando Fallback de Seguridad con Gemini...');
-      const sanitizedContents = buildGeminiContents(conversationHistory, userMessage);
-
-      const { response, modelUsed } = await callGeminiWithModelFallback(ai, {
-        contents: sanitizedContents,
-        config: {
-          systemInstruction: systemPrompt,
-          temperature: 0.7,
-        },
-      });
-
-      if (response && response.text) {
-        console.log(`[Resilience Engine] ¡Éxito en Fase 3 con Gemini model ${modelUsed}!`);
-        return { reply: response.text.trim(), providerUsed: `Gemini (${modelUsed})` };
-      }
-    } catch (geminiErr: any) {
-      console.error('[Resilience Engine] Fallo en Fase 3 Gemini:', geminiErr?.message || geminiErr);
-    }
-  }
-
-  // --------------------------------------------------------------------------
-  // MANEJO DE ERRORES FINAL: 503 Mensaje pedagógico amigable
-  // --------------------------------------------------------------------------
+  // Manejo de errores final: el endpoint responde 503 con mensaje pedagógico amigable.
   throw new Error('Disculpa, estoy organizando mis apuntes. ¿Podrías repetirme tu pregunta en unos segundos?');
 }
 
@@ -452,6 +768,7 @@ CONTEXTO ACADÉMICO OBLIGATORIO Y ESTRICTO:
 
 REGLAS PEDAGÓGICAS ESTRICTAS (MÉTODO SOCRÁTICO):
 1. RESTRICCIÓN DE CONTEXTO: SOLO puedes hablar sobre el tema académico de esta clase ("${dailyClass?.theme || subject?.name}"). Si el estudiante pregunta sobre cosas ajenas a la clase o temas no relacionados, redirígelo con amabilidad y calidez hacia el tema de hoy.
+1.1 RUTA DE MINI-LECCIONES: La teoría se entrega en la interfaz "Clase Interactiva" como micro-lecciones (tarjetas 1..N con su reto de opción múltiple). NUNCA repitas una exposición larga ni vuelques todas las definiciones: acompaña, verifica y refuerza en mensajes cortos (máximo 80 palabras), enfocados en la lección que el estudiante menciona. Si pide que le expliques TODO, dale un resumen breve por puntos (máx 120 palabras).
 2. NUNCA des la respuesta directa o final si se trata de un ejercicio o razonamiento.
 3. Utiliza preguntas socráticas, pistas escalonadas, metáforas sencillas y ejemplos cotidianos adaptados a su edad (${student?.age || 10} años).
 4. Si el estudiante comete un error, jamás digas simplemente "está mal". Pregúntale qué procedimiento usó o haz una pregunta guía que le permita descubrir el error por sí mismo.
@@ -483,6 +800,248 @@ REGLAS PEDAGÓGICAS ESTRICTAS (MÉTODO SOCRÁTICO):
       error: fallbackMsg,
       isOfflineSimulation: true,
     });
+  }
+});
+
+// Paso 15b: Generador de la ruta de "micro-lecciones" (JSON estricto que consume el MicroLessonPlayer de la Clase Interactiva).
+app.post('/api/ai/lesson-plan', async (req: Request, res: Response) => {
+  try {
+    const { student, teacher, subject, dailyClass } = req.body;
+    if (!dailyClass?.theme) {
+      return res.status(503).json({ plan: null, isOfflineSimulation: true });
+    }
+    const count = Math.min(4, Math.max(2, Number(process.env.MICROLESSON_COUNT || 3)));
+
+    const systemPrompt = `
+Eres el diseñador instruccional jefe de Wisdom School, experto en microlearning infantil.
+Tu única tarea: convertir el tema del día en ${count} micro-lecciones progresivas, devolviendo SOLO un objeto JSON válido (sin fences markdown, sin prosa antes o después). NO raciocines en voz alta, NO muestres tu razonamiento, NO pidas más datos: emite directamente el objeto JSON final.
+
+DATOS DE LA SESIÓN:
+- Estudiante: ${student?.name || 'el estudiante'} (${student?.age || 10} años)
+- Materia: ${subject?.name || 'General'} · Profesora/or: ${teacher?.name || 'tu profe'}
+- Tema: "${dailyClass.theme}"
+- Objetivo de aprendizaje: ${dailyClass.objective || 'comprender los conceptos clave del tema'}
+
+ESQUEMA EXACTO (respétalo al pie de la letra):
+{"unitTitle":"título del tema","lessons":[{"title":"subtema (máx 40 caracteres)","theory":"explicación EXACTA de máximo 50 palabras en español para niños","analogy":"analogía de la vida real (máx 15 palabras)","example":"ejemplo concreto (máx 20 palabras)","quiz":{"question":"pregunta de opción múltiple sobre ESTE subtema (máx 20 palabras)","options":["opción A corta","opción B corta","opción C corta"],"correctIndex":0,"correctExplanation":"por qué es correcta (máx 12 palabras)"}}],"closingMessage":"felicitación cálida del profesor (máx 20 palabras)"}
+
+REGLAS ESTRICTAS:
+0. SÉ EXTREMADAMENTE COMPACTO: toda la respuesta debe caber en ~700 tokens. Sin saltos de línea, sin markdown y sin comillas dobles dentro de los valores.
+1. El array lessons debe tener exactamente ${count} elementos, en orden progresivo (de lo más simple a lo aplicado), cubriendo TODOS los conceptos necesarios para el objetivo.
+2. Cada lección enseña UN solo concepto pequeño.
+3. options tiene SIEMPRE 3 cadenas no vacías y muy distintas entre sí; correctIndex es 0, 1 o 2.
+4. Idioma: español claro y afectuoso. Nunca hagas preguntas fuera del quiz.
+5. No inventes datos: si un número o dato de entrada es escaso, usa ejemplos numéricos simples y coherentes con la edad.
+6. No incluyas claves adicionales fuera del esquema; no añadas texto antes ni después del JSON.
+    `.trim();
+
+    const result = await executeResilientAIPipeline({
+      systemPrompt,
+      userMessage: `Genera ahora el JSON de las ${count} micro-lecciones para "${dailyClass.theme}" en español.`,
+      conversationHistory: [],
+    }, { modelTryMs: Number(process.env.MICROLESSON_MODEL_TIMEOUT_MS || 22000), tierBudgetMs: Number(process.env.MICROLESSON_TIER_BUDGET_MS || 46000), lastTierBudgetMs: Number(process.env.MICROLESSON_LAST_TIER_BUDGET_MS || 44000), gen: { maxTokens: 1400, temperature: 0.2 } });
+
+    const jsonStr = extractJsonObject(result.reply);
+    const parsed = looseParseJson(jsonStr);
+    res.setHeader('Cache-Control', 'no-store');
+    if (!parsed) {
+      console.warn('[lesson-plan] JSON no parseable. Snippet:', (result.reply || '').slice(0, 300));
+      return res.status(503).json({ plan: null, providerUsed: result.providerUsed, isOfflineSimulation: false, rawSnippet: (result.reply || '').slice(0, 600) });
+    }
+    return res.json({ plan: parsed, providerUsed: result.providerUsed });
+  } catch (err: any) {
+    console.error('Error en /api/ai/lesson-plan:', err?.message || err);
+    return res.status(503).json({ plan: null, isOfflineSimulation: true });
+  }
+});
+
+// Paso 15c: Genera UNA micro-lección compacta (JSON pequeño = fiable y rápido también en modelos gratuitos congestados).
+// El MicroLessonPlayer pide la lección N de T con las cubiertas (no repetir), cachea por estudiante+clase+índice+fecha y muestra learningPath mientras llega.
+app.post('/api/ai/lesson-bite', async (req: Request, res: Response) => {
+  try {
+    const { student, teacher, subject, dailyClass, index, total, covered } = req.body;
+    if (!dailyClass?.theme || !Number.isInteger(index) || index < 1) {
+      return res.status(400).json({ lesson: null, error: 'Faltan dailyClass.theme o index' });
+    }
+    const coveredList: string[] = Array.isArray(covered) ? covered.filter((c: any) => typeof c === 'string' && c.trim()).slice(-3) : [];
+    const totalLessons = Math.min(5, Math.max(2, Number(total) || 3));
+
+    const systemPrompt = `
+Eres el diseñador instruccional de Wisdom School, experto en microlearning infantil.
+Genera la micro-lección ${index} de ${totalLessons} (orden progresivo) para enseñar "${dailyClass.theme}" a ${student?.name || 'el estudiante'} (${student?.age || 10} años), materia ${subject?.name || 'General'}. Objetivo de la clase: ${dailyClass.objective || 'comprender los conceptos clave'}.
+${coveredList.length ? `Ya se explicaron estos subtemas (NO los repitas ni los resumas): ${coveredList.join(' | ')}. Aporta el siguiente concepto esencial hacia el objetivo.` : 'Es la primera lección: empieza por el concepto más fundamental del tema.'}
+
+Devuelve SOLO este objeto JSON compacto (sin razonamiento visible, sin prosa, sin markdown, sin texto antes o después):
+{"title":"subtema en máx 40 caracteres","theory":"explicación exacta de máx 45 palabras para su edad","analogy":"analogía de su vida real en máx 12 palabras","example":"ejemplo concreto en máx 18 palabras","quiz":{"question":"pregunta de opción múltiple sobre ESTE subtema (máx 18 palabras)","options":["opción A corta","opción B corta","opción C corta"],"correctIndex":0,"correctExplanation":"por qué es correcta (máx 12 palabras)"}}
+REGLAS: español claro y afectuoso; options SIEMPRE 3, cortas y muy distintas; correctIndex 0, 1 o 2; nada de listas anidadas dentro de los valores.
+    `.trim();
+
+    const result = await executeResilientAIPipeline({
+      systemPrompt,
+      userMessage: `Genera la micro-lección ${index} de ${totalLessons} como JSON.`,
+      conversationHistory: [],
+    }, { modelTryMs: Number(process.env.MICROBITE_MODEL_TIMEOUT_MS || 9000), tierBudgetMs: Number(process.env.MICROBITE_TIER_BUDGET_MS || 22000), lastTierBudgetMs: Number(process.env.MICROBITE_LAST_TIER_BUDGET_MS || 13000), gen: { maxTokens: 1100, temperature: 0.4 } });
+
+    const parsed = looseParseJson(extractJsonObject(result.reply));
+    res.setHeader('Cache-Control', 'no-store');
+    const quiz = parsed?.quiz;
+    const valid = parsed && typeof parsed.title === 'string' && typeof parsed.theory === 'string' && parsed.theory.trim()
+      && quiz && typeof quiz.question === 'string' && Array.isArray(quiz.options) && quiz.options.length === 3
+      && Number.isInteger(Number(quiz.correctIndex)) && Number(quiz.correctIndex) >= 0 && Number(quiz.correctIndex) <= 2;
+    if (!valid) {
+      console.warn('[lesson-bite] JSON inválido. Snippet:', (result.reply || '').slice(0, 240));
+      return res.status(503).json({ lesson: null, providerUsed: result.providerUsed, isOfflineSimulation: false });
+    }
+    return res.json({
+      lesson: {
+        title: String(parsed.title).trim(),
+        theory: String(parsed.theory).trim(),
+        analogy: typeof parsed.analogy === 'string' && parsed.analogy.trim() ? parsed.analogy.trim() : undefined,
+        example: typeof parsed.example === 'string' && parsed.example.trim() ? parsed.example.trim() : undefined,
+        quiz: {
+          question: String(quiz.question).trim(),
+          options: (quiz.options as string[]).map((o: any) => String(o).trim()),
+          correctIndex: Number(quiz.correctIndex),
+          correctExplanation: typeof quiz.correctExplanation === 'string' ? quiz.correctExplanation.trim() : undefined,
+        },
+      },
+      providerUsed: result.providerUsed,
+    });
+  } catch (err: any) {
+    console.error('Error en /api/ai/lesson-bite:', err?.message || err);
+    return res.status(503).json({ lesson: null, isOfflineSimulation: true });
+  }
+});
+
+// Paso 15e: DESARROLLA el tema para la Guía Didáctica oficial (plantilla "El Ciclo del Agua").
+// MODO A (preferido): el cliente envía los `steps` ya resueltos por la ruta interactiva → se genera SOLO {intro, questionA, questionB}
+// (JSON chico = rápido y fiable también con free-tier saturado; la guía queda idéntica a lo que el niño estudió).
+// MODO B: sin steps → genera guía completa (intro+3 pasos reales+preguntas). Si nada funciona, el frente usa su fallback con la lectura real.
+app.post('/api/ai/guide-content', async (req: Request, res: Response) => {
+  try {
+    const { student, subject, dailyClass, steps: presetSteps } = req.body ?? {};
+    if (!dailyClass?.theme) {
+      return res.status(400).json({ content: null, error: 'Falta dailyClass.theme' });
+    }
+    const preset: Array<{ title: string; text: string }> = (Array.isArray(presetSteps) ? presetSteps : [])
+      .filter((s: any) => s && typeof s.title === 'string' && typeof s.text === 'string' && s.text.trim().length > 25)
+      .slice(0, 3)
+      .map((s: any) => ({ title: String(s.title).replace(/\s+/g, ' ').trim().slice(0, 70), text: String(s.text).replace(/\s+/g, ' ').trim().slice(0, 300) }));
+
+    const edad = student?.age || 10;
+    // Normalización de campos JSON: SOLO colapsar espacios (cleanReasoningLeak es para prosa larga, no para
+    // strings cortos sin tildes: ahí devolvía null y tiraba respuestas válidas enteras — bug corregido).
+    const norm = (s: unknown, max: number) => (typeof s === 'string' ? s : '').replace(/\s+/g, ' ').trim().slice(0, max);
+
+    let systemPrompt: string;
+    let userMessage: string;
+    let budgets: { modelTryMs: number; tierBudgetMs: number; lastTierBudgetMs: number; maxTokens: number };
+
+    if (preset.length >= 2) {
+      const pasosTxt = preset.map((s, i) => `Paso ${i + 1}: ${s.title} — ${s.text}`).join('\n');
+      systemPrompt = `
+Eres el autor de las Guías Didácticas de Wisdom School (escuela cristiana evangélica). El estudiante YA vio estos pasos del tema "${dailyClass.theme}" en su clase interactiva:
+${pasosTxt}
+
+Genera SOLO un objeto JSON (empieza con { y termina }, sin notas internas, sin markdown) con este esquema exacto y nada más:
+{"intro":"párrafo de 50-70 palabras, español cálido y sencillo para un niño de ${edad} años: presenta el tema, por qué importa en la vida real y termina con una frase que conecte su orden y propósito con Dios creador y con nuestra mayordomía (sin citar versículos largos)","questionA":"pregunta de ANÁLISIS encadenando TODOS los pasos de arriba (qué pasa primero, después, al final) y por qué el proceso funciona así y no al revés; máximo 45 palabras, termina con una mini-pregunta de por qué","questionB":"UN escenario concreto de la vida real de un niño de ${edad} años donde una parte del proceso falla o está en riesgo, seguido de 2 preguntas cortas: ¿qué pasaría…? y ¿cuál es tu responsabilidad para cuidarlo como buen mayordomo de lo que Dios creó?; máximo 55 palabras"}
+PROHIBIDO inventar pasos nuevos o cambiar los nombres de los dados; las preguntas DEBEN poder responderse leyendo solo los pasos de arriba.
+      `.trim();
+      userMessage = `Genera el JSON (intro, questionA, questionB) para "${dailyClass.theme}". Materia: ${subject?.name || 'General'}.`;
+      budgets = { modelTryMs: 10000, tierBudgetMs: 24000, lastTierBudgetMs: 14000, maxTokens: 520 };
+    } else {
+      const base = [
+        dailyClass.objective ? `Objetivo: ${dailyClass.objective}` : '',
+        dailyClass.introduction ? `Introducción del maestro: ${String(dailyClass.introduction).slice(0, 500)}` : '',
+        dailyClass.reading ? `Lectura base de la clase: ${String(dailyClass.reading).slice(0, 800)}` : '',
+        (dailyClass.activities && dailyClass.activities[0]) ? `Actividad clave: ${dailyClass.activities[0].title} — ${dailyClass.activities[0].description}` : '',
+      ].filter(Boolean).join('\n');
+      systemPrompt = `
+Eres el autor de las Guías Didácticas oficiales de Wisdom School (escuela cristiana evangélica, cosmovisión bíblica). Tu trabajo: DESARROLLAR EL TEMA con contenido real y nombres concretos. Estilo de referencia (copia SU ESTILO, no su contenido): Tema "El ciclo del agua" → intro de 4 líneas; "Paso 1: Evaporación (El Ascenso): el sol calienta el agua… sube como vapor"; "Paso 2: Condensación (La Formación): el vapor se enfría y forma nubes"; "Paso 3: Precipitación (El Regreso): cae como lluvia y riega los campos"; después A y B.
+Los pasos DEBEN usar los NOMBRES REALES de cada parte del proceso (términos científicos, episodios, reglas, operaciones...), con apodo evocador entre paréntesis. PROHIBIDO titular pasos "Observa", "Comprende", "Parte 1", "Idea central".
+
+Tu respuesta COMIENZA con { y TERMINA con }. Sin notas internas ni texto fuera del JSON. ESQUEMA EXACTO:
+{"intro":"50-70 palabras, español sencillo para ${edad} años, cierra conectando orden/propósito con Dios creador","steps":[{"title":"NOMBRE real (Apodo)","text":"explicación SOLO de este paso, 35-48 palabras sin relleno"},{"title":"NOMBRE real del siguiente paso (Apodo)","text":"35-48 palabras"},{"title":"NOMBRE real del último paso (Apodo)","text":"35-48 palabras"}],"questionA":"A. Expresa con tus propias palabras: pregunta de análisis encadenando los 3 pasos + por qué funcionan en ese orden (máx 45 palabras)","questionB":"B. Pensamiento crítico: escenario real donde algo falla o está en riesgo + ¿qué pasaría...? + ¿cuál es tu responsabilidad/mayordomía? (máx 55 palabras)"}
+      `.trim();
+      userMessage = `Tema a desarrollar: "${dailyClass.theme}". Materia: ${subject?.name || 'General'}. Estudiante: ${student?.name || 'tu estudiante'} (${edad} años).\n${base}\nDesarrolla ahora el JSON de la guía.`;
+      budgets = { modelTryMs: 14000, tierBudgetMs: 30000, lastTierBudgetMs: 18000, maxTokens: 1600 };
+    }
+
+    const result = await executeResilientAIPipeline(
+      { systemPrompt, userMessage, conversationHistory: [] },
+      { modelTryMs: budgets.modelTryMs, tierBudgetMs: budgets.tierBudgetMs, lastTierBudgetMs: budgets.lastTierBudgetMs, gen: { maxTokens: budgets.maxTokens, temperature: 0.35 } }
+    );
+
+    const parsed = looseParseJson(extractJsonObject(result.reply));
+    res.setHeader('Cache-Control', 'no-store');
+    const intro = norm(parsed?.intro ?? parsed?.introduction, 520);
+    const questionA = norm(parsed?.questionA, 360).replace(/^A\.\s*/i, '').replace(/^Expresa con tus propias palabras\s*[:\-—]\s*/i, '');
+    const questionB = norm(parsed?.questionB, 440).replace(/^B\.\s*/i, '').replace(/^Pensamiento (cr[ií]tico|de an[aá]lisis)\s*[:\-—]\s*/i, '');
+
+    let outSteps = preset;
+    if (preset.length < 2) {
+      const rawSteps = Array.isArray(parsed?.steps) ? parsed.steps : [];
+      outSteps = rawSteps
+        .filter((s: any) => s && typeof s.title === 'string' && typeof s.text === 'string' && s.text.trim().length > 25)
+        .slice(0, 3)
+        .map((s: any) => ({ title: norm(s.title, 70).replace(/^Paso\s*\d+\s*[:\-—]\s*/i, ''), text: norm(s.text, 320) }));
+    }
+    if (!intro || outSteps.length < 2 || !questionA || !questionB) {
+      console.warn('[guide-content] incompleto. Snippet:', (result.reply || '').slice(0, 260));
+      return res.status(503).json({ content: null, providerUsed: result.providerUsed });
+    }
+    return res.json({ content: { intro, steps: outSteps, questionA, questionB }, providerUsed: result.providerUsed });
+  } catch (err: any) {
+    console.error('Error en /api/ai/guide-content:', err?.message || err);
+    return res.status(503).json({ content: null, isOfflineSimulation: true });
+  }
+});
+
+// Paso 15d: Re-explicación con sustento teórico para la ruta de micro-lecciones.
+// A diferencia del chat socrático (que jamás da la respuesta), aquí SÍ se explica por qué la respuesta
+// correcta lo es, usando el contenido exacto de la lección que el niño ya está viendo.
+app.post('/api/ai/reexplain', async (req: Request, res: Response) => {
+  try {
+    const { student, teacher, subject, dailyClass, lesson } = req.body ?? {};
+    const theory = String(lesson?.theory || '').slice(0, 700);
+    const correctAnswer = String(lesson?.correctAnswer || '').slice(0, 140);
+    const question = String(lesson?.question || '').slice(0, 220);
+    if (!theory || !correctAnswer) {
+      return res.status(400).json({ text: null, error: 'Faltan lesson.theory o lesson.correctAnswer' });
+    }
+    const analogy = String(lesson?.analogy || '').slice(0, 200);
+    const example = String(lesson?.example || '').slice(0, 200);
+
+    const systemPrompt = `
+Eres "${teacher?.name || 'el profesor de Wisdom School'}", explicando con mucho cariño a ${student?.name || 'tu estudiante'} (${student?.age || 10} años), de la materia ${subject?.name || 'General'}.
+Acaba de fallar este reto: "${question || 'la pregunta de la lección'}". La respuesta correcta es "${correctAnswer}".
+
+Contenido oficial de SU lección (úsalo como única fuente, no lo contradigas):
+- Teoría: ${theory}
+- Analogía usada: ${analogy || '(la de la ficha)'}
+- Ejemplo usado: ${example || '(el de la ficha)'}
+
+Escribe SOLO la explicación final, sin títulos, sin markdown, sin listas y SIN escribir nunca tu planificación o notas internas:
+1. Una frase de ánimo ("No pasa nada...", varíala), 2. vuelve a contar el concepto con palabras MÁS simples que la teoría de arriba, 3. usa una analogía NUEVA y distinta a la de la ficha (otra cosa de su vida diaria), 4. cierra diciendo exactamente por qué "${correctAnswer}" es la respuesta correcta, conectándola con el ejemplo.
+Máximo 60 palabras español claro para su edad. PROHIBIDO hacer preguntas, prohibido pedirle que responda algo: es una explicación definitiva para que vuelva a intentarlo con éxito.
+    `.trim();
+
+    const result = await executeResilientAIPipeline({
+      systemPrompt,
+      userMessage: 'Dame la explicación de cariño ahora.',
+      conversationHistory: [],
+    }, { modelTryMs: Number(process.env.REEXPLAIN_MODEL_TIMEOUT_MS || 8000), tierBudgetMs: Number(process.env.REEXPLAIN_TIER_BUDGET_MS || 16000), lastTierBudgetMs: Number(process.env.REEXPLAIN_LAST_TIER_BUDGET_MS || 10000), gen: { maxTokens: 480, temperature: 0.8 } });
+
+    const text = cleanReasoningLeak(result.reply);
+    res.setHeader('Cache-Control', 'no-store');
+    if (!text) {
+      console.warn('[reexplain] sin texto útil. Snippet:', (result.reply || '').slice(0, 200));
+      return res.status(503).json({ text: null, providerUsed: result.providerUsed });
+    }
+    return res.json({ text, providerUsed: result.providerUsed });
+  } catch (err: any) {
+    console.error('Error en /api/ai/reexplain:', err?.message || err);
+    return res.status(503).json({ text: null, isOfflineSimulation: true });
   }
 });
 

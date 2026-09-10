@@ -18,30 +18,59 @@ const chunkList = <T,>(arr: T[], k: number): T[][] => {
   return out;
 };
 
-// Fallback determinista: DESARROLLA con el texto real de la lección (reading/introduction),
-// nunca con etiquetas metodológicas. Se usa si la IA no responde.
-const buildFromReading = (c: DailyClass): GuideAiContent => {
-  const src = clean(c.reading || c.introduction || `Hoy trabajamos "${c.theme}". ${c.objective || ""}`, 1000);
-  const sentences = src.split(/(?<=[.!?])\s+/).filter((s) => s.trim().length > 25);
-  const intro = clean(sentences.shift() || firstSentences(src, 1), 260);
-  const groups = chunkList(sentences.slice(0, 12), Math.max(1, Math.ceil(Math.min(sentences.length, 12) / 3) || 1)).slice(0, 3);
-  const steps: GuideStep[] = groups.map((g, i) => {
-    const text = clean(g.join(" "), 230);
-    const firstWords = text.split(" ").slice(0, 6).join(" ").replace(/[.,;:].*$/, "");
-    return { title: `${firstWords.charAt(0).toUpperCase()}${firstWords.slice(1)}… (Parte ${i + 1})`, text };
+// Fallback determinista MULTIFUENTE y honesto: reúne TODOS los fragmentos reales de la clase
+// (lecture, introduction, objective, actividades, socráticas, tarea, reflexión). Nunca deja un
+// único paso raquítico; y si el material semilla es pobre, lo declara para que el alumno vuelva
+// a la Clase Interactiva (donde la IA desarrolla el tema) en lugar de fingir desarrollo.
+const collectFragments = (c: DailyClass): string[] => {
+  const out: string[] = [];
+  const push = (t: unknown) => { const s = clean(typeof t === "string" ? t : "", 300); if (s && s.split(" ").length >= 5 && !out.includes(s)) out.push(s); };
+  push(c.reading); push(c.introduction); push(c.objective);
+  (c.activities || []).slice(0, 3).forEach((a: any) => push(a?.description));
+  (c.socraticQuestions || []).slice(0, 2).forEach((q) => push(q));
+  push(c.homeworkTask && !String(c.homeworkTask).startsWith("Pendiente") ? c.homeworkTask : "");
+  push(c.reflectionPrompt);
+  (c.learningPath || []).slice(0, 2).forEach((s: any) => {
+    const cc = s?.coreConcept;
+    if (cc && typeof cc.summary === "string" && !/concepto central|an[aá]lisis detallado|ejecuci[oó]n pr[aá]ctica|demostraci[oó]n de maestr/i.test(cc.summary)) push(cc.summary);
   });
-  const act = c.activities && c.activities[0];
-  if (!steps.length) steps.push({ title: `${clean(c.theme, 60)} (Idea central)`, text: firstSentences(src, 2) });
+  return out;
+};
+
+const shortName = (s: string): string => clean((s || "").split(" ").slice(0, 6).join(" ").replace(/[.,;:\s]+$/, ""), 48);
+
+const buildFromReading = (c: DailyClass): GuideAiContent => {
+  const frags = collectFragments(c);
+  const rich = frags.length >= 5;
+  const intro = clean(
+    (frags[0] || `Hoy trabajamos "${clean(c.theme, 60)}".`) + " " +
+    (frags[1] || `Objetivo de la clase: ${clean(c.objective || "comprender el tema con orden y propósito", 220)}`) + " " +
+    "Dios hizo todas las cosas con orden y propósito, y cada idea de esta clase encaja con la siguiente.",
+    480
+  );
+  let steps: GuideStep[] = [];
+  if (rich) {
+    const rest = frags.slice(2);
+    const groups = chunkList(rest, Math.max(1, Math.ceil(Math.min(rest.length || 1, 9) / 3))).slice(0, 3);
+    steps = groups.map((g: string[], i: number) => ({ title: `Paso ${i + 1}: ${shortName(g[0] || c.theme)}…`, text: clean(g.join(" "), 280) }));
+  } else {
+    steps = [
+      { title: `El corazón del tema: ${clean(c.theme, 56)}`, text: clean(frags.join(" ") || `Explora "${c.theme}" con tu profesor IA en la Clase Interactiva: ahí encontrarás definiciones, ejemplos y analogías completas.`, 280) },
+      { title: "Lo que explorarás con tu profesor", text: clean((c.socraticQuestions || []).slice(0, 2).join("  ·  ") || `Las preguntas vivas de "${c.theme}" guían el laboratorio y el taller.`, 280) },
+      { title: "Tu misión de hoy", text: clean([(c.activities && c.activities[1] && c.activities[1].description), c.homeworkTask].filter((x) => x && !String(x).startsWith("Pendiente")).join(" ") || "Sube tu evidencia del Taller Práctico y repasa el laboratorio.", 280) },
+    ].filter((s) => s.text.length > 18);
+  }
+  while (steps.length < 3) steps.push({ title: "Para cerrar con orden", text: `Explica "${clean(c.theme, 56)}" con un ejemplo propio y úsalo hoy en tu casa: aprendemos para cuidar lo que Dios creó.` });
   return {
     intro,
-    steps: steps.length ? steps : [{ title: clean(c.theme, 60), text: firstSentences(src, 2) }],
-    questionA: clean(`¿Por qué este proceso de "${c.theme}" ocurre tal como lo leíste y no de otra manera? Respóndelo con tus palabras, como se lo explicarías a un compañero.`, 340),
-    questionB: clean(
-      (c.reflectionPrompt || `Imagina que algo falla en la parte ${steps.length > 1 ? "del proceso que más te costó" : "que aprendiste hoy"}. ¿Qué pasaría y cómo actuarías con responsabilidad?`) +
-        " Cierra explicando qué parte de esta mayordomía refleja el carácter de Dios.",
-      400
-    ),
-    providerUsed: act ? "fallback lectura real de la clase" : "fallback lectura real de la clase",
+    steps: steps.slice(0, 3),
+    questionA: clean(rich
+      ? `Expresa con tus propias palabras: ¿cómo se conectan los tres pasos de "${clean(c.theme, 60)}" y qué pasaría si saltaras el primero?`
+      : `Sin mirar la guía: ¿qué entenderías hoy de "${clean(c.theme, 56)}" si tu profesor te lo pidiera con SUS palabras (las de la Clase Interactiva)?`, 320),
+    questionB: clean((c.reflectionPrompt || "¿Qué parte de este tema pondrías en práctica hoy en tu casa y por qué?") + " Cierra: ¿qué reflejo de mayordomía ves aquí?", 380),
+    providerUsed: rich
+      ? "síntesis local del material semilla de la clase (sin IA hoy)"
+      : "semilla local pobre → completa el desarrollo en la Clase Interactiva y vuelve a descargar",
   };
 };
 
@@ -120,7 +149,11 @@ export function generateClassGuideHTML(
     ${pista ? `<div class="pista">💡 <strong>Pista:</strong> ${pista}</div>` : ""}
     <div style="height:6px"></div>`;
 
-  const introText = /[.!?…]$/.test(content.intro.trim()) ? content.intro : `${content.intro}.`;
+  const introBase = /[.!?…]$/.test(content.intro.trim()) ? content.intro : `${content.intro}.`;
+  // La frase cosmovisiva se añade SOLO si la fuente no la trajo ya (evita la duplicación "Dios… Dios…").
+  const fullIntro = /Dios|Creador|G[ée]nesis|mayordom/i.test(content.intro)
+    ? introBase
+    : `${introBase} Dios hizo todas las cosas con orden y propósito (Génesis 1:31; Colosenses 1:16-17), y estudiar este tema es descubrir ese diseño para cuidarlo`;
 
   const banner = currentClass.studentId === "avril" || currentClass.studentId === "karen"
     ? `<div class="banner" style="background:#7c9cff14;border:1px solid #7c9cff55;" >🐶 Snoopy confía en tu prosa: el mundo tiene orden porque Dios lo pensó. <em>Guía Peanuts</em></div>`
@@ -186,7 +219,7 @@ export function generateClassGuideHTML(
   ${banner}
 
   <h2>1. Desarrollo del Tema (Texto Base)</h2>
-  <p class="intro">${esc(introText)} Dios hizo todas las cosas con orden y propósito (Génesis 1:31; Colosenses 1:16-17), y estudiar este tema es descubrir ese diseño para cuidarlo.</p>
+  <p class="intro">${esc(fullIntro)}</p>
   ${stepsHtml}
 
   <h2>2. Taller Práctico (Análisis y Síntesis)</h2>

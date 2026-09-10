@@ -1,17 +1,21 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useSchool, DayOfWeekName } from '../../context/SchoolContext';
+import { useScrollToTopOnChange } from '../../hooks/useScrollToTopOnChange';
+import { scrollAppToTop } from '../../utils/scrollToTop';
 import { DailyClass, ClassActivity } from '../../types';
 import { formatYouTubeEmbedUrl, getYouTubeWatchUrl, getYouTubeSearchUrl } from '../../utils/youtube';
-import { downloadClassGuide } from '../../utils/guideGenerator';
+import { downloadClassGuide, routeGuideContent } from '../../utils/guideGenerator';
 import { downloadConsolidatedDailyGuide } from '../../utils/consolidatedGuideGenerator';
 import { ActivityDetailModal } from '../activities/ActivityDetailModal';
+import { requestGuideContent, requestLessonBite } from '../../services/aiService';
 import { ClassVideoPlayer } from './ClassVideoPlayer';
-import { InteractiveLessonView } from './InteractiveLessonView';
+import { MicroLessonPlayer } from './MicroLessonPlayer';
+import { ClassTeacherChat } from './ClassTeacherChat';
+import { LessonTimeline } from './LessonTimeline';
 import { PageHeader } from '../layout/PageHeader';
 import {
-  PlayCircle, BookOpen, HelpCircle, ListTodo, Download, Upload, Bot, Sparkles, ExternalLink,
-  CheckCircle2, Clock, ArrowRight, ArrowLeft, Tv, Cpu, Layers, MessageSquareQuote, Lightbulb,
-  Timer, Play, BrainCircuit, Microscope, Calendar, AlertCircle, GraduationCap
+  BookOpen, HelpCircle, ListTodo, Download, Upload, Sparkles, ExternalLink,
+  CheckCircle2, ArrowRight, Cpu, Layers, Lightbulb, Calendar, AlertCircle, BrainCircuit,
 } from 'lucide-react';
 
 const DAYS_CONFIG: { day: DayOfWeekName; date: string; isStart?: boolean }[] = [
@@ -33,6 +37,8 @@ const forceSpanishUrl = (url: string) => {
   } catch (e) { return url; }
 };
 
+type ActiveSubTab = 'content' | 'simulator' | 'activities' | 'homework';
+
 export const DailyClassView: React.FC = () => {
   const [isReviewWeek, setIsReviewWeek] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
@@ -45,13 +51,17 @@ export const DailyClassView: React.FC = () => {
   const {
     activeClass, todayClasses, allStudentClasses, selectedDayOfWeek, setSelectedDayOfWeek,
     setActiveClass, studentSubjects, activeSubject, setActiveSubject, openTeacherDrawerWithContext,
-    toggleActivityCompletion, setActiveTab, currentStudent,
+    toggleActivityCompletion, setActiveTab, currentStudent, completeClass,
   } = useSchool();
 
-  const [activeSubTab, setActiveSubTab] = useState<'content' | 'simulator' | 'activities' | 'homework' | 'reflection'>('content');
+  const [activeSubTab, setActiveSubTab] = useState<ActiveSubTab>('content');
   const [viewMode, setViewMode] = useState<'focus' | 'all-classes'>('focus');
   const [downloadSuccess, setDownloadSuccess] = useState(false);
+  const [isGeneratingGuide, setIsGeneratingGuide] = useState(false);
+  const [routeSteps, setRouteSteps] = useState<{ title: string; text: string }[]>([]);
+  const routeStepsForClass = useRef<string | null>(null);
   const [selectedActivityForModal, setSelectedActivityForModal] = useState<ClassActivity | null>(null);
+  const [completedSteps, setCompletedSteps] = useState<Set<string>>(new Set());
 
   const currentClass = activeClass || todayClasses[0] || allStudentClasses[0];
   const subject = currentClass ? studentSubjects.find((s: any) => s.id === currentClass.subjectId) : studentSubjects[0];
@@ -64,18 +74,52 @@ export const DailyClassView: React.FC = () => {
   const prevClass = currentClassIndex > 0 ? todayClasses[currentClassIndex - 1] : null;
   const nextClass = currentClassIndex >= 0 && currentClassIndex < todayClasses.length - 1 ? todayClasses[currentClassIndex + 1] : null;
 
+  const allActivitiesCompleted = activitiesList.length > 0 && activitiesList.every((a: any) => a.completed);
+
   const handleSelectClass = (targetClass: DailyClass) => {
     setActiveClass(targetClass);
     const targetSub = studentSubjects.find((s: any) => s.id === targetClass.subjectId);
     if (targetSub) setActiveSubject(targetSub);
-    setActiveSubTab('content'); setViewMode('focus'); window.scrollTo({ top: 0, behavior: 'smooth' });
+    setActiveSubTab('content'); setViewMode('focus'); scrollAppToTop('smooth');
   };
 
-  const handleDownloadGuide = (mode?: 'single' | 'consolidated') => {
+  // Dentro de la ventana de clase también es una "sub-ruta": sub-pestaña, modo o clase distinta => vista arriba.
+  useScrollToTopOnChange([activeSubTab, viewMode, currentClass?.id]);
+
+  const handleDownloadGuide = async (mode?: 'single' | 'consolidated') => {
     if (mode === 'consolidated' || (mode === undefined && todayClasses.length > 1)) {
       renderConsolidatedGuide();
     } else if (currentClass) {
-      downloadClassGuide(currentClass, subject, currentStudent.name, currentStudent.grade);
+      setIsGeneratingGuide(true);
+      try {
+        // Asegurar los 3 conceptos reales ANTES de componer (cache: lo ya generado no gasta red).
+        let steps = routeStepsForClass.current === currentClass.id ? routeSteps : [];
+        if (steps.filter((s) => (s.text || '').length > 40).length < 2) {
+          try {
+            const titles: string[] = []; const collected: { title: string; text: string }[] = [];
+            for (let i = 1; i <= 3; i++) {
+              const b = await requestLessonBite({ student: currentStudent, teacher: subject.teacher, subject, dailyClass: currentClass, index: i, total: 3, covered: [...titles] });
+              if (b) { collected.push({ title: b.title, text: [b.theory, b.analogy, b.example].filter(Boolean).join(' ') }); titles.push(b.title); }
+            }
+            if (collected.length >= 2) { steps = collected; setRouteSteps(collected); routeStepsForClass.current = currentClass.id; }
+          } catch { /* sin bites: se usará el último fallback del generador */ }
+        }
+        const aiContent = await requestGuideContent({
+          student: currentStudent,
+          subject,
+          dailyClass: currentClass,
+          steps: steps.length >= 2 ? steps : undefined,
+        });
+        // Cadena de garantía: IA sobre la ruta real → composición local con ESOS pasos → síntesis semilla honesta.
+        const fallbackFromRoute = steps.length >= 2
+          ? routeGuideContent(steps as any, { theme: currentClass.theme, studentName: currentStudent.name, subjectName: subject.name, withSplit: /cienc|mat|natur|hist|bio|quim/i.test(`${subject.id}${subject.name}`) })
+          : null;
+        downloadClassGuide(currentClass, subject, currentStudent.name, currentStudent.grade, aiContent ?? fallbackFromRoute);
+      } catch {
+        downloadClassGuide(currentClass, subject, currentStudent.name, currentStudent.grade, null);
+      } finally {
+        setIsGeneratingGuide(false);
+      }
     }
     setDownloadSuccess(true);
     setTimeout(() => setDownloadSuccess(false), 4000);
@@ -94,12 +138,27 @@ export const DailyClassView: React.FC = () => {
     });
   };
 
-  const handleAskSocraticTeacher = (promptText: string) => {
-    localStorage.setItem('pending_socratic_prompt', promptText);
+  const handleStepClick = (stepId: string) => {
+    setActiveSubTab(stepId as ActiveSubTab);
+    setCompletedSteps((prev) => {
+      const next = new Set<string>(prev);
+      next.add(stepId);
+      return next;
+    });
+  };
+
+  const handleCompleteClass = () => {
+    if (currentClass) {
+      completeClass(currentClass.id);
+      setCompletedSteps(new Set(['content', 'simulator', 'activities', 'homework']));
+    }
+  };
+
+  const handleAskTeacher = (promptText: string) => {
     openTeacherDrawerWithContext(subject, currentClass);
   };
 
-  const handleGoToSubmitWork = () => setActiveTab('works');
+  const handleGoToSubmitWork = () => setActiveTab('activities');
 
   if (!isMounted) return null;
   if (!currentClass || !subject) return (<div className="p-12 text-center rounded-3xl bg-slate-800/40 border border-slate-700/40 text-white">No hay clases seleccionadas</div>);
@@ -107,7 +166,7 @@ export const DailyClassView: React.FC = () => {
   return (
     <div className="space-y-6 animate-fade-in">
       <PageHeader title={isReviewWeek ? "Clases de Entrenamiento (Modo Repaso)" : "Clases del Día"} />
-      
+
       {/* Day Selector */}
       <div className="p-5 rounded-3xl bg-slate-800/90 border border-slate-700/80 space-y-4 shadow-xl">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
@@ -128,15 +187,23 @@ export const DailyClassView: React.FC = () => {
 
       {viewMode === 'focus' && (
         <>
+          {/* Learning Path Timeline */}
+          <LessonTimeline
+            activeStep={activeSubTab}
+            onStepClick={handleStepClick}
+            completedSteps={Array.from(completedSteps)}
+            totalMinutes={currentClass.timeBreakdown?.reduce((sum, p) => sum + p.minutes, 0) || 90}
+          />
+
+          {/* Main Class Card */}
           <div className="rounded-3xl bg-slate-800/80 border border-slate-700/80 p-6 sm:p-8 shadow-xl space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <span className="px-3 py-1 rounded-full text-xs font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">{subject.name}</span>
                 <span className="text-xs text-slate-400 font-medium">{currentClass.date}</span>
               </div>
-              <button onClick={() => openTeacherDrawerWithContext(subject, currentClass)} className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/40 text-indigo-200 text-xs font-bold transition-all shadow-sm group">
-                <img src={subject.teacher.avatar} alt={subject.teacher.name} className="w-5 h-5 rounded-full object-cover ring-1 ring-indigo-400" />
-                <span>Hablar con {subject.teacher.name}</span><Bot className="w-3.5 h-3.5 text-indigo-400 group-hover:animate-bounce" />
+              <button onClick={() => handleCompleteClass()} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-sm ${allActivitiesCompleted ? 'bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-200' : 'bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-200'}`}>
+                {allActivitiesCompleted ? <><CheckCircle2 className="w-4 h-4" /><span>Clase Completada ✓</span></> : <><CheckCircle2 className="w-4 h-4" /><span>Completar Clase</span></>}
               </button>
             </div>
             <div><h1 className="text-2xl sm:text-3xl font-extrabold text-white mt-1">{currentClass.theme}</h1></div>
@@ -148,42 +215,52 @@ export const DailyClassView: React.FC = () => {
             </div>
           </div>
 
-          {/* Navigation Sub-Tabs */}
+          {/* Navigation Sub-Tabs - Now 4 steps only */}
           <div className="flex items-center gap-2 border-b border-slate-800 pb-2 overflow-x-auto">
             {[
-              { id: 'content', label: '1. Masterclass Gamificada', icon: BookOpen },
+              { id: 'content', label: '1. Clase en Vivo con tu Profesor', icon: BookOpen },
               { id: 'simulator', label: '2. Laboratorio Digital', icon: Cpu },
               { id: 'activities', label: '3. Taller Práctico', icon: ListTodo, badge: `${isReviewWeek ? 0 : activitiesList.filter((a: any) => a.completed).length}/${activitiesList.length}` },
               { id: 'homework', label: '4. Guía & Evidencias', icon: Upload },
-              { id: 'reflection', label: '5. Pausa Socrática', icon: MessageSquareQuote },
             ].map((tab) => (
-              <button key={tab.id} onClick={() => setActiveSubTab(tab.id as any)} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${activeSubTab === tab.id ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-800/60 text-slate-400 hover:text-slate-200 hover:bg-slate-800'}`}>
+              <button key={tab.id} onClick={() => handleStepClick(tab.id)} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${activeSubTab === tab.id ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-800/60 text-slate-400 hover:text-slate-200 hover:bg-slate-800'}`}>
                 <tab.icon className="w-3.5 h-3.5" /><span>{tab.label}</span>
                 {tab.badge && <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${activeSubTab === tab.id ? 'bg-indigo-700 text-white' : 'bg-slate-700 text-slate-300'}`}>{tab.badge}</span>}
               </button>
             ))}
           </div>
 
-          {/* SUB-TAB 1: MASTERCLASS GAMIFICADA */}
+          {/* SUB-TAB 1: CLASE EN VIVO — EL PROFESOR IA PROTAGONIZA EL ESPACIO CENTRAL */}
           {activeSubTab === 'content' && (
             <div className="space-y-6 animate-fade-in">
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-6 rounded-3xl bg-gradient-to-r from-indigo-900/80 to-slate-900 border-2 border-indigo-500/30 shadow-xl">
                 <div>
-                  <h2 className="text-xl sm:text-2xl font-black text-white flex items-center gap-2"><BrainCircuit className="w-6 h-6 text-indigo-400" /> Lección Interactiva</h2>
-                  <p className="text-indigo-200 mt-1 text-xs sm:text-sm">Supera los retos de tu profesor para desbloquear el siguiente conocimiento.</p>
+                  <h2 className="text-xl sm:text-2xl font-black text-white flex items-center gap-2"><BrainCircuit className="w-6 h-6 text-indigo-400" /> Tu Sala de Clase Interactiva</h2>
+                  <p className="text-indigo-200 mt-1 text-xs sm:text-sm">
+                    {subject.teacher.name} preparó tu ruta en mini-lecciones con retos. Avanza una tarjeta a la vez, responde con opción múltiple y usa el chat con él/ella cuando lo necesites.
+                  </p>
                 </div>
-                <button onClick={() => handleDownloadGuide()} className="w-full sm:w-auto px-5 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs shadow-lg transition-all flex items-center justify-center gap-2">
-                  <Download className="w-4 h-4" /> Descargar PDF de Apoyo
+                <button onClick={() => handleDownloadGuide('single')} disabled={isGeneratingGuide} className="w-full sm:w-auto px-5 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-70 disabled:cursor-wait text-slate-950 font-black text-xs shadow-lg transition-all flex items-center justify-center gap-2">
+                  <Download className={`w-4 h-4 ${isGeneratingGuide ? "animate-bounce" : ""}`} /> {isGeneratingGuide ? "Desarrollando tu guía…" : "Descargar Guía Didáctica"}
                 </button>
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <div className="lg:col-span-2">
-                  <InteractiveLessonView teacher={subject.teacher} student={currentStudent} dailyClass={currentClass} />
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                {/* COLUMNA CENTRAL: RUTA DE MICRO-LECCIONES DIRIGIDA POR TU PROFESOR */}
+                <div className="lg:col-span-8">
+                  <MicroLessonPlayer
+                    dailyClass={currentClass}
+                    subject={subject}
+                    student={currentStudent}
+                    onGoToLab={() => handleStepClick('simulator')}
+                    onStepsResolved={(steps) => { routeStepsForClass.current = currentClass.id; setRouteSteps(steps); }}
+                  />
                 </div>
 
-                <div className="space-y-6">
-                  <div className="p-6 rounded-3xl bg-slate-800/80 border border-slate-700/80 space-y-4 sticky top-6 shadow-xl">
+                {/* COLUMNA LATERAL: COMPAÑERO IA + RECURSOS */}
+                <aside className="lg:col-span-4 space-y-6">
+                  <ClassTeacherChat compact />
+                  <div className="p-6 rounded-3xl bg-slate-800/80 border border-slate-700/80 space-y-4 shadow-xl">
                     <h3 className="text-base font-bold text-white flex items-center gap-2 border-b border-slate-700 pb-3"><Layers className="w-5 h-5 text-indigo-400" /><span>Recursos de Apoyo</span></h3>
                     {resourcesList.length > 0 && (
                       <div className="flex items-start gap-2 p-3 mb-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[10px] text-amber-200">
@@ -205,7 +282,7 @@ export const DailyClassView: React.FC = () => {
                       )}
                     </div>
                   </div>
-                </div>
+                </aside>
               </div>
             </div>
           )}
@@ -236,7 +313,7 @@ export const DailyClassView: React.FC = () => {
                   </div>
                 )}
               </div>
-              
+
               <ClassVideoPlayer
                 currentClass={currentClass}
                 subject={subject}
@@ -313,19 +390,20 @@ export const DailyClassView: React.FC = () => {
                   <div className="w-10 h-10 rounded-xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center border border-indigo-500/20">
                     <Download className="w-5 h-5" />
                   </div>
-                  <h3 className="text-base font-bold text-white">Descargar Guía de la Clase</h3>
+                  <h3 className="text-base font-bold text-white">Guía Didáctica y Taller Práctico</h3>
                   <p className="text-xs text-slate-400 leading-relaxed">
-                    Descarga tu hoja de trabajo con los ejercicios para imprimir o resolver digitalmente.
+                    Texto base en pasos cortos + dos cajones de escritura (comprensión y aplicación) listos para imprimir.
                   </p>
                   <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-700 text-xs font-mono text-indigo-300 break-all">
                     📄 {currentClass.guideTitle || 'Guia_Didactica_Clase.pdf'}
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <button onClick={() => handleDownloadGuide()} className="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-md transition-all flex items-center justify-center gap-2">
-                    <Download className="w-4 h-4" /><span>Descargar PDF</span>
+                  <button onClick={() => handleDownloadGuide('single')} disabled={isGeneratingGuide} className="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-70 disabled:cursor-wait text-white font-bold text-xs shadow-md transition-all flex items-center justify-center gap-2">
+                    <Download className={`w-4 h-4 ${isGeneratingGuide ? "animate-bounce" : ""}`} /><span>{isGeneratingGuide ? "Desarrollando tu guía…" : "Descargar Guía Didáctica"}</span>
                   </button>
-                  {downloadSuccess && <p className="text-xs text-emerald-400 text-center font-semibold animate-fade-in">✓ PDF descargado correctamente.</p>}
+                  {downloadSuccess && <p className="text-xs text-emerald-400 text-center font-semibold animate-fade-in">✓ Guía lista para imprimir o firmar.</p>}
+                  {isGeneratingGuide && <p className="text-[10px] text-indigo-300 text-center">Toma 5-15 s: es contenido real desarrollado para este tema, no una plantilla vacía.</p>}
                 </div>
               </div>
 
@@ -346,76 +424,6 @@ export const DailyClassView: React.FC = () => {
                   <Upload className="w-4 h-4" /><span>Entregar Trabajo</span>
                 </button>
               </div>
-            </div>
-          )}
-
-          {/* SUB-TAB 5: PAUSA SOCRÁTICA */}
-          {activeSubTab === 'reflection' && (
-            <div className="space-y-6 animate-fade-in">
-              <div>
-                <h3 className="text-lg font-bold text-white flex items-center gap-2"><MessageSquareQuote className="w-5 h-5 text-indigo-400" /><span>Pausa Socrática de Cierre</span></h3>
-                <p className="text-xs text-slate-400 mt-1">Reflexiona y debate estas preguntas con el profesor IA antes de dar por terminada la clase.</p>
-              </div>
-
-              {/* Integrated Socratic Pauses from learning path */}
-              <div className="space-y-4">
-                {currentClass.socraticPauses && currentClass.socraticPauses.length > 0 ? (
-                  currentClass.socraticPauses.map((pause) => (
-                    <div key={pause.id} className="p-5 rounded-2xl bg-violet-950/30 border border-violet-500/30 space-y-3 animate-fade-in">
-                      <div className="flex items-center gap-2 text-xs font-bold text-violet-300"><HelpCircle className="w-4 h-4" /><span>Pausa Socrática</span></div>
-                      <p className="text-sm text-slate-200 font-medium">"{pause.prompt}"</p>
-                      {pause.followUpQuestion && (
-                        <p className="text-xs text-violet-200 italic">"{pause.followUpQuestion}"</p>
-                      )}
-                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pt-2">
-                        <button onClick={() => handleAskSocraticTeacher(`Profesor, sobre esta pregunta: "${pause.prompt}". ¿Me puedes guiar para razonar la respuesta?`)} className="text-xs text-indigo-400 hover:text-indigo-300 font-semibold flex items-center gap-1">
-                          <span>Debatir con el profesor IA</span><ArrowRight className="w-3 h-3" />
-                        </button>
-                        <span className="text-[10px] text-slate-500">Reflexiona antes de avanzar: {pause.reflectionPrompt}</span>
-                      </div>
-                    </div>
-                  ))
-                ) : socraticQuestionsList.length > 0 ? (
-                  socraticQuestionsList.map((q: string, idx: number) => (
-                    <div key={idx} className="p-5 rounded-2xl bg-indigo-950/30 border border-indigo-500/30 space-y-3">
-                      <div className="flex items-center gap-2 text-xs font-bold text-indigo-300"><HelpCircle className="w-4 h-4 text-indigo-400" /><span>Pregunta de Reflexión #{idx + 1}</span></div>
-                      <p className="text-sm text-slate-200 font-medium">"{q}"</p>
-                      <button onClick={() => handleAskSocraticTeacher(`Profesor, sobre esta pregunta: "${q}". ¿Me puedes guiar para razonar la respuesta?`)} className="text-xs text-indigo-400 hover:text-indigo-300 font-semibold flex items-center gap-1">
-                        <span>Debatir esta pregunta con el profesor IA</span><ArrowRight className="w-3 h-3" />
-                      </button>
-                    </div>
-                  ))
-                ) : (
-                  <div className="p-8 rounded-2xl bg-slate-800/40 border border-slate-700 text-sm text-slate-400 text-center">
-                    Abre el chat con el profesor para que te plantee una pregunta sorpresa.
-                  </div>
-                )}
-              </div>
-
-              <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-700 space-y-2">
-                <span className="text-xs font-bold uppercase tracking-wider text-amber-400">Reflexión Final del Día</span>
-                <p className="text-xs text-slate-300 italic">"{currentClass.reflectionPrompt}"</p>
-              </div>
-
-              {/* Evidence criteria display */}
-              {currentClass.evidenceCriteria && currentClass.evidenceCriteria.length > 0 && (
-                <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-700 space-y-3">
-                  <span className="text-xs font-bold uppercase tracking-wider text-emerald-400">Criterios de Evidencia</span>
-                  <div className="space-y-2">
-                    {currentClass.evidenceCriteria.map((criterion, idx) => (
-                      <div key={idx} className="flex items-start gap-3 p-3 rounded-xl bg-slate-800/60 border border-slate-700">
-                        <div className="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center text-emerald-400 shrink-0 text-xs font-black">
-                          {criterion.weight}
-                        </div>
-                        <div className="space-y-1">
-                          <p className="text-xs font-bold text-white">{criterion.criterion}</p>
-                          <p className="text-[10px] text-slate-400">Evidencia: {criterion.indicator}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
           )}
 

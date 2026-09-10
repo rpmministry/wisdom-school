@@ -1,4 +1,4 @@
-import { Student, AITeacher, Subject, DailyClass, WorkAnalysisResult } from '../types';
+import { Student, AITeacher, Subject, DailyClass, WorkAnalysisResult, MicroLessonPlan, MicroLesson } from '../types';
 
 export interface ChatMessage {
   id: string;
@@ -31,6 +31,14 @@ export interface AnalyzeWorkRequest {
 const RETRY_DELAYS_MS = [2000, 4000, 6000]; // 2s, 4s, 6s
 const MAX_RETRIES = RETRY_DELAYS_MS.length;
 
+// Los errores de clave inválida/petición inválida son FATALES: reintentarlos solo quema 12 segundos.
+class FatalAIError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'FatalAIError';
+  }
+}
+
 async function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
@@ -46,6 +54,7 @@ async function fetchWithRetry<T>(
     try {
       return await fetchFn();
     } catch (error: any) {
+      if (error?.name === 'FatalAIError') throw error; // transición inmediata al motor auxiliar
       lastError = error;
       
       // If this was the last attempt, throw
@@ -109,18 +118,15 @@ async function getFreeOpenRouterModels(): Promise<string[]> {
     const data = await res.json();
     let freeModels = data.data.filter((m: any) => parseFloat(m.pricing?.prompt || "1") === 0 && parseFloat(m.pricing?.completion || "1") === 0).map((m: any) => m.id);
     
-    // Priorizamos modelos rápidos y eficientes
-    const preferredOrder = ["google/gemini-flash-1.5:free", "google/gemini-2.0-flash-lite-preview-02-05:free", "meta-llama/llama-3.1-8b-instruct:free"];
-    freeModels.sort((a: string, b: string) => {
-      const aRank = preferredOrder.indexOf(a); const bRank = preferredOrder.indexOf(b);
-      if (aRank !== -1 && bRank !== -1) return aRank - bRank;
-      if (aRank !== -1) return -1; if (bRank !== -1) return 1; return 0;
-    });
+    // Priorizamos familias de modelos conocidas por calidad en modo gratuito.
+    const FAMILIES = ['qwen', 'google/gemini', 'deepseek', 'meta-llama', 'mistral', 'gemma', 'glm', 'kimi', 'nemotron'];
+    const rank = (id: string) => { const i = FAMILIES.findIndex((f) => id.startsWith(f)); return i === -1 ? 99 : i; };
+    freeModels.sort((a: string, b: string) => rank(a) - rank(b));
     if (freeModels.length > 0) { cachedFreeModels = freeModels; return cachedFreeModels; }
   } catch (error) { 
     console.warn("[Motor IA Auxiliar] Falló la obtención dinámica de lista. Usando lista estática."); 
   }
-  return ["google/gemini-flash-1.5:free", "meta-llama/llama-3.1-8b-instruct:free"];
+  return ["nvidia/nemotron-3.5-lightning:free", "nex-agi/nex-n2.5-mini:free", "poolside/laguna-s-2.1:free"];
 }
 
 async function fetchWithTimeout(resource: string, options: RequestInit, timeoutMs: number) {
@@ -133,36 +139,392 @@ async function fetchWithTimeout(resource: string, options: RequestInit, timeoutM
 }
 
 // ==========================================
+// PLAN DE MICRO-LECCIONES (ruta paginada + quizzes) — servido por la jerarquía gratuita del servidor
+// ==========================================
+// Contenido DESARROLLADO de la Guía Didáctica (plantilla oficial: intro + PASOS REALES + A/B).
+// DISEÑO: si el caller pasa `steps` (los que la Clase Interactiva ya resolvió, cacheados y coherentes con lo que el niño vio),
+// el server genera SOLO {intro, questionA, questionB} = JSON pequeño y confiable hasta en free-tier saturado (guía == clase).
+// Sin steps, cae a modo completo (intro+pasos+preguntas); null => generador usa su fallback determinista (lectura real).
+export async function requestGuideContent(req: {
+  student: Student;
+  subject: Subject;
+  dailyClass: DailyClass;
+  steps?: { title: string; text: string }[];
+}): Promise<import('../utils/guideGenerator').GuideAiContent | null> {
+  const preset = (req.steps || []).filter((s) => s && typeof s.title === "string" && typeof s.text === "string" && s.text.trim().length > 25).slice(0, 3);
+  const wantsFull = preset.length < 2;
+  // Caché diaria por clase: la guía buena se reusa sin gastar la cuota gratuita del día.
+  const dateKey = req.dailyClass?.date || new Date().toISOString().slice(0, 10);
+  const cacheKey = `wisdom_guide_v1_${req.student?.id || 'x'}_${req.dailyClass?.id || 'c'}_${dateKey}`;
+  try {
+    const cached = JSON.parse(localStorage.getItem(cacheKey) || 'null');
+    const cl = cached?.content;
+    if (cl && typeof cl.intro === 'string' && Array.isArray(cl.steps) && cl.steps.length >= 2 && cl.questionA && cl.questionB) {
+      return { intro: String(cl.intro), steps: cl.steps.map((s: any) => ({ title: String(s.title), text: String(s.text) })), questionA: String(cl.questionA), questionB: String(cl.questionB), providerUsed: `${cached.providerUsed || 'IA'} (caché de hoy)` };
+    }
+  } catch { /* cache corrupta: regenerar */ }
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), wantsFull ? 55000 : 35000);
+  try {
+    const res = await fetch('/api/ai/guide-content', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      signal: controller.signal,
+      body: JSON.stringify({
+        student: req.student, subject: req.subject, dailyClass: req.dailyClass,
+        ...(wantsFull ? {} : { steps: preset }),
+      }),
+    });
+    if (!res.ok) return null;
+    const data = await res.json().catch(() => null);
+    const c = data?.content;
+    if (!c || typeof c.intro !== 'string') return null;
+
+    const finalSteps = wantsFull
+      ? (Array.isArray(c.steps) ? c.steps : [])
+          .filter((s: any) => s && typeof s.title === 'string' && typeof s.text === 'string' && s.text.trim().length > 20)
+          .slice(0, 3)
+          .map((s: any) => ({ title: String(s.title), text: String(s.text) }))
+      : preset;
+    const requireModelSteps = wantsFull && finalSteps.length < 2 ? null : finalSteps;
+    if (!requireModelSteps) return null;
+    if (!(c.questionA && c.questionB)) return null;
+    const built = {
+      intro: String(c.intro),
+      steps: requireModelSteps,
+      questionA: String(c.questionA),
+      questionB: String(c.questionB),
+      providerUsed: data.providerUsed || (wantsFull ? 'guía IA completa' : 'guía IA sobre la ruta del estudiante'),
+  };
+  // Solo cacheamos el camino IA (MODO A/B); el fallback determinista local no debe congelarse.
+  try {
+    if (data?.providerUsed && !data.isOfflineSimulation && built.steps.length >= 2) {
+      localStorage.setItem(cacheKey, JSON.stringify({ content: { intro: built.intro, steps: built.steps, questionA: built.questionA, questionB: built.questionB }, providerUsed: built.providerUsed }));
+    }
+  } catch { /* cuota llena: sin caché, la guía igual se descarga */ }
+  return built;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+// Re-explicación afectuosa con sustento teórico (usa /api/ai/reexplain; null => el UI mantiene la explicación determinista).
+export async function requestReExplanation(req: {
+  student: Student;
+  teacher: AITeacher;
+  subject: Subject;
+  dailyClass: DailyClass;
+  explanation: { theory: string; analogy?: string; example?: string; question: string; correctAnswer: string };
+}): Promise<string | null> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15000);
+  try {
+    const res = await fetch('/api/ai/reexplain', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      signal: controller.signal,
+      body: JSON.stringify({
+        student: req.student, teacher: req.teacher, subject: req.subject,
+        dailyClass: req.dailyClass, lesson: req.explanation,
+      }),
+    });
+    if (!res.ok) return null;
+    const data = await res.json().catch(() => null);
+    const text = typeof data?.text === 'string' ? data.text.trim() : '';
+    return text.length > 12 ? text : null;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+// Una micro-lección (JSON pequeño) — camino principal del MicroLessonPlayer: fiable incluso con la capa gratuita saturada.
+const BITE_CACHE_PREFIX = 'wisdom_lesson_bite_v1_';
+function biteCacheKey(studentId: string, classId: string, date: string, index: number): string {
+  return `${BITE_CACHE_PREFIX}${studentId}_${classId}_${index}_${date}`;
+}
+
+export async function requestLessonBite(req: {
+  student: Student;
+  teacher: AITeacher;
+  subject: Subject;
+  dailyClass: DailyClass;
+  index: number; // 1-based
+  total: number;
+  covered: string[]; // títulos ya explicados (para no repetir)
+}): Promise<MicroLesson | null> {
+  const dateKey = req.dailyClass?.date || new Date().toISOString().slice(0, 10);
+  const key = biteCacheKey(req.student?.id || 'x', req.dailyClass?.id || 'c', dateKey, req.index);
+  try {
+    const cached = localStorage.getItem(key);
+    if (cached) {
+      const parsed = JSON.parse(cached);
+      const l = parsed?.lesson;
+      if (l && typeof l.theory === 'string' && l.quiz?.options?.length === 3) {
+        return {
+          id: `micro-${req.dailyClass?.id}-L${req.index}`,
+          title: l.title,
+          theory: l.theory,
+          analogy: l.analogy,
+          example: l.example,
+          quiz: l.quiz,
+        };
+      }
+    }
+  } catch { /* caché corrupta: regenerar */ }
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 30000);
+  try {
+    const res = await fetch('/api/ai/lesson-bite', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      signal: controller.signal,
+      body: JSON.stringify({
+        student: req.student, teacher: req.teacher, subject: req.subject,
+        dailyClass: req.dailyClass, index: req.index, total: req.total, covered: req.covered,
+      }),
+    });
+    if (!res.ok) return null;
+    const data = await res.json().catch(() => null);
+    const l = data?.lesson;
+    if (!l || typeof l.theory !== 'string' || !l.quiz || !Array.isArray(l.quiz.options) || l.quiz.options.length !== 3) return null;
+    const lesson: MicroLesson = {
+      id: `micro-${req.dailyClass?.id}-L${req.index}`,
+      title: String(l.title ?? `Lección ${req.index}`),
+      theory: String(l.theory),
+      analogy: l.analogy,
+      example: l.example,
+      quiz: {
+        question: String(l.quiz.question),
+        options: l.quiz.options.map((o: any) => String(o)),
+        correctIndex: Math.min(2, Math.max(0, Number(l.quiz.correctIndex) || 0)),
+        correctExplanation: l.quiz.correctExplanation,
+      },
+    };
+    try { localStorage.setItem(key, JSON.stringify({ lesson: l, providerUsed: data.providerUsed })); } catch { /* cuota llena: sin caché, funciona igual */ }
+    return lesson;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+function normalizeLessonPlan(raw: any, dailyClass: DailyClass | null, providerUsed?: string): MicroLessonPlan | null {
+  try {
+    if (!raw || !Array.isArray(raw.lessons) || raw.lessons.length < 1 || raw.lessons.length > 5) return null;
+    const lessons: MicroLesson[] = [];
+    for (let i = 0; i < raw.lessons.length; i++) {
+      const l = raw.lessons[i];
+      if (!l || typeof l.title !== 'string' || typeof l.theory !== 'string' || l.theory.trim().length < 10) return null;
+      let quiz = null;
+      if (l.quiz && typeof l.quiz.question === 'string' && Array.isArray(l.quiz.options) && l.quiz.options.length === 3
+        && l.quiz.options.every((o: any) => typeof o === 'string' && o.trim())
+        && Number.isInteger(Number(l.quiz.correctIndex)) && Number(l.quiz.correctIndex) >= 0 && Number(l.quiz.correctIndex) <= 2) {
+        quiz = {
+          question: String(l.quiz.question).trim(),
+          options: (l.quiz.options as string[]).map((o) => String(o).trim()),
+          correctIndex: Number(l.quiz.correctIndex),
+          correctExplanation: typeof l.quiz.correctExplanation === 'string' ? l.quiz.correctExplanation.trim() : undefined,
+          encouragement: typeof l.quiz.encouragement === 'string' ? l.quiz.encouragement.trim() : undefined,
+        };
+      }
+      lessons.push({
+        id: `micro-${dailyClass?.id || 'clase'}-L${i + 1}`,
+        title: String(l.title).trim(),
+        theory: String(l.theory).trim(),
+        analogy: typeof l.analogy === 'string' && l.analogy.trim() ? l.analogy.trim() : undefined,
+        example: typeof l.example === 'string' && l.example.trim() ? l.example.trim() : undefined,
+        quiz,
+      });
+    }
+    return {
+      unitTitle: typeof raw.unitTitle === 'string' && raw.unitTitle.trim() ? raw.unitTitle.trim() : (dailyClass?.theme || 'Ruta de Aprendizaje'),
+      lessons,
+      closingMessage: typeof raw.closingMessage === 'string' && raw.closingMessage.trim() ? raw.closingMessage.trim() : undefined,
+      providerUsed,
+      degraded: false,
+    };
+  } catch {
+    return null;
+  }
+}
+
+// Construye el plan de respaldo desde el learningPath estático de la clase (siembra sin costo, sin quizzes).
+export function buildStaticLessonPlan(dailyClass: DailyClass): MicroLessonPlan | null {
+  const stages = (dailyClass.learningPath && dailyClass.learningPath.length > 0)
+    ? dailyClass.learningPath
+    : [];
+  if (stages.length === 0) return null;
+  const lessons: MicroLesson[] = stages.map((s, i) => ({
+    id: `micro-${dailyClass.id}-L${i + 1}`,
+    title: s.title.replace(/^Paso \d+[:\s]*/i, '') || `Lección ${i + 1}`,
+    theory: [s.coreConcept.summary, s.coreConcept.detailedExplanation].filter(Boolean).join(' '),
+    analogy: s.coreConcept.visualAnalogy,
+    example: (s.coreConcept.keyTakeaways || []).slice(0, 3).join(' · '),
+    quiz: null,
+  }));
+  return { unitTitle: dailyClass.theme, lessons, closingMessage: undefined, providerUsed: 'learningPath estático', degraded: true };
+}
+
+function lessonPlanCacheKey(student: Student, dailyClass: DailyClass): string {
+  const d = new Date();
+  const day = `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+  return `wisdom_lesson_plan_v1_${student?.id || 'x'}_${dailyClass?.id || 'c'}_${dailyClass?.date || day}`;
+}
+
+export async function requestLessonPlan(req: {
+  student: Student;
+  teacher: AITeacher;
+  subject: Subject;
+  dailyClass: DailyClass;
+}): Promise<MicroLessonPlan | null> {
+  const cacheKey = lessonPlanCacheKey(req.student, req.dailyClass);
+  try {
+    const cached = localStorage.getItem(cacheKey);
+    if (cached) {
+      const parsed = JSON.parse(cached);
+      const plan = normalizeLessonPlan(parsed?.plan, req.dailyClass, parsed?.providerUsed ? `${parsed.providerUsed} (caché)` : 'caché');
+      if (plan) {
+        console.log('[lesson-plan] sirviendo desde caché local:', cacheKey);
+        return plan;
+      }
+    }
+  } catch { /* caché corrupta o no disponible: seguimos con la red */ }
+
+  const controller = new AbortController();
+  // Un plan grande en modelos gratuitos puede tardar; el resultado se cachea, así que solo pesa la 1ª vez del día.
+  const PLAN_TIMEOUT_MS = Number(import.meta.env.VITE_LESSON_PLAN_TIMEOUT_MS || 90000);
+  const timeoutId = setTimeout(() => controller.abort(), PLAN_TIMEOUT_MS);
+  try {
+    const res = await fetch('/api/ai/lesson-plan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      signal: controller.signal,
+      body: JSON.stringify({ student: req.student, teacher: req.teacher, subject: req.subject, dailyClass: req.dailyClass }),
+    });
+    if (!res.ok) return null;
+    const data = await res.json().catch(() => null);
+    if (!data || !data.plan) return null;
+    const plan = normalizeLessonPlan(data.plan, req.dailyClass, data.providerUsed);
+    if (plan) {
+      try {
+        // Solo cacheamos planes con evaluación (no degradados): un fallo 503 no debe quedar guardado.
+        if (plan.lessons.length > 1 && plan.lessons.some((l) => l.quiz)) {
+          localStorage.setItem(cacheKey, JSON.stringify({ plan: data.plan, providerUsed: data.providerUsed }));
+        }
+      } catch { /* sin caché si supera cuota: no es fatal */ }
+      console.log('[lesson-plan] generado por:', plan.providerUsed);
+    }
+    return plan;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+// ==========================================
+// FASE A: JERARQUÍA EN EL SERVIDOR (Qwen 3.8 Flash → OpenCode → Gemini 3.7 Flash)
+// Las claves viven solo en el servidor. Cualquier fallo (red, 404, 503, timeout)
+// devuelve null y la llamada continúa hacia la FASE B (ruta directa del cliente,
+// idéntica a la implementación anterior = respaldo de contingencia).
+// ==========================================
+async function tryServerTeacherHierarchy(req: TeacherChatRequest): Promise<string | null> {
+  const SERVER_TIMEOUT_MS = Number(import.meta.env.VITE_AI_SERVER_TIMEOUT_MS || 25000);
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), SERVER_TIMEOUT_MS);
+  try {
+    const res = await fetch('/api/ai/teacher-chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      signal: controller.signal,
+      body: JSON.stringify({
+        student: req.student,
+        teacher: req.teacher,
+        subject: req.subject,
+        dailyClass: req.dailyClass,
+        conversationHistory: req.conversationHistory,
+        message: req.message,
+      }),
+    });
+    if (!res.ok) return null;
+    const data = await res.json().catch(() => null);
+    const reply = data?.reply;
+    // El servidor marca isOfflineSimulation=true cuando toda su jerarquía falló: en ese caso probamos la fase B local.
+    if (data?.isOfflineSimulation) return null;
+    if (reply && typeof reply === 'string' && reply.trim()) return reply.trim();
+    return null;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+// ==========================================
 // FUNCIÓN CENTRAL: IA DEL PROFESOR CON REINTENTOS
 // ==========================================
 export async function askAITeacher(req: TeacherChatRequest): Promise<string> {
+  // FASE A — jerarquía administrada en el servidor (mejor fidelidad, claves ocultas).
+  try {
+    const serverReply = await tryServerTeacherHierarchy(req);
+    if (serverReply) return serverReply;
+  } catch {
+    /* silencio deliberado: se cae a la FASE B */
+  }
+
   const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || "";
   const OPENROUTER_API_KEY = import.meta.env.VITE_OPENROUTER_API_KEY || "";
   
   const GEMINI_TIMEOUT = 15000; 
   const OPENROUTER_TIMEOUT = 8000;
 
-  const systemInstruction = `
-    Eres ${req.teacher.name}, un experto pedagogo, inmensamente paciente y profesor de ${req.subject.name}.
-    Estás dando una CLASE MAGISTRAL PRIVADA a tu estudiante: ${req.student.name}.
+const systemInstruction = `
+    Eres ${req.teacher.name}, el Director de la Clase de ${req.subject.name}. Actúas como el profesor guía principal de esta sesión magistral privada para ${req.student.name}.
     Contexto de la clase actual: "${req.dailyClass?.theme}".
     Objetivo: ${req.dailyClass?.objective}.
 
-    DIRECTRICES PEDAGÓGICAS ESTRICTAS (MÉTODO SOCRÁTICO PASO A PASO):
-    1. PROHIBIDO DAR TEXTOS LARGOS: Nunca le des toda la información de golpe. Un cerebro aprende mejor por partes.
-    2. DIVIDE Y VENCERÁS: Desglosa el tema "${req.dailyClass?.theme}" en conceptos clave muy fáciles de digerir.
-    3. CICLO DE ENSEÑANZA (Repite esto por cada concepto):
-       - Paso A: Explica el concepto de forma muy sencilla, usando un ejemplo o analogía de la vida real.
-       - Paso B: Inmediatamente después, hazle UNA sola pregunta de razonamiento para verificar si entendió.
-       - Paso C: Detente y espera su respuesta. No avances al siguiente concepto bajo ninguna circunstancia.
-    4. CORRECCIÓN EMPÁTICA: Si el estudiante responde mal, no le des la respuesta correcta. Indaga por qué pensó así, muéstrale la falla en su lógica amablemente y vuelve a explicarlo de otra forma.
-    5. CELEBRACIÓN Y AVANCE: Si responde bien, felicítalo efusivamente y avanza al siguiente concepto.
-    6. Eres su guía. Habla en un tono amigable, motivador y sumamente claro. Usa Markdown (negritas y listas) para resaltar lo importante.
+    METODOLOGÍA OBLIGATORIA DEL DIRECTOR DE CLASE — RUTA DE APRENDIZAJE ACTIVO:
+
+    PASO 1 — BIENVENIDA BREVE A LA RUTA (PROHIBIDO EXPONER LA TEORÍA AQUÍ):
+    - La teoría ya NO se entrega en el chat: la plataforma se la muestra al alumno en la "Ruta Interactiva" (tarjetas de micro-lecciones 1..N con teoría corta, analogía, ejemplo y un reto de opción múltiple).
+    - Tu primera línea debe ser un saludo cálido + invitarlo a avanzar por sus mini-lecciones. NUNCA repitas una exposición larga ni todas las definiciones del tema.
+
+    PASO 2 — COMPAÑERO DE VERIFICACIÓN:
+    - Cuando el alumno te cuente qué lección está viendo o responda a ella, haz UNA sola pregunta corta de razonamiento sobre ese punto específico y espera su respuesta.
+    - Si falla o duda: no des la respuesta; indaga por qué pensó así y muéstrale amablemente la grieta en su lógica. Si acierta: felicítalo con energía y pídele el siguiente paso de la ruta.
+
+    PASO 3 — REEXPLICACIÓN AFECTUOSA (CUANDO NO SE ENTIENDE):
+    - Si pide ayuda o evidencia confusión sobre un concepto: reexplicalo SOLO a ÉL, en máximo 4 líneas, con lenguaje más sencillo, una analogía nueva o un ejemplo de su vida. Nunca vuelques toda la teoría otra vez; solo el punto dudosos.
+    - Luego verifica con una mini-pregunta y solo entonces déjalo continuar su ruta.
+
+    PASO 4 — Laboratorio Digital:
+    - Cuando el alumno termine sus mini-lecciones, anímalo a entrar al "Laboratorio Digital" (el botón grande de la pantalla de éxito) para ver el video/simulador.
+
+    PASO 5 — Taller Práctico y Evidencia:
+    - Después lo esperas en el "Taller Práctico", ayudándolo con cada actividad y celebrando cuando suba su evidencia. Cierra con una reflexión breve que conecte el tema con su vida.
+
+    REGLAS GENERALES:
+    - TODOS tus mensajes deben ser BREVES (máximo 80 palabras); la teoría extensa le corresponde a las tarjetas de micro-lecciones, nunca a ti. La única excepción: si el alumno pide explícitamente "explícamelo todo", le das un resumen por lecciones en ≤120 palabras.
+    - Mantén siempre el contexto de la lección que el alumno menciona; si no dice cuál, pregúntale en 5 palabras en qué mini-lección va.
+    - Eres su guía. Tono amigable, motivador y sumamente claro. Usa Markdown en español.
   `;
 
   let primaryErrorMsg = "";
 
-  const GEMINI_KEY_AVAILABLE = !!import.meta.env.VITE_GEMINI_API_KEY && import.meta.env.VITE_GEMINI_API_KEY !== "TU_CLAVE_AQUI";
+  // El valor pegado a veces es un OAuth Client ID (…apps.googleusercontent.com), que NUNCA funciona como API key de Gemini:
+  // detectarlo aquí evita quemar 15 s en reintentos inútiles y deja pasar al Motor Auxiliar Gratuito.
+  const GEMINI_KEY_SHAPE_OK = /^AIza[0-9A-Za-z_-]{10,}$/.test(GEMINI_API_KEY.trim()) || /^AQ\.[0-9A-Za-z_.-]{10,}$/.test(GEMINI_API_KEY.trim());
+  if (GEMINI_API_KEY && !GEMINI_KEY_SHAPE_OK) {
+    console.warn("[Red Neural] ⚠️ VITE_GEMINI_API_KEY no tiene formato de API key de Gemini (parece OAuth Client ID u otro valor). Se omite el motor primario y se usará la IA gratuita de OpenRouter. Consigue la key real en https://aistudio.google.com/apikey");
+  }
+
+  const GEMINI_KEY_AVAILABLE = !!import.meta.env.VITE_GEMINI_API_KEY && import.meta.env.VITE_GEMINI_API_KEY !== "TU_CLAVE_AQUI" && GEMINI_KEY_SHAPE_OK;
   const OPENROUTER_KEY_AVAILABLE = !!import.meta.env.VITE_OPENROUTER_API_KEY && import.meta.env.VITE_OPENROUTER_API_KEY !== "PEGA_AQUI_TU_CLAVE_OPENROUTER";
 
   // Build conversation history
@@ -201,15 +563,22 @@ export async function askAITeacher(req: TeacherChatRequest): Promise<string> {
         }
         
         if (geminiData.error) {
-          throw new Error(`Error oficial de Google: ${geminiData.error.message}`);
+          const errMessage = String(geminiData.error.message || geminiData.error.status || '');
+          if (/API key not valid|API_KEY_INVALID|PERMISSION_DENIED|UNAUTHENTICATED|INVALID_ARGUMENT|BAD REQUEST/i.test(errMessage)) {
+            throw new FatalAIError(`Google rechazó la credencial/petición: ${errMessage}`);
+          }
+          throw new Error(`Error oficial de Google: ${errMessage}`);
         }
         throw new Error("Respuesta inválida o vacía de Gemini");
       });
       
       return geminiResponse;
     } catch (geminiError: any) {
-      primaryErrorMsg = geminiError.name === 'AbortError' ? 'Tiempo de espera agotado (Timeout)' : geminiError.message;
-      console.warn(`[Red Neural] ⚠️ Motor primario falló tras ${MAX_RETRIES} reintentos. Motivo: ${primaryErrorMsg}`);
+      const fatal = geminiError?.name === 'FatalAIError';
+      primaryErrorMsg = geminiError?.name === 'AbortError' ? 'Tiempo de espera agotado (Timeout)' : geminiError?.message;
+      console.warn(fatal
+        ? `[Red Neural] ⚠️ Motor primario descartado al instante (error terminal): ${primaryErrorMsg}`
+        : `[Red Neural] ⚠️ Motor primario falló tras ${MAX_RETRIES} reintentos. Motivo: ${primaryErrorMsg}`);
     }
   }
 
