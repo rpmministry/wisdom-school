@@ -202,7 +202,7 @@ app.get('/api/health', async (req: Request, res: Response) => {
       geminiConfigured: isUsableGeminiKey(process.env.GEMINI_API_KEY),
       openRouterConfigured: Boolean(process.env.OPENROUTER_API_KEY?.trim()),
       openCodeConfigured: Boolean(process.env.OPENCODE_API_KEY?.trim()),
-      ttsConfigured: Boolean(process.env.GOOGLE_TTS_API_KEY?.trim() || process.env.GEMINI_API_KEY?.trim()),
+      ttsConfigured: Boolean(process.env.GOOGLE_TTS_API_KEY?.trim()),
       freeFirst: !process.env.DEEPSEEK_API_KEY?.trim(),
       hierarchy: hierarchySummary,
     },
@@ -226,10 +226,9 @@ function isFemaleTeacherName(teacherName: string): boolean {
 }
 
 function getTTSKeys(): string[] {
-  return [process.env.GOOGLE_TTS_API_KEY, process.env.GEMINI_API_KEY]
-    .map((k) => (k || '').trim())
-    .filter(Boolean)
-    .filter((k, i, arr) => arr.indexOf(k) === i);
+  // Solo la clave de Google Cloud (Text-to-Speech). NO usar GEMINI_API_KEY:
+  // es una key de AI Studio (formato AQ.) y Google TTS la rechaza con 401.
+  return [(process.env.GOOGLE_TTS_API_KEY || '').trim()].filter(Boolean);
 }
 
 app.post('/api/tts', async (req: Request, res: Response) => {
