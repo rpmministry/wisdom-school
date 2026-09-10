@@ -6,3 +6,6 @@ coverage/
 *.log
 .env*
 !.env.example
+# Entry de la función Vercel (se genera con `npm run build`)
+api-server.js
+api-server.js.map

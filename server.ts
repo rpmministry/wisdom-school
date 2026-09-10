@@ -3,9 +3,11 @@ import path from 'path';
 import fs from 'fs';
 import dotenv from 'dotenv';
 
-dotenv.config();
-// Las claves del servidor (sin prefijo VITE_) se guardan en .env.local; se cargan sin pisar las variables ya existentes (producción/Vercel las inyecta el entorno).
-dotenv.config({ path: '.env.local' });
+// Carga de variables locales SOLO fuera de Vercel (allí el entorno las inyecta).
+if (!process.env.VERCEL) {
+  dotenv.config();
+  dotenv.config({ path: '.env.local' });
+}
 
 // Base del proyecto. En Vercel process.cwd() es /var/task; en local, la raíz del repo.
 const appRoot = process.cwd();
