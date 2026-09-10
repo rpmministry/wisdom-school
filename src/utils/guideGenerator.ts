@@ -204,8 +204,9 @@ export function generateClassGuideHTML(
 
   <div class="brand">
     <span class="ws">☀️ WISDOM SCHOOL</span>
-    <small>ECUADOR · 2026-2027 · CONFESED EVANGÉLICA</small>
+    <small>ECUADOR · 2026-2027 · CONFESIÓN EVANGÉLICA</small>
   </div>
+  <div style="margin:8px 0 2px;background:#065f46;color:#ecfdf5;border-radius:6px;padding:4px 10px;font:700 9.5px 'Segoe UI',Arial;text-align:center;letter-spacing:.4px;">FORMATO NUEVO v3.0 · una página por asignatura · impresa el ${esc(stampStr)}</div>
 
   <h1>Guía Didáctica y Taller Práctico <span style="color:#64748b">|</span> Tiempo estimado: 45 minutos</h1>
   <div class="sub">Guía del estudiante · enfoque Montessori-Charlotte Mason</div>
@@ -315,6 +316,7 @@ export function generateDailyGuidesBundleHTML(opts: {
     </div>
     <h1>Guías Didácticas del Día <span style="color:#64748b">|</span> PDF combinado</h1>
     <div class="sub">${items.length} asignatura${items.length === 1 ? "" : "s"} programada${items.length === 1 ? "" : "s"} en el horario escolar</div>
+    <div style="margin:8px 0 2px;background:#065f46;color:#ecfdf5;border-radius:6px;padding:4px 10px;font:700 9.5px 'Segoe UI',Arial;text-align:center;letter-spacing:.4px;">FORMATO NUEVO v3.0 · paquete diario · generado el ${esc(bundleStamp)}</div>
     <div class="cover-meta">
       <span><b>Alumno:</b> ${esc(studentName)}</span>
       <span><b>Grado:</b> ${esc(studentGrade)}</span>

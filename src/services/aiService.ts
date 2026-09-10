@@ -155,7 +155,7 @@ export async function requestGuideContent(req: {
   const wantsFull = preset.length < 2;
   // Caché diaria por clase: la guía buena se reusa sin gastar la cuota gratuita del día.
   const dateKey = req.dailyClass?.date || new Date().toISOString().slice(0, 10);
-  const cacheKey = `wisdom_guide_v1_${req.student?.id || 'x'}_${req.dailyClass?.id || 'c'}_${dateKey}`;
+  const cacheKey = `wisdom_guide_v3_${req.student?.id || 'x'}_${req.dailyClass?.id || 'c'}_${dateKey}`;
   try {
     const cached = JSON.parse(localStorage.getItem(cacheKey) || 'null');
     const cl = cached?.content;
