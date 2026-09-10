@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useSchool, DayOfWeekName } from '../../context/SchoolContext';
 import { StudentAvatar } from '../common/StudentAvatar';
 import { WorldHeaderBanner } from '../common/WorldCharacters';
+import { DevocionalCard } from './DevocionalCard';
+import { PageHeader } from '../layout/PageHeader';
 import {
   Play,
   Calendar,
@@ -17,7 +19,6 @@ import {
   HelpCircle,
   Coffee,
   Award,
-  Layers,
   ChevronRight,
 } from 'lucide-react';
 
@@ -74,16 +75,31 @@ export const StudentDashboard: React.FC = () => {
 
   const isAvril = currentStudent.id === 'avril' || currentStudent.id === 'karen';
 
-  if (!isMounted) return null;
+  if (!isMounted) {
+    return (
+      <div className="space-y-6 animate-pulse" aria-hidden>
+        <div className="h-10 w-56 rounded-xl bg-slate-800/70" />
+        <div className="h-40 rounded-3xl bg-slate-800/60" />
+        <div className="h-20 rounded-2xl bg-slate-800/60" />
+        <div className="h-64 rounded-3xl bg-slate-800/60" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 sm:space-y-8">
       
+      {/* Única puerta de entrada: widgets + clases del día en una sola vista */}
+      <PageHeader title="Mi Espacio de Estudio" />
+
       {/* Student Movie World Banner */}
       <WorldHeaderBanner
         studentId={currentStudent.id}
         studentName={currentStudent.name}
       />
+
+      {/* Devocional Diario - nuevo */}
+      <DevocionalCard />
 
       {/* Day Selector Bar */}
       <div className={`flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 rounded-2xl border ${
@@ -156,19 +172,6 @@ export const StudentDashboard: React.FC = () => {
               {currentProject.description}
             </p>
           </div>
-
-          <button
-            onClick={() => setActiveTab('schedule')}
-            className={`px-4 py-2.5 rounded-xl text-white text-xs font-extrabold shadow-md transition-all flex items-center gap-2 shrink-0 ${
-              isAvril
-                ? 'bg-amber-600 hover:bg-amber-500 text-slate-950 font-black'
-                : 'bg-red-600 hover:bg-red-500 text-white'
-            }`}
-          >
-            <Layers className="w-4 h-4" />
-            <span>Ver Plan del Proyecto</span>
-            <ArrowRight className="w-3.5 h-3.5" />
-          </button>
         </section>
       )}
 
@@ -189,13 +192,6 @@ export const StudentDashboard: React.FC = () => {
                 {todayClasses.length} {todayClasses.length === 1 ? 'clase' : 'clases'}
               </span>
             </h2>
-            <button
-              onClick={() => setActiveTab('classes')}
-              className={`text-xs font-bold flex items-center gap-1 ${isAvril ? 'text-amber-400 hover:text-amber-300' : 'text-red-400 hover:text-red-300'}`}
-            >
-              <span>Abrir vista de clases</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
           </div>
 
           {/* List of classes for the selected day */}
@@ -383,121 +379,77 @@ export const StudentDashboard: React.FC = () => {
 
         </div>
 
-        {/* Right Sidebar: Schedule for selected day & Recent AI Feedback */}
-        <div className="space-y-6">
-          
-          {/* Schedule Mini-Timeline for selected day (08:00 - 12:00) */}
-          <div className={`p-5 rounded-2xl border shadow-md space-y-4 ${
-            isAvril
-              ? 'bg-slate-900/90 border-amber-500/30'
-              : 'bg-slate-900/90 border-red-500/30'
-          }`}>
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                <Calendar className={`w-4 h-4 ${isAvril ? 'text-amber-400' : 'text-red-400'}`} />
-                <span>Horario ({selectedDayOfWeek})</span>
-              </h3>
-              <button
-                onClick={() => setActiveTab('schedule')}
-                className={`text-xs font-bold ${isAvril ? 'text-amber-400 hover:text-amber-300' : 'text-red-400 hover:text-red-300'}`}
-              >
-                Ver Plan
-              </button>
-            </div>
-
-            <div className="space-y-2.5">
-              {todaySchedule.map((entry: any) => {
-                const matchingClass = entry.classId
-                  ? todayClasses.find((c: any) => c.id === entry.classId)
-                  : null;
-                return (
-                  <div
-                    key={entry.id}
-                    onClick={() => {
-                      if (matchingClass) handleStartClass(matchingClass);
-                      else if (!entry.isRecess && todayClasses[0]) handleStartClass(todayClasses[0]);
-                    }}
-                    className={`p-3 rounded-xl border transition-all ${
-                      entry.isRecess
-                        ? 'bg-amber-950/20 border-amber-500/30'
-                        : 'bg-slate-950/80 border-slate-800 hover:border-slate-700 cursor-pointer'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between text-[11px]">
-                      <span className="font-mono text-slate-300 flex items-center gap-1">
-                        <Clock className={`w-3 h-3 ${isAvril ? 'text-amber-400' : 'text-red-400'}`} />
-                        {entry.startTime} - {entry.endTime}
-                      </span>
-                      {entry.isRecess ? (
-                        <span className="text-[10px] font-bold text-amber-300 flex items-center gap-1">
-                          <Coffee className="w-3 h-3" />
-                          Descanso
-                        </span>
-                      ) : (
-                        <span className="text-[10px] font-bold text-emerald-400 flex items-center gap-1">
-                          ▶ Ver clase
-                        </span>
-                      )}
-                    </div>
-                    <h4 className={`text-xs font-bold mt-1 ${entry.isRecess ? 'text-amber-200' : 'text-slate-200'}`}>
-                      {entry.subjectName}
-                    </h4>
-                  </div>
-                );
-              })}
-            </div>
-
-            <div className="pt-2 text-center">
-              <span className="text-[11px] text-slate-400">
-                Fin de la jornada escolar: 12:00
-              </span>
-            </div>
-          </div>
-
-          {/* Recent AI Evaluated Homeworks */}
-          <div className={`p-5 rounded-2xl border shadow-md space-y-4 ${
-            isAvril
-              ? 'bg-slate-900/90 border-amber-500/30'
-              : 'bg-slate-900/90 border-red-500/30'
-          }`}>
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                <FileCheck2 className="w-4 h-4 text-emerald-400" />
-                <span>Retroalimentación IA Reciente</span>
-              </h3>
-              <button
-                onClick={() => setActiveTab('works')}
-                className={`text-xs font-bold ${isAvril ? 'text-amber-400 hover:text-amber-300' : 'text-red-400 hover:text-red-300'}`}
-              >
-                Ver todos
-              </button>
-            </div>
-
-            <div className="space-y-3">
-              {studentSubmissions.slice(0, 2).map((sub: any) => (
-                <div
-                  key={sub.id}
-                  onClick={() => setActiveTab('works')}
-                  className="p-3 rounded-xl bg-slate-950/80 border border-slate-800 hover:border-emerald-500/40 cursor-pointer transition-all space-y-2"
+          {/* Right Sidebar: Schedule for selected day & Devocional */}
+          <div className="space-y-6">
+            {/* Schedule Mini-Timeline for selected day (08:00 - 12:00) */}
+            <div className={`p-5 rounded-2xl border shadow-md ${
+              isAvril
+                ? 'bg-slate-900/90 border-amber-500/30'
+                : 'bg-slate-900/90 border-red-500/30'
+            }`}>
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                  <Calendar className={`w-4 h-4 ${isAvril ? 'text-amber-400' : 'text-red-400'}`} />
+                  <span>Horario ({selectedDayOfWeek})</span>
+                </h3>
+                <button
+                  onClick={() => setActiveTab('schedule')}
+                  className={`text-xs font-bold ${isAvril ? 'text-amber-400 hover:text-amber-300' : 'text-red-400 hover:text-red-300'}`}
                 >
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-200 truncate">{sub.title}</span>
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">
-                      {sub.analysis?.comprehensionLevel || 'Revisado'}
-                    </span>
-                  </div>
-                  {sub.analysis && (
-                    <p className="text-xs text-slate-300 line-clamp-2 leading-relaxed bg-slate-900/90 p-2 rounded-lg border border-slate-800">
-                      💡 {sub.analysis.feedbackSummary}
-                    </p>
-                  )}
-                  <span className="text-[10px] text-slate-400 block">{sub.submittedAt}</span>
-                </div>
-              ))}
-            </div>
-          </div>
+                  Ver Plan
+                </button>
+              </div>
 
-        </div>
+              <div className="space-y-2.5">
+                {todaySchedule.map((entry: any) => {
+                  const matchingClass = entry.classId
+                    ? todayClasses.find((c: any) => c.id === entry.classId)
+                    : null;
+                  return (
+                    <div
+                      key={entry.id}
+                      onClick={() => {
+                        if (matchingClass) handleStartClass(matchingClass);
+                        else if (!entry.isRecess && todayClasses[0]) handleStartClass(todayClasses[0]);
+                      }}
+                      className={`p-3 rounded-xl border transition-all ${
+                        entry.isRecess
+                          ? 'bg-amber-950/20 border-amber-500/30'
+                          : 'bg-slate-950/80 border-slate-800 hover:border-slate-700 cursor-pointer'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="font-mono text-slate-300 flex items-center gap-1">
+                          <Clock className={`w-3 h-3 ${isAvril ? 'text-amber-400' : 'text-red-400'}`} />
+                          {entry.startTime} - {entry.endTime}
+                        </span>
+                        {entry.isRecess ? (
+                          <span className="text-[10px] font-bold text-amber-300 flex items-center gap-1">
+                            <Coffee className="w-3 h-3" />
+                            Descanso
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-bold text-emerald-400 flex items-center gap-1">
+                            ▶ Ver clase
+                          </span>
+                        )}
+                      </div>
+                      <h4 className={`text-xs font-bold mt-1 ${entry.isRecess ? 'text-amber-200' : 'text-slate-200'}`}>
+                        {entry.subjectName}
+                      </h4>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="pt-2 text-center">
+                <span className="text-[11px] text-slate-400">
+                  Fin de la jornada escolar: 12:00
+                </span>
+              </div>
+            </div>
+
+          </div>
 
       </div>
 

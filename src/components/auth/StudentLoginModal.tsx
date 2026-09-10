@@ -232,7 +232,7 @@ try {
           </p>
         </div>
 
-        <div className="p-6 sm:p-8 space-y-6 overflow-y-auto">
+        <div className="p-6 sm:p-8 space-y-6 overflow-y-auto overscroll-contain">
 
           {/* 1. Email/Password Form */}
           <form onSubmit={handleLoginSubmit} className="space-y-4">

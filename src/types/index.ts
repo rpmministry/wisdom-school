@@ -209,6 +209,33 @@ export interface EvidenceCriterion {
   weight: number; // 1-5
 }
 
+/** ---- Microlearning: Ruta de Aprendizaje Paginada (Clase Interactiva) ---- */
+
+export interface MicroLessonQuiz {
+  question: string;
+  options: string[]; // exactamente 3 opciones
+  correctIndex: number; // 0 | 1 | 2
+  correctExplanation?: string; // refuerzo positivo al acertar
+  encouragement?: string; // mensaje tierno al fallar
+}
+
+export interface MicroLesson {
+  id: string;
+  title: string;
+  theory: string; // teoría breve (<=70 palabras)
+  analogy?: string; // analogía del mundo del estudiante
+  example?: string; // ejemplo con números/caso concreto
+  quiz?: MicroLessonQuiz | null;
+}
+
+export interface MicroLessonPlan {
+  unitTitle: string;
+  lessons: MicroLesson[]; // 1..5 micro-lecciones secuenciales
+  closingMessage?: string; // felicitación final del profesor
+  providerUsed?: string; // trazabilidad de qué modelo generó el plan
+  degraded?: boolean; // true cuando se construyó desde learningPath sin quizzes
+}
+
 export interface VerifiedResource {
   title?: string;
   name?: string;
@@ -342,7 +369,5 @@ export type NavigationTab =
   | 'subjects'
   | 'schedule'
   | 'classes'
-  | 'activities'
-  | 'works'
   | 'progress';
 

@@ -1,6 +1,7 @@
 import React from 'react';
 import { useSchool } from '../../context/SchoolContext';
 import { NavigationTab } from '../../types';
+import { isNavItemActive } from '../../utils/navigation';
 import { SchoolLogo } from '../common/SchoolLogo';
 import { StudentAvatar } from '../common/StudentAvatar';
 import {
@@ -8,11 +9,7 @@ import {
   User,
   BookMarked,
   CalendarDays,
-  PlayCircle,
-  ListTodo,
-  FileCheck2,
   TrendingUp,
-  Sparkles,
 } from 'lucide-react';
 
 interface NavItem {
@@ -23,27 +20,22 @@ interface NavItem {
 }
 
 export const Sidebar: React.FC = () => {
-  const { activeTab, setActiveTab, currentStudent, submissions, todayClasses } = useSchool();
+  const { activeTab, setActiveTab, currentStudent, todayClasses } = useSchool();
 
-  const pendingWorksCount = submissions.filter(
-    (s) => s.studentId === currentStudent.id && s.status === 'reviewed'
-  ).length;
-
+  // "Mi Espacio de Estudio" es la única puerta de entrada: fusiona el antiguo
+  // "Mi Espacio" con "Clases del Día". Las clases ya no son una pestaña aparte.
   const navItems: NavItem[] = [
     { id: 'home', label: 'Inicio', icon: Home },
-    { id: 'space', label: 'Mi Espacio', icon: User },
+    { id: 'space', label: 'Mi Espacio de Estudio', icon: User, badge: todayClasses.length > 0 ? todayClasses.length.toString() : undefined },
     { id: 'subjects', label: 'Materias', icon: BookMarked },
     { id: 'schedule', label: 'Horario', icon: CalendarDays },
-    { id: 'classes', label: 'Clases del Día', icon: PlayCircle, badge: todayClasses.length.toString() },
-    { id: 'activities', label: 'Actividades', icon: ListTodo },
-    { id: 'works', label: 'Trabajos & IA', icon: FileCheck2, badge: pendingWorksCount ? `${pendingWorksCount} rev.` : undefined },
     { id: 'progress', label: 'Progreso', icon: TrendingUp },
   ];
 
   const isAvril = currentStudent.id === 'avril' || currentStudent.id === 'karen';
 
   return (
-    <aside className={`w-64 min-w-[16rem] max-w-[20rem] border-r p-4 flex flex-col justify-between hidden md:flex shrink-0 transition-colors duration-300 min-w-0 ${
+    <aside className={`w-56 lg:w-64 xl:w-72 border-r p-4 flex flex-col justify-between hidden md:flex shrink-0 transition-colors duration-300 ${
       isAvril
         ? 'bg-slate-900/95 border-amber-500/20'
         : 'bg-slate-900/95 border-red-500/20'
@@ -103,13 +95,13 @@ export const Sidebar: React.FC = () => {
           </div>
           {navItems.map((item) => {
             const Icon = item.icon;
-            const isActive = activeTab === item.id;
+            const isActive = isNavItemActive(item.id, activeTab);
             return (
               <button
                 key={item.id}
                 id={`nav-item-${item.id}`}
                 onClick={() => setActiveTab(item.id)}
-                className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                className={`w-full flex items-center justify-between min-h-[44px] px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all ${
                   isActive
                     ? isAvril
                       ? 'bg-amber-500/20 text-amber-200 border border-amber-500/40 shadow-sm'

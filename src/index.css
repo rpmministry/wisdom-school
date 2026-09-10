@@ -1,11 +1,19 @@
 @import "tailwindcss";
 
 @layer base {
+  html {
+    /* Desactiva el gesto nativo de "deslizar para volver" del navegador (Chrome/Android):
+       la navegación atrás la controla la SPA con su propia pila de historial. */
+    overscroll-behavior-x: none;
+  }
   body {
     font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
     overflow-x: hidden;
+    /* Evita el encadenamiento del scroll al contenedor padre en móviles. */
+    overscroll-behavior-x: none;
+    overscroll-behavior-y: contain;
   }
   h1, h2, h3, h4, h5, h6 {
     font-family: 'Outfit', 'Plus Jakarta Sans', sans-serif;
@@ -31,6 +39,71 @@
     html {
       font-size: 18px;
     }
+  }
+}
+
+/* ------------------------------------------------------------------
+   Ergonomía táctil (móvil y tablet)
+   ------------------------------------------------------------------ */
+
+/* Sin resaltado azul al tocar y sin retardo de 300 ms en controles. */
+html {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button,
+a,
+[role='button'],
+label,
+summary,
+input,
+select,
+textarea {
+  touch-action: manipulation;
+}
+
+/* Respeta el notch / indicador de inicio en la parte superior. */
+.pt-safe {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+/* Los campos de texto no deben provocar el zoom automático de iOS (<16px). */
+@media (max-width: 767px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
+/* Deslizamiento horizontal fluido en tablas/carruseles táctiles. */
+.touch-scroll-x {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Feedback táctil consistente donde no hay hover real. */
+@media (hover: none) {
+  .touch-lift:active {
+    transform: scale(0.98);
+  }
+}
+
+/* Anillo de foco visible para tablets con teclado o control por switch. */
+:focus-visible {
+  outline: 2px solid rgb(129 140 248);
+  outline-offset: 2px;
+  border-radius: 0.5rem;
+}
+
+/* Respeta la preferencia de movimiento reducido (evita mareo en niños sensibles). */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
 

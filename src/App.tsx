@@ -6,39 +6,41 @@ import { Sidebar } from './components/layout/Sidebar';
 import { MobileBottomNav } from './components/layout/MobileBottomNav';
 import { PageHeader } from './components/layout/PageHeader';
 import { useHardwareBackButton } from './hooks/useHardwareBackButton';
+import { useSwipeBack } from './hooks/useSwipeBack';
+import { useScrollToTopOnChange } from './hooks/useScrollToTopOnChange';
+import { APP_SCROLL_CONTAINER_ID } from './utils/scrollToTop';
 import { LandingView } from './components/landing/LandingView';
 import { StudentDashboard } from './components/dashboard/StudentDashboard';
 import { SubjectsView } from './components/subjects/SubjectsView';
 import { DailyClassView } from './components/classes/DailyClassView';
-import { WorksView } from './components/works/WorksView';
 import { ProgressView } from './components/progress/ProgressView';
 import { ScheduleView } from './components/schedule/ScheduleView';
-import { ActivitiesView } from './components/activities/ActivitiesView';
 import { AITeacherDrawer } from './components/teacher/AITeacherDrawer';
 import { StudentLoginModal } from './components/auth/StudentLoginModal';
 import { NewStudentModal } from './components/landing/NewStudentModal';
-import {
-  Home,
-  User,
-  BookMarked,
-  PlayCircle,
-  FileCheck2,
-  TrendingUp,
-  CalendarDays,
-  ListTodo,
-} from 'lucide-react';
+import { DemoLockModal } from './components/demo/DemoLockModal';
+import { DemoContactWidget } from './components/demo/DemoContactWidget';
+import { SaveStatusIndicator } from './components/common/SaveStatusIndicator';
 
 const MainContent: React.FC = () => {
   useHardwareBackButton();
+  useSwipeBack();
   
   const {
     activeTab,
     setActiveTab,
     currentStudent,
+    selectedDayOfWeek,
     isAuthModalOpen,
     targetLoginStudentId,
     closeAuthModal,
+    isDemoLockOpen,
+    closeDemoLock,
+    isDemoMode,
   } = useSchool();
+
+  // Reset global de scroll al cambiar de "ruta" SPA: pestaña, estudiante o día seleccionado.
+  useScrollToTopOnChange([activeTab, currentStudent?.id, selectedDayOfWeek]);
 
   const [registerModalOpen, setRegisterModalOpen] = useState(false);
 
@@ -52,33 +54,31 @@ const MainContent: React.FC = () => {
         return <SubjectsView />;
       case 'classes':
         return <DailyClassView />;
-      case 'works':
-        return <WorksView />;
       case 'progress':
         return <ProgressView />;
       case 'schedule':
         return <ScheduleView />;
-      case 'activities':
-        return <ActivitiesView />;
       default:
         return <LandingView />;
     }
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-950 text-slate-100 selection:bg-indigo-500 selection:text-white">
+    <div className="min-h-dvh flex flex-col bg-slate-950 text-slate-100 selection:bg-indigo-500 selection:text-white">
       <Navbar />
 
       <div className="flex-1 flex w-full max-w-[100vw] overflow-x-hidden">
         {activeTab !== 'home' && <Sidebar />}
 
-        <main className="flex-1 px-4 sm:px-6 lg:px-8 pt-0 pb-24 md:pb-8 overflow-y-auto overflow-x-hidden">
+        <main id={APP_SCROLL_CONTAINER_ID} className="flex-1 px-4 sm:px-6 lg:px-8 pt-0 pb-28 md:pb-8 overflow-y-auto overflow-x-hidden">
           <div className="max-w-7xl mx-auto w-full">
             {renderActiveView()}
           </div>
         </main>
       </div>
 
+      {/* Drawer global del Profesor IA: consumido por "Tutor IA" en el dashboard,
+          la vista de clase y el modal de actividades. */}
       <AITeacherDrawer />
 
       <StudentLoginModal
@@ -93,6 +93,20 @@ const MainContent: React.FC = () => {
         onClose={() => setRegisterModalOpen(false)}
       />
 
+      <DemoLockModal
+        isOpen={isDemoLockOpen}
+        onClose={closeDemoLock}
+        onRegister={() => {
+          closeDemoLock();
+          setRegisterModalOpen(true);
+        }}
+      />
+
+      {/* Contacto global: SOLO visible para los perfiles de prueba (Karen / Mauricio)
+          y únicamente dentro del espacio educativo, nunca en la pantalla principal. */}
+      {isDemoMode && activeTab !== 'home' && <DemoContactWidget />}
+
+      <SaveStatusIndicator />
       <MobileBottomNav />
     </div>
   );

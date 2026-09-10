@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useSchool } from '../../context/SchoolContext';
 import { askAITeacher, ChatMessage, renderMarkdownToHtml } from '../../services/aiService';
 import { ttsService } from '../../services/ttsService';
-import { Bot, X, Send, Loader2, Volume2, VolumeX, Play, Pause, StopCircle } from 'lucide-react';
+import { Bot, X, Send, Loader2, Volume2, Play, Pause, StopCircle, Square } from 'lucide-react';
 
 export const AITeacherDrawer: React.FC = () => {
   const {
@@ -29,26 +29,21 @@ export const AITeacherDrawer: React.FC = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  
-  const [isVoiceEnabled, setIsVoiceEnabled] = useState(true);
+  const scrollBoxRef = useRef<HTMLDivElement>(null);
+
   const [speakingId, setSpeakingId] = useState<string | null>(null);
   const [isPaused, setIsPaused] = useState(false);
 
-const lastActivityRef = useRef(Date.now());
-   const classIntervalRef = useRef<any>(null);
-   const promptTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-   const handlePlayVoice = async (text: string, messageId: string) => {
-     await ttsService.play({
-       messageId,
-       text,
-       teacherName: teacher?.name || '',
-       onEnd: () => { setSpeakingId(null); setIsPaused(false); },
-       onPause: () => { setIsPaused(true); },
-       onPlay: () => { setSpeakingId(messageId); setIsPaused(false); },
-     });
-   };
+  const handlePlayVoice = async (text: string, messageId: string) => {
+    await ttsService.play({
+      messageId,
+      text,
+      teacherName: teacher?.name || '',
+      onEnd: () => { setSpeakingId(null); setIsPaused(false); },
+      onPause: () => { setIsPaused(true); },
+      onPlay: () => { setSpeakingId(messageId); setIsPaused(false); },
+    });
+  };
 
   const handlePauseVoice = () => {
     ttsService.pause();
@@ -66,33 +61,30 @@ const lastActivityRef = useRef(Date.now());
 
   useEffect(() => {
     if (teacher && subject && isTeacherDrawerOpen && messages.length === 0) {
-      const pendingPrompt = localStorage.getItem('pending_socratic_prompt');
-      if (pendingPrompt) return;
-
       const greetingId = `msg-${Date.now()}`;
-      const greetingContent = `¡Hola ${currentStudent.name}! Soy ${teacher.name}, tu tutor de ${subject.name}. Hoy estamos enfocados en "${dailyClass?.theme || 'repasar la materia'}". ¿Por dónde te gustaría comenzar a razonar?`;
-      
+      const greetingContent = `¡Hola ${currentStudent.name}! Soy ${teacher.name}, tu tutor de ${subject.name}. Hoy: "${dailyClass?.theme || 'el tema de hoy'}". Te acompaño paso a paso: escribe tu pregunta cuando quieras.`;
+
       const greeting: ChatMessage = { id: greetingId, role: 'model', content: greetingContent, timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) };
       setMessages([greeting]);
-
-      if (isVoiceEnabled) {
-        setTimeout(() => handlePlayVoice(greetingContent, greetingId), 800);
-      }
     }
   }, [teacher?.id, currentStudent.id, subject?.id, dailyClass?.id, isTeacherDrawerOpen]);
 
-  useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, isLoading]);
+  // Solo la caja interna del drawer scrollea; scrollIntoView burbujeaba hasta el documento
+  // y podía saltar la vista al fondo al abrir el tutor.
+  useEffect(() => {
+    const box = scrollBoxRef.current;
+    if (box) box.scrollTo({ top: box.scrollHeight, behavior: 'smooth' });
+  }, [messages, isLoading]);
 
   const handleSendMessage = async (customText?: string) => {
     const textToSend = customText || inputValue.trim();
     if (!textToSend || isLoading || !teacher || !subject) return;
 
     handleStopVoice();
-    lastActivityRef.current = Date.now();
 
     const userMessage: ChatMessage = { id: `msg-${Date.now()}`, role: 'user', content: textToSend, timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) };
     const updatedMessages = [...messages, userMessage];
-    setMessages(updatedMessages); 
+    setMessages(updatedMessages);
     setInputValue('');
     setIsLoading(true);
 
@@ -108,98 +100,22 @@ const lastActivityRef = useRef(Date.now());
       const modelMessage: ChatMessage = { id: replyId, role: 'model', content: reply, timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) };
 
       setMessages((prev) => [...prev, modelMessage]);
-
-      if (isVoiceEnabled) {
-        setTimeout(() => handlePlayVoice(reply, replyId), 500);
-      }
     } catch (err: any) {
       console.error(err);
-      const isSystemError = err.message?.includes('SISTEMA DE EMERGENCIA');
       const errId = `msg-err-${Date.now()}`;
-      const errorMessage: ChatMessage = { id: errId, role: 'model', content: isSystemError ? err.message : 'Disculpa, tuve un pequeño fallo de memoria temporal. ¿Podrías repetirme tu idea?', timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) };
+      const errorMessage: ChatMessage = { id: errId, role: 'model', content: 'Disculpa, se me trabó la voz. ¿Me repites tu idea, por favor?', timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) };
       setMessages((prev) => [...prev, errorMessage]);
-      
-      if (isVoiceEnabled && !isSystemError) {
-        setTimeout(() => handlePlayVoice(errorMessage.content, errId), 500);
-      }
     } finally {
       setIsLoading(false);
     }
   };
 
-  useEffect(() => {
-    if (!isTeacherDrawerOpen || isLoading) return;
-
-    classIntervalRef.current = setInterval(() => {
-      const inactiveMs = Date.now() - lastActivityRef.current;
-      if (inactiveMs > 90000 && messages.length > 0) {
-        const followUpPrompts = [
-          `Profesor, ¿podrías profundizar en "${dailyClass?.theme || 'el tema'}" con otro ejemplo concreto?`,
-          `¿Podrías conectar este aprendizaje con algo que vivamos en el día a día?`,
-          `Profesor, ¿qué otra perspectiva podemos explorar sobre "${dailyClass?.theme || 'este tema'}"?`,
-          `¿Me puedes guiar para aplicar lo aprendido en un problema práctico?`,
-        ];
-        const randomPrompt = followUpPrompts[Math.floor(Math.random() * followUpPrompts.length)];
-        handleSendMessage(randomPrompt);
-        lastActivityRef.current = Date.now();
-      }
-    }, 30000);
-
-    return () => {
-      if (classIntervalRef.current) clearInterval(classIntervalRef.current);
-    };
-  }, [isTeacherDrawerOpen, isLoading, messages.length, dailyClass?.theme]);
-
-  useEffect(() => {
-    if (promptTimeoutRef.current) {
-      clearTimeout(promptTimeoutRef.current);
-      promptTimeoutRef.current = null;
-    }
-    if (isTeacherDrawerOpen) {
-      lastActivityRef.current = Date.now();
-      const pendingPrompt = localStorage.getItem('pending_socratic_prompt');
-      if (pendingPrompt) {
-        localStorage.removeItem('pending_socratic_prompt');
-        promptTimeoutRef.current = setTimeout(() => handleSendMessage(pendingPrompt), 300);
-      }
-    }
-    return () => {
-      if (promptTimeoutRef.current) {
-        clearTimeout(promptTimeoutRef.current);
-        promptTimeoutRef.current = null;
-      }
-    };
-  }, [isTeacherDrawerOpen]);
-
-  useEffect(() => {
-    if (!isTeacherDrawerOpen || isLoading) return;
-
-    classIntervalRef.current = setInterval(() => {
-      const inactiveMs = Date.now() - lastActivityRef.current;
-      if (inactiveMs > 90000 && messages.length > 0) {
-        const followUpPrompts = [
-          `Profesor, ¿podrías profundizar en "${dailyClass?.theme || 'el tema'}" con otro ejemplo concreto?`,
-          `¿Podrías conectar este aprendizaje con algo que vivamos en el día a día?`,
-          `Profesor, ¿qué otra perspectiva podemos explorar sobre "${dailyClass?.theme || 'este tema'}"?`,
-          `¿Me puedes guiar para aplicar lo aprendido en un problema práctico?`,
-        ];
-        const randomPrompt = followUpPrompts[Math.floor(Math.random() * followUpPrompts.length)];
-        handleSendMessage(randomPrompt);
-        lastActivityRef.current = Date.now();
-      }
-    }, 30000);
-
-    return () => {
-      if (classIntervalRef.current) clearInterval(classIntervalRef.current);
-    };
-  }, [isTeacherDrawerOpen, isLoading, messages.length, dailyClass?.theme]);
-
   if (!isTeacherDrawerOpen || !teacher || !subject) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] overflow-hidden flex justify-right bg-black/60 backdrop-blur-sm transition-opacity duration-300">
+    <div className="fixed inset-0 z-[100] overflow-hidden flex justify-end bg-black/60 backdrop-blur-sm transition-opacity duration-300">
       <div className="w-full max-w-lg border-l shadow-2xl flex flex-col h-full bg-slate-900 transition-transform duration-300 translate-x-0" style={{ background: 'linear-gradient(180deg, rgba(15,23,42,0.98), rgba(15,23,42,0.94))', borderColor: `${studentTheme.accent}55` }}>
-        
+
         <div className="p-4 sm:p-5 border-b flex items-center justify-between shadow-md" style={{ background: `linear-gradient(135deg, ${studentTheme.accent}22, rgba(15,23,42,0.92) 60%, rgba(2,6,23,0.96))` }}>
           <div className="flex items-center gap-3">
             <div className="relative">
@@ -209,38 +125,36 @@ const lastActivityRef = useRef(Date.now());
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="text-sm font-bold text-white">{teacher.name}</h3>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">Voz Cloud HD</span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">Voz manual</span>
               </div>
               <p className="text-xs font-medium mt-1" style={{ color: studentTheme.accent }}>{subject.name}</p>
             </div>
           </div>
-          
+
           <div className="flex items-center gap-2">
-            <button onClick={() => { setIsVoiceEnabled(!isVoiceEnabled); if (isVoiceEnabled) handleStopVoice(); }} className={`flex items-center gap-2 px-3 py-1.5 rounded-xl transition-all border shadow-sm ${isVoiceEnabled ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' : 'bg-slate-800 text-slate-400 border-slate-700'}`}>
-              {isVoiceEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
-              <span className="text-xs font-bold hidden sm:inline">{isVoiceEnabled ? 'Auto-Voz: ON' : 'Auto-Voz: OFF'}</span>
-            </button>
-            <button onClick={() => setIsTeacherDrawerOpen(false)} className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"><X className="w-5 h-5" /></button>
+            <button onClick={() => setIsTeacherDrawerOpen(false)} aria-label="Cerrar tutor" className="relative p-2.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors after:absolute after:-inset-1.5 after:content-['']"><X className="w-5 h-5" /></button>
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 space-y-5">
+        <div ref={scrollBoxRef} className="flex-1 overflow-y-auto overscroll-contain p-4 space-y-5">
+          <p className="text-[10px] text-slate-400 flex items-center gap-1.5">
+            <Volume2 className="w-3 h-3" /> El audio se reproduce solo cuando tú presionas <strong className="text-emerald-400">REPRODUCIR</strong>.
+          </p>
           {messages.map((msg) => {
             const isUser = msg.role === 'user';
             const isActiveSpeech = speakingId === msg.id;
-            const isSystemError = msg.content.includes('SISTEMA DE EMERGENCIA');
 
             return (
               <div key={msg.id} className={`flex gap-3 ${isUser ? 'justify-end' : 'justify-start'}`}>
                 {!isUser && <img src={teacher.avatar} alt={teacher.name} className="w-8 h-8 rounded-lg object-cover mt-1 shadow-md" />}
-                
+
                 <div className={`flex flex-col max-w-[90%] ${isUser ? 'items-end' : 'items-start'}`}>
-                  
-                  <div className="p-4 rounded-2xl text-xs sm:text-sm leading-relaxed shadow-lg" style={isUser ? { background: `linear-gradient(135deg, ${studentTheme.accent}, ${studentTheme.accent}cc)`, color: '#fff', borderBottomRightRadius: 0 } : { background: isSystemError ? 'rgba(60, 20, 20, 0.95)' : 'rgba(15, 23, 42, 0.95)', border: `1px solid ${isActiveSpeech && !isPaused ? '#10b981' : isSystemError ? '#ef4444' : studentTheme.accent + '55'}`, color: '#e2e8f0', borderBottomLeftRadius: 0 }}>
+
+                  <div className="p-4 rounded-2xl text-xs sm:text-sm leading-relaxed shadow-lg" style={isUser ? { background: `linear-gradient(135deg, ${studentTheme.accent}, ${studentTheme.accent}cc)`, color: '#fff', borderBottomRightRadius: 0 } : { background: 'rgba(15, 23, 42, 0.95)', border: `1px solid ${isActiveSpeech && !isPaused ? '#10b981' : studentTheme.accent + '55'}`, color: '#e2e8f0', borderBottomLeftRadius: 0 }}>
                     {isUser ? <div className="whitespace-pre-line font-medium">{msg.content}</div> : <div className="markdown-body" dangerouslySetInnerHTML={{ __html: renderMarkdownToHtml(msg.content) }} />}
                   </div>
 
-                  {!isUser && !isSystemError && (
+                  {!isUser && (
                     <div className="mt-2 w-full max-w-sm p-2.5 rounded-xl bg-slate-950 border border-slate-800 flex flex-col gap-2 shadow-inner">
                       <div className="flex items-center justify-between border-b border-slate-800/60 pb-1.5 px-1">
                         <span className="text-[10px] font-bold text-slate-400 tracking-wide uppercase">Controles de Audio</span>
@@ -255,10 +169,13 @@ const lastActivityRef = useRef(Date.now());
                               <Pause className="w-3 h-3" /> Pausado
                             </span>
                           )}
+                          {!isActiveSpeech && (
+                            <span className="text-[9px] text-slate-500 uppercase tracking-wider">Listo para escuchar</span>
+                          )}
                           <span className="text-[9px] text-slate-500 font-mono">{msg.timestamp}</span>
                         </div>
                       </div>
-                      
+
                       <div className="flex items-center gap-1.5">
                         {/* Botón Reproducir / Reanudar */}
                         <button
@@ -270,7 +187,7 @@ const lastActivityRef = useRef(Date.now());
                               handlePlayVoice(msg.content, msg.id);
                             }
                           }}
-                          className={`flex-1 flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg font-bold text-[10px] sm:text-xs transition-all active:scale-95 ${
+                          className={`flex-1 flex items-center justify-center gap-1 px-2.5 py-2 min-h-[38px] rounded-lg font-bold text-[10px] sm:text-xs transition-all active:scale-95 ${
                             isActiveSpeech && !isPaused
                               ? 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700/30'
                               : 'bg-emerald-600 text-white hover:bg-emerald-500 shadow-md border border-emerald-500/20'
@@ -285,7 +202,7 @@ const lastActivityRef = useRef(Date.now());
                         {/* Botón Pausar */}
                         <button
                           onClick={handlePauseVoice}
-                          className={`flex-1 flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg font-bold text-[10px] sm:text-xs transition-all active:scale-95 ${
+                          className={`flex-1 flex items-center justify-center gap-1 px-2.5 py-2 min-h-[38px] rounded-lg font-bold text-[10px] sm:text-xs transition-all active:scale-95 ${
                             isActiveSpeech && !isPaused
                               ? 'bg-amber-600 text-white hover:bg-amber-500 shadow-md border border-amber-500/20'
                               : 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700/30'
@@ -300,7 +217,7 @@ const lastActivityRef = useRef(Date.now());
                         {/* Botón Detener */}
                         <button
                           onClick={handleStopVoice}
-                          className={`flex-1 flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg font-bold text-[10px] sm:text-xs transition-all active:scale-95 ${
+                          className={`flex-1 flex items-center justify-center gap-1 px-2.5 py-2 min-h-[38px] rounded-lg font-bold text-[10px] sm:text-xs transition-all active:scale-95 ${
                             isActiveSpeech
                               ? 'bg-rose-600 text-white hover:bg-rose-500 shadow-md border border-rose-500/20'
                               : 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700/30'
@@ -319,27 +236,59 @@ const lastActivityRef = useRef(Date.now());
               </div>
             );
           })}
-          
+
           {isLoading && (
             <div className="flex gap-3 items-center text-slate-400 text-xs">
               <img src={teacher.avatar} alt={teacher.name} className="w-8 h-8 rounded-lg object-cover animate-pulse shadow-md" />
-              <div className="p-3 rounded-2xl bg-slate-800 border border-slate-700 flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin text-indigo-400" /><span className="font-bold tracking-wide">Analizando respuesta...</span></div>
+              <div className="p-3 rounded-2xl bg-slate-800 border border-slate-700 flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin text-indigo-400" /><span className="font-bold tracking-wide">Pensando…</span></div>
             </div>
           )}
-          <div ref={messagesEndRef} />
+          <div />
         </div>
 
-        <div className="p-3 border-t overflow-x-auto flex items-center gap-2 scrollbar-none bg-slate-900/90 shadow-[0_-10px_15px_-3px_rgba(0,0,0,0.3)] z-10 relative">
+        {/* BARRA GLOBAL DE AUDIO: pausar/detener la voz disponible en CUALQUIER momento mientras hay reproducción */}
+        {speakingId && (
+          <div className="px-4 py-2.5 border-t bg-slate-950/95 flex items-center justify-between gap-3 shadow-[0_-8px_20px_-6px_rgba(0,0,0,0.6)]">
+            <span className="text-[10px] font-black uppercase tracking-widest flex items-center gap-2" style={{ color: isPaused ? '#fbbf24' : '#34d399' }}>
+              {isPaused ? <><Pause className="w-3.5 h-3.5" /> Audio en pausa</> : <><Volume2 className="w-3.5 h-3.5 animate-pulse" /> {teacher.name} está hablando</>}
+            </span>
+            <div className="flex items-center gap-2">
+              {isPaused ? (
+                <button
+                  onClick={() => { ttsService.resume(); setIsPaused(false); }}
+                  className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-black flex items-center gap-1.5 transition-all active:scale-95"
+                >
+                  <Play className="w-3.5 h-3.5 fill-current" /> REANUDAR
+                </button>
+              ) : (
+                <button
+                  onClick={handlePauseVoice}
+                  className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-[11px] font-black flex items-center gap-1.5 transition-all active:scale-95"
+                >
+                  <Pause className="w-3.5 h-3.5" /> PAUSAR
+                </button>
+              )}
+              <button
+                onClick={handleStopVoice}
+                className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-[11px] font-black flex items-center gap-1.5 transition-all active:scale-95"
+              >
+                <Square className="w-3.5 h-3.5 fill-current" /> DETENER
+              </button>
+            </div>
+          </div>
+        )}
+
+        <div className="p-3 border-t overflow-x-auto overscroll-x-contain touch-scroll-x flex items-center gap-2 scrollbar-none bg-slate-900/90 shadow-[0_-10px_15px_-3px_rgba(0,0,0,0.3)] z-10 relative">
           <span className="text-[10px] text-slate-400 font-black uppercase tracking-wider shrink-0 pl-1">Atajos:</span>
           {['¿Me das un ejemplo cotidiano?', '¿Por qué ocurre esto?', 'Ya lo entendí, siguiente paso'].map((promptText, idx) => (
-            <button key={idx} onClick={() => handleSendMessage(promptText)} disabled={isLoading} className="px-3 py-1.5 rounded-lg border bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-indigo-200 whitespace-nowrap transition-colors shadow-sm">{promptText}</button>
+            <button key={idx} onClick={() => handleSendMessage(promptText)} disabled={isLoading} className="inline-flex items-center min-h-[40px] px-3 py-1.5 rounded-lg border bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-indigo-200 whitespace-nowrap transition-colors shadow-sm shrink-0">{promptText}</button>
           ))}
         </div>
 
-        <div className="p-4 bg-slate-900 z-10 relative">
+        <div className="px-4 pt-4 bg-slate-900 z-10 relative" style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom, 0px))' }}>
           <form onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }} className="flex items-center gap-2">
-            <input id="input-teacher-chat" type="text" value={inputValue} onChange={(e) => setInputValue(e.target.value)} placeholder={`Habla con ${teacher.name}...`} disabled={isLoading} className="flex-1 rounded-xl px-4 py-3.5 text-sm bg-slate-800 text-white focus:outline-none border-2 border-slate-700 focus:border-indigo-500 transition-all font-medium shadow-inner" />
-            <button type="submit" disabled={!inputValue.trim() || isLoading} className="p-3.5 rounded-xl text-white bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 transition-all shadow-lg shadow-indigo-600/30 active:scale-95"><Send className="w-5 h-5" /></button>
+            <input id="input-teacher-chat" type="text" enterKeyHint="send" autoCapitalize="sentences" autoComplete="off" value={inputValue} onChange={(e) => setInputValue(e.target.value)} placeholder={`Escribe tu respuesta para ${teacher.name}...`} disabled={isLoading} className="flex-1 min-w-0 rounded-xl px-4 py-3.5 text-base bg-slate-800 text-white focus:outline-none border-2 border-slate-700 focus:border-indigo-500 transition-all font-medium shadow-inner" />
+            <button type="submit" disabled={!inputValue.trim() || isLoading} aria-label="Enviar mensaje" className="p-3.5 min-h-[48px] min-w-[48px] flex items-center justify-center rounded-xl text-white bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 transition-all shadow-lg shadow-indigo-600/30 active:scale-95 shrink-0"><Send className="w-5 h-5" /></button>
           </form>
         </div>
       </div>

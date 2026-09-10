@@ -95,7 +95,7 @@ export const CurriculumLevelsSection: React.FC = () => {
       </div>
 
       {/* Tabs selector */}
-      <div className="flex items-center justify-start sm:justify-center gap-2 overflow-x-auto pb-2 scrollbar-none">
+      <div className="flex items-center justify-start sm:justify-center gap-2 overflow-x-auto overscroll-x-contain touch-scroll-x pb-2 scrollbar-none">
         {levels.map((lvl) => (
           <button
             key={lvl.id}

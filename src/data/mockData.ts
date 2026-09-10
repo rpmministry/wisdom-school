@@ -1,5 +1,5 @@
 import { Student, Subject, DailyClass, StudentSubmission, ScheduleEntry, ScheduleSlot } from '../types';
-import { ALL_DAILY_CLASSES } from './dailyClassesData';
+import { ALL_DAILY_CLASSES, AVRIL_DAILY_CLASSES, GAEL_DAILY_CLASSES } from './dailyClassesData';
 import { GAEL_ECA_MACRO, GAEL_ECA_UNITS, GAEL_SCI_MACRO, GAEL_SCI_UNITS } from './gaelCurriculumData';
 import { GAEL_PE_MACRO, GAEL_PE_UNITS, GAEL_SOC_MACRO, GAEL_SOC_UNITS } from './gaelCurriculumDataPart2';
 import { GAEL_ENG_MACRO, GAEL_ENG_UNITS, GAEL_LANG_MACRO, GAEL_LANG_UNITS } from './gaelCurriculumDataPart3';
@@ -169,7 +169,35 @@ const RAW_GAEL_SUBJECTS: Subject[] = [
 export const AVRIL_SUBJECTS: Subject[] = RAW_AVRIL_SUBJECTS.map(resetSubjectProgress);
 export const GAEL_SUBJECTS: Subject[] = RAW_GAEL_SUBJECTS.map(resetSubjectProgress);
 
-export const SUBJECTS_DATA: Subject[] = [...AVRIL_SUBJECTS, ...GAEL_SUBJECTS];
+// =====================================================================
+// MODO DEMO: Karen (mundo Snoopy) y Mauricio (mundo Mario).
+// Reutilizan el currículo de Avril/Gael pero con identidad propia y
+// exponiendo UNA sola clase interactiva por materia.
+// =====================================================================
+type DemoFrom = 'avril' | 'gael';
+type DemoTo = 'karen' | 'mauricio';
+
+const remapDemoId = (value: string, from: DemoFrom, to: DemoTo): string =>
+  value.split(`-${from}`).join(`-${to}`);
+
+const buildDemoSubjects = (subjects: Subject[], from: DemoFrom, to: DemoTo): Subject[] =>
+  subjects.map((subject) => ({
+    ...subject,
+    id: remapDemoId(subject.id, from, to),
+    studentId: to,
+    progressPercentage: 0,
+    classesCompleted: 0,
+  }));
+
+export const KAREN_SUBJECTS: Subject[] = buildDemoSubjects(AVRIL_SUBJECTS, 'avril', 'karen');
+export const MAURICIO_SUBJECTS: Subject[] = buildDemoSubjects(GAEL_SUBJECTS, 'gael', 'mauricio');
+
+export const SUBJECTS_DATA: Subject[] = [
+  ...AVRIL_SUBJECTS,
+  ...GAEL_SUBJECTS,
+  ...KAREN_SUBJECTS,
+  ...MAURICIO_SUBJECTS,
+];
 
 export const AVRIL_SCHEDULE_SLOTS: ScheduleSlot[] = [
   { timeRange: '08:00 - 08:45', Lunes: 'Matemáticas', Martes: 'Inglés', Miércoles: 'Lengua y Lit.', Jueves: 'Ciencias Naturales', Viernes: 'Matemáticas' },
@@ -325,10 +353,52 @@ function generateScheduleEntries(): ScheduleEntry[] {
   return entries;
 }
 
-export const SCHEDULE_DATA: ScheduleEntry[] = generateScheduleEntries();
+const BASE_SCHEDULE_DATA: ScheduleEntry[] = generateScheduleEntries();
+
+const buildDemoSchedule = (entries: ScheduleEntry[], from: DemoFrom, to: DemoTo): ScheduleEntry[] =>
+  entries
+    .filter((entry) => entry.studentId === from)
+    .map((entry) => ({
+      ...entry,
+      id: remapDemoId(entry.id, from, to),
+      studentId: to,
+      subjectId: entry.subjectId ? remapDemoId(entry.subjectId, from, to) : entry.subjectId,
+      classId: entry.classId ? remapDemoId(entry.classId, from, to) : entry.classId,
+    }));
+
+export const SCHEDULE_DATA: ScheduleEntry[] = [
+  ...BASE_SCHEDULE_DATA,
+  ...buildDemoSchedule(BASE_SCHEDULE_DATA, 'avril', 'karen'),
+  ...buildDemoSchedule(BASE_SCHEDULE_DATA, 'gael', 'mauricio'),
+];
+
+// Cada materia demo conserva UNA sola clase interactiva (la primera de su plan).
+const buildDemoClasses = (classes: DailyClass[], from: DemoFrom, to: DemoTo): DailyClass[] => {
+  const seenSubjects = new Set<string>();
+  const result: DailyClass[] = [];
+  for (const cls of classes) {
+    if (seenSubjects.has(cls.subjectId)) continue;
+    seenSubjects.add(cls.subjectId);
+    result.push({
+      ...cls,
+      id: remapDemoId(cls.id, from, to),
+      subjectId: remapDemoId(cls.subjectId, from, to),
+      studentId: to,
+      isCompleted: false,
+      resources: cls.resources.map((res) => ({ ...res, id: remapDemoId(res.id, from, to) })),
+      activities: cls.activities.map((act) => ({ ...act, id: remapDemoId(act.id, from, to), completed: false })),
+      learningPath: cls.learningPath?.map((stage) => ({ ...stage, id: remapDemoId(stage.id, from, to) })),
+    });
+  }
+  return result;
+};
+
+export const KAREN_DAILY_CLASSES: DailyClass[] = buildDemoClasses(AVRIL_DAILY_CLASSES, 'avril', 'karen');
+export const MAURICIO_DAILY_CLASSES: DailyClass[] = buildDemoClasses(GAEL_DAILY_CLASSES, 'gael', 'mauricio');
+export const DEMO_DAILY_CLASSES: DailyClass[] = [...KAREN_DAILY_CLASSES, ...MAURICIO_DAILY_CLASSES];
 
 // FILTRO PURIFICADOR 3: FORZAMOS TODAS LAS CLASES DEL DÍA A 0
-export const DAILY_CLASSES_DATA: DailyClass[] = ALL_DAILY_CLASSES.map(cls => ({
+export const DAILY_CLASSES_DATA: DailyClass[] = [...ALL_DAILY_CLASSES, ...DEMO_DAILY_CLASSES].map(cls => ({
   ...cls,
   isCompleted: false, 
   status: 'scheduled',

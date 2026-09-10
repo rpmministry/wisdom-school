@@ -136,7 +136,7 @@ const scheduleDays: { day: 'Lunes' | 'Martes' | 'Miércoles' | 'Jueves' | 'Viern
       </section>
 
       {/* Navigation Sub-Tabs */}
-      <div className="flex items-center gap-2 border-b border-slate-800 pb-2 overflow-x-auto">
+      <div className="flex items-center gap-2 border-b border-slate-800 pb-2 overflow-x-auto overscroll-x-contain touch-scroll-x scrollbar-none">
         <button
           onClick={() => setActiveSubTab('horario')}
           className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap ${
@@ -191,7 +191,7 @@ const scheduleDays: { day: 'Lunes' | 'Martes' | 'Miércoles' | 'Jueves' | 'Viern
             </div>
 
             {/* Quick Day Filter */}
-            <div className="flex items-center gap-1.5 bg-slate-900/90 p-1 rounded-xl border border-slate-800 overflow-x-auto max-w-full">
+            <div className="flex items-center gap-1.5 bg-slate-900/90 p-1 rounded-xl border border-slate-800 overflow-x-auto overscroll-x-contain touch-scroll-x scrollbar-none max-w-full">
               <button
                 onClick={() => setSelectedDay('Todos')}
                 className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${
@@ -223,7 +223,7 @@ const scheduleDays: { day: 'Lunes' | 'Martes' | 'Miércoles' | 'Jueves' | 'Viern
 
 {/* TABLA OFICIAL (Matching Page 4 of PDF exactly) */}
               {selectedDay === 'Todos' ? (
-                <div className="overflow-x-auto rounded-2xl border border-slate-700/80 bg-slate-900/90 shadow-xl">
+                <div className="overflow-x-auto overscroll-x-contain touch-scroll-x rounded-2xl border border-slate-700/80 bg-slate-900/90 shadow-xl">
                   <table className="w-full text-left border-collapse">
                     <thead>
                       <tr className="bg-slate-800/90 border-b border-slate-700 text-xs font-extrabold uppercase text-slate-300">

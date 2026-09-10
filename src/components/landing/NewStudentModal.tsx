@@ -118,7 +118,7 @@ export const NewStudentModal: React.FC<NewStudentModalProps> = ({
         </div>
 
         {/* Modal Body */}
-        <div className="p-6 overflow-y-auto space-y-6 flex-1 text-slate-100">
+        <div className="p-6 overflow-y-auto overscroll-contain space-y-6 flex-1 text-slate-100">
           {!createdSuccess ? (
             <form onSubmit={handleCreateStudent} className="space-y-6">
               

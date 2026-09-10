@@ -75,7 +75,7 @@ export const AITeacherTryoutWidget: React.FC = () => {
       </div>
 
       {/* Chat messages box */}
-      <div className="h-64 overflow-y-auto space-y-3 p-4 rounded-2xl bg-slate-950/80 border border-slate-800 text-xs">
+      <div className="h-64 overflow-y-auto overscroll-contain space-y-3 p-4 rounded-2xl bg-slate-950/80 border border-slate-800 text-xs">
         {chatLog.map((msg, index) => (
           <div
             key={index}

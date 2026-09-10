@@ -79,7 +79,7 @@ export const ClassTeacherChat: React.FC<ClassTeacherChatProps> = ({ className = 
   useEffect(() => {
     if (teacher && subject && messages.length === 0) {
       const greetingId = `msg-${Date.now()}`;
-      const greetingContent = `¡Hola ${currentStudent.name}! Soy ${teacher.name}, tu profesor de ${subject.name}. Hoy trabajaremos el tema "${dailyClass?.theme || 'de repaso'}". La explicación completa llega en la "Ruta Interactiva": mini-lecciones cortas con retos, justo aquí mismo. Yo soy tu compañero: úsame para preguntar, pedir ejemplos o cuando un punto no te quede claro. Comencemos.`;
+      const greetingContent = `¡Hola ${currentStudent.name}! Soy ${teacher.name}, tu profe de ${subject.name}. Hoy: "${dailyClass?.theme || 'repaso'}". Avanza por las mini-lecciones y aquí me preguntas lo que quieras.`;
       const greeting: ChatMessage = { id: greetingId, role: 'model', content: greetingContent, timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) };
       setMessages([greeting]);
     }
@@ -119,9 +119,8 @@ export const ClassTeacherChat: React.FC<ClassTeacherChatProps> = ({ className = 
       setMessages((prev) => [...prev, modelMessage]);
     } catch (err: any) {
       console.error(err);
-      const isSystemError = err.message?.includes('SISTEMA DE EMERGENCIA');
       const errId = `msg-err-${Date.now()}`;
-      const errorMessage: ChatMessage = { id: errId, role: 'model', content: isSystemError ? err.message : 'Disculpa, tuve un pequeño fallo de memoria temporal. ¿Podrías repetirme tu idea?', timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) };
+      const errorMessage: ChatMessage = { id: errId, role: 'model', content: 'Disculpa, se me trabó la voz. ¿Me repites tu idea, por favor?', timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) };
       setMessages((prev) => [...prev, errorMessage]);
     } finally {
       setIsLoading(false);
@@ -187,7 +186,7 @@ export const ClassTeacherChat: React.FC<ClassTeacherChatProps> = ({ className = 
       </div>
 
       {/* ZONA CENTRAL: EL DESARROLLO DE LA CLASE (EXPLICACIÓN ↔ RESPUESTA) */}
-      <div ref={scrollBoxRef} className={`flex-1 overflow-y-auto p-4 sm:p-6 space-y-5 ${compact ? 'h-[340px] sm:h-[420px] xl:h-[520px]' : 'h-[420px] sm:h-[520px] lg:h-[560px] xl:h-[620px]'}`} style={{ scrollbarWidth: 'thin', scrollbarColor: studentTheme.accent }}>
+      <div ref={scrollBoxRef} className={`flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6 space-y-5 ${compact ? 'h-[340px] sm:h-[420px] xl:h-[520px]' : 'h-[420px] sm:h-[520px] lg:h-[560px] xl:h-[620px]'}`} style={{ scrollbarWidth: 'thin', scrollbarColor: studentTheme.accent }}>
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center py-12 text-center gap-2">
             <Bot className="w-12 h-12 mb-1" style={{ color: studentTheme.accent }} />
@@ -197,7 +196,6 @@ export const ClassTeacherChat: React.FC<ClassTeacherChatProps> = ({ className = 
         {messages.map((msg) => {
           const isUser = msg.role === 'user';
           const isActiveSpeech = speakingId === msg.id;
-          const isSystemError = msg.content.includes('SISTEMA DE EMERGENCIA');
 
           return (
             <div key={msg.id} className={`flex gap-3 ${isUser ? 'justify-end' : 'justify-start'}`}>
@@ -205,11 +203,11 @@ export const ClassTeacherChat: React.FC<ClassTeacherChatProps> = ({ className = 
 
               <div className={`flex flex-col max-w-[92%] sm:max-w-[85%] ${isUser ? 'items-end' : 'items-start'}`}>
                 {!isUser && <span className="text-[9px] font-black uppercase tracking-wider text-slate-500 mb-1 pl-1">{teacher?.name} explica</span>}
-                <div className="p-4 rounded-2xl text-sm sm:text-[15px] leading-relaxed shadow-lg" style={isUser ? { background: `linear-gradient(135deg, ${studentTheme.accent}, ${studentTheme.accent}cc)`, color: '#fff', borderBottomRightRadius: 0 } : { background: isSystemError ? 'rgba(60, 20, 20, 0.95)' : 'rgba(15, 23, 42, 0.95)', border: `1px solid ${isActiveSpeech && !isPaused ? '#10b981' : isSystemError ? '#ef4444' : studentTheme.accent + '55'}`, color: '#e2e8f0', borderBottomLeftRadius: 0 }}>
+                <div className="p-4 rounded-2xl text-sm sm:text-[15px] leading-relaxed shadow-lg" style={isUser ? { background: `linear-gradient(135deg, ${studentTheme.accent}, ${studentTheme.accent}cc)`, color: '#fff', borderBottomRightRadius: 0 } : { background: 'rgba(15, 23, 42, 0.95)', border: `1px solid ${isActiveSpeech && !isPaused ? '#10b981' : studentTheme.accent + '55'}`, color: '#e2e8f0', borderBottomLeftRadius: 0 }}>
                   {isUser ? <div className="whitespace-pre-line"><span className="text-[9px] uppercase font-black opacity-70 block mb-0.5">Tu respuesta</span>{msg.content}</div> : <div className="markdown-body" dangerouslySetInnerHTML={{ __html: renderMarkdownToHtml(msg.content) }} />}
                 </div>
 
-                {!isUser && !isSystemError && (
+                {!isUser && (
                   <div className="mt-2 w-full max-w-sm p-2.5 rounded-xl bg-slate-950 border border-slate-800 flex flex-col gap-2 shadow-inner">
                     <div className="flex items-center justify-between border-b border-slate-800/60 pb-1.5 px-1">
                       <span className="text-[10px] font-bold text-slate-400 tracking-wide uppercase">Controles de Audio</span>
@@ -241,7 +239,7 @@ export const ClassTeacherChat: React.FC<ClassTeacherChatProps> = ({ className = 
                             handlePlayVoice(msg.content, msg.id);
                           }
                         }}
-                        className={`flex-1 flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg font-bold text-[10px] sm:text-xs transition-all active:scale-95 ${isActiveSpeech && !isPaused ? 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700/30' : 'bg-emerald-600 text-white hover:bg-emerald-500 shadow-md border border-emerald-500/20'}`}
+                        className={`flex-1 flex items-center justify-center gap-1 px-2.5 py-2 min-h-[38px] rounded-lg font-bold text-[10px] sm:text-xs transition-all active:scale-95 ${isActiveSpeech && !isPaused ? 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700/30' : 'bg-emerald-600 text-white hover:bg-emerald-500 shadow-md border border-emerald-500/20'}`}
                         disabled={isActiveSpeech && !isPaused}
                         title={isActiveSpeech && isPaused ? 'Reanudar audio' : 'Reproducir audio'}
                       >
@@ -251,7 +249,7 @@ export const ClassTeacherChat: React.FC<ClassTeacherChatProps> = ({ className = 
 
                       <button
                         onClick={handlePauseVoice}
-                        className={`flex-1 flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg font-bold text-[10px] sm:text-xs transition-all active:scale-95 ${isActiveSpeech && !isPaused ? 'bg-amber-600 text-white hover:bg-amber-500 shadow-md border border-amber-500/20' : 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700/30'}`}
+                        className={`flex-1 flex items-center justify-center gap-1 px-2.5 py-2 min-h-[38px] rounded-lg font-bold text-[10px] sm:text-xs transition-all active:scale-95 ${isActiveSpeech && !isPaused ? 'bg-amber-600 text-white hover:bg-amber-500 shadow-md border border-amber-500/20' : 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700/30'}`}
                         disabled={!isActiveSpeech || isPaused}
                         title="Pausar audio"
                       >
@@ -261,7 +259,7 @@ export const ClassTeacherChat: React.FC<ClassTeacherChatProps> = ({ className = 
 
                       <button
                         onClick={handleStopVoice}
-                        className={`flex-1 flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg font-bold text-[10px] sm:text-xs transition-all active:scale-95 ${isActiveSpeech ? 'bg-rose-600 text-white hover:bg-rose-500 shadow-md border border-rose-500/20' : 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700/30'}`}
+                        className={`flex-1 flex items-center justify-center gap-1 px-2.5 py-2 min-h-[38px] rounded-lg font-bold text-[10px] sm:text-xs transition-all active:scale-95 ${isActiveSpeech ? 'bg-rose-600 text-white hover:bg-rose-500 shadow-md border border-rose-500/20' : 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700/30'}`}
                         disabled={!isActiveSpeech}
                         title="Detener audio"
                       >
@@ -280,15 +278,15 @@ export const ClassTeacherChat: React.FC<ClassTeacherChatProps> = ({ className = 
         {isLoading && (
           <div className="flex gap-3 items-center text-slate-400 text-sm">
             <img src={teacher?.avatar} alt={teacher?.name} className="w-9 h-9 rounded-xl object-cover animate-pulse shadow-md" />
-            <div className="p-3 rounded-2xl bg-slate-800 border border-slate-700 flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin text-indigo-400" /><span className="font-bold tracking-wide">{teacher?.name} está explicando…</span></div>
+            <div className="p-3 rounded-2xl bg-slate-800 border border-slate-700 flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin text-indigo-400" /><span className="font-bold tracking-wide">{teacher?.name} está pensando…</span></div>
           </div>
         )}
       </div>
       {/* ATAJOS DE INTERACCIÓN */}
-      <div className="p-3 border-t overflow-x-auto flex items-center gap-2 scrollbar-none bg-slate-900/90">
+      <div className="p-3 border-t overflow-x-auto overscroll-x-contain touch-scroll-x flex items-center gap-2 scrollbar-none bg-slate-900/90">
         <span className="text-[10px] text-slate-400 font-black uppercase tracking-wider shrink-0 pl-1"><MessageSquare className="w-3 h-3 inline mr-1" />Atajos:</span>
         {quickPrompts.map((promptText, idx) => (
-          <button key={idx} onClick={() => handleSendMessage(promptText)} disabled={isLoading} className="px-3 py-1.5 rounded-lg border bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-indigo-200 whitespace-nowrap transition-colors shadow-sm">{promptText}</button>
+          <button key={idx} onClick={() => handleSendMessage(promptText)} disabled={isLoading} className="inline-flex items-center min-h-[40px] px-3 py-1.5 rounded-lg border bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-indigo-200 whitespace-nowrap transition-colors shadow-sm shrink-0">{promptText}</button>
         ))}
       </div>
 
@@ -345,8 +343,8 @@ export const ClassTeacherChat: React.FC<ClassTeacherChatProps> = ({ className = 
       {/* ENTRADA DEL ESTUDIANTE */}
       <div className="p-4 bg-slate-900 border-t">
         <form onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }} className="flex items-center gap-2">
-          <input id={`input-teacher-chat-${compact ? 'compact' : 'full'}`} type="text" value={inputValue} onChange={(e) => setInputValue(e.target.value)} placeholder={`Escribe tu respuesta para ${teacher?.name}...`} disabled={isLoading} className="flex-1 rounded-xl px-4 py-3.5 text-sm sm:text-base bg-slate-800 text-white focus:outline-none border-2 border-slate-700 transition-all font-medium shadow-inner" style={{ caretColor: studentTheme.accent }} />
-          <button type="submit" disabled={!inputValue.trim() || isLoading} className="p-3.5 rounded-xl text-white hover:brightness-110 disabled:opacity-50 transition-all shadow-lg active:scale-95" style={{ background: studentTheme.accent, boxShadow: `0 6px 20px ${studentTheme.accent}55` }}><Send className="w-5 h-5" /></button>
+          <input id={`input-teacher-chat-${compact ? 'compact' : 'full'}`} type="text" enterKeyHint="send" autoCapitalize="sentences" autoComplete="off" value={inputValue} onChange={(e) => setInputValue(e.target.value)} placeholder={`Escribe tu respuesta para ${teacher?.name}...`} disabled={isLoading} className="flex-1 min-w-0 rounded-xl px-4 py-3.5 text-base bg-slate-800 text-white focus:outline-none border-2 border-slate-700 transition-all font-medium shadow-inner" style={{ caretColor: studentTheme.accent }} />
+          <button type="submit" disabled={!inputValue.trim() || isLoading} aria-label="Enviar mensaje" className="p-3.5 min-h-[48px] min-w-[48px] flex items-center justify-center rounded-xl text-white hover:brightness-110 disabled:opacity-50 transition-all shadow-lg active:scale-95 shrink-0" style={{ background: studentTheme.accent, boxShadow: `0 6px 20px ${studentTheme.accent}55` }}><Send className="w-5 h-5" /></button>
         </form>
         {world && <p className="text-[9px] text-slate-600 italic mt-2 text-center">{world.quote}</p>}
       </div>

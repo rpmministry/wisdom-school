@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useSchool } from '../../context/SchoolContext';
 import { SchoolLogo } from '../common/SchoolLogo';
+import { StudentAvatar } from '../common/StudentAvatar';
+import { Footer } from '../layout/Footer';
 import { NewStudentModal } from './NewStudentModal';
 import { CurriculumLevelsSection } from './CurriculumLevelsSection';
 import { AITeacherTryoutWidget } from './AITeacherTryoutWidget';
@@ -27,6 +29,7 @@ import {
   ArrowRight,
   Lock,
   AlertCircle,
+  Play,
 } from 'lucide-react';
 
 export const LandingView: React.FC = () => {
@@ -269,7 +272,7 @@ export const LandingView: React.FC = () => {
             </div>
 
             <div className="lg:w-[400px] lg:flex-shrink-0 w-full">
-              {authenticatedStudentId && !isDemoStudent ? <ActiveSessionBanner /> : (!authenticatedStudentId ? <InactiveSessionBanner /> : null)}
+              {authenticatedStudentId && !isDemoStudent ? <ActiveSessionBanner /> : <InactiveSessionBanner />}
             </div>
           </div>
 
@@ -294,6 +297,95 @@ export const LandingView: React.FC = () => {
               );
             })}
           </div>
+        </div>
+      </section>
+
+      {/* MODO DEMO — protagonista, above the fold */}
+      <section className="relative overflow-hidden rounded-[1.75rem] border border-purple-500/30 bg-gradient-to-br from-purple-950/60 via-slate-900 to-indigo-950/50 px-6 py-8 sm:px-10 sm:py-10 shadow-2xl">
+        <div className="absolute -top-16 -right-10 w-80 h-80 bg-purple-500/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-16 -left-10 w-80 h-80 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
+
+        <div className="relative z-10 space-y-7">
+          <div className="text-center max-w-2xl mx-auto space-y-3">
+            <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-purple-500/15 border border-purple-500/40 text-purple-200 text-xs font-bold uppercase tracking-wider">
+              <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+              <span>Sin registro · Acceso inmediato</span>
+            </div>
+            <h2 className="text-3xl sm:text-4xl font-black text-white tracking-tight">
+              Explora el Modo Demo
+            </h2>
+            <p className="text-sm sm:text-base text-slate-300 leading-relaxed">
+              Prueba la experiencia interactiva de Wisdom School con dos perfiles de muestra. Interactúa con el
+              profesor IA, escucha la voz guía y recorre una clase completa antes de registrarte.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5 max-w-4xl mx-auto">
+            {([
+              {
+                id: 'karen' as const,
+                world: '🐶 Mundo Snoopy',
+                blurb: 'Álgebra, literatura y pensamiento crítico de 8.º EGB.',
+                cardClass: 'from-amber-950/50 via-slate-900 to-amber-900/20 border-amber-500/40 hover:border-amber-400/70',
+                badgeClass: 'bg-amber-500/20 text-amber-300 border-amber-500/40',
+                buttonClass: 'bg-amber-500 hover:bg-amber-400 text-slate-950',
+              },
+              {
+                id: 'mauricio' as const,
+                world: '🍄 Mundo Mario',
+                blurb: 'Cuentos, matemáticas lúdicas y ciencia para 4.º EGB.',
+                cardClass: 'from-red-950/50 via-slate-900 to-red-900/20 border-red-500/40 hover:border-red-400/70',
+                badgeClass: 'bg-red-500/20 text-red-300 border-red-500/40',
+                buttonClass: 'bg-red-600 hover:bg-red-500 text-white',
+              },
+            ]).map((profile) => {
+              const student = studentsList.find((s) => s.id === profile.id);
+              if (!student) return null;
+              return (
+                <div
+                  key={profile.id}
+                  className={`group relative flex flex-col gap-4 p-6 rounded-3xl border bg-gradient-to-br shadow-xl transition-all hover:-translate-y-1 ${profile.cardClass}`}
+                >
+                  <div className="flex items-center gap-4">
+                    <StudentAvatar studentId={student.id} name={student.name} size="xl" />
+                    <div className="min-w-0">
+                      <span className={`inline-block text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full border ${profile.badgeClass}`}>
+                        {profile.world}
+                      </span>
+                      <h3 className="text-xl font-black text-white mt-1.5">{student.name}</h3>
+                      <p className="text-xs font-bold text-slate-400">
+                        {student.age} años · {student.grade}
+                      </p>
+                    </div>
+                  </div>
+
+                  <p className="text-sm text-slate-300 leading-relaxed">{profile.blurb}</p>
+
+                  <div className="flex flex-wrap gap-2 text-[11px] font-bold text-slate-300">
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-950/60 border border-slate-700/70">
+                      <Bot className="w-3.5 h-3.5 text-emerald-400" /> Profesor IA
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-950/60 border border-slate-700/70">
+                      <BookOpen className="w-3.5 h-3.5 text-indigo-400" /> 1 clase por materia
+                    </span>
+                  </div>
+
+                  <button
+                    onClick={() => loginAsTestStudent(profile.id)}
+                    className={`mt-auto w-full py-3.5 rounded-2xl font-black text-sm shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2 ${profile.buttonClass}`}
+                  >
+                    <Play className="w-4 h-4 fill-current" />
+                    <span>Entrar al Modo Demo</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+
+          <p className="text-center text-[11px] text-slate-500">
+            El progreso del Modo Demo es temporal: explora libremente y regístrate cuando quieras continuar.
+          </p>
         </div>
       </section>
 
@@ -364,39 +456,7 @@ export const LandingView: React.FC = () => {
         />
       )}
 
-      {/* Sección de perfiles de prueba para evaluación de usabilidad */}
-      <section className="p-6 sm:p-8 rounded-3xl bg-gradient-to-r from-purple-950/60 via-slate-900 to-purple-950/60 border border-purple-500/30 flex flex-col items-center justify-start gap-6 shadow-xl max-w-2xl mx-auto mb-10">
-        <div className="text-center space-y-4">
-          <h2 className="text-2xl font-bold text-white tracking-tight">Perfiles de Prueba</h2>
-          <p className="text-sm text-slate-400">
-            Evalúa la usabilidad de la plataforma con perfiles de estudiantes de prueba
-            sin afectar el progreso de los perfiles reales.
-          </p>
-          <div className="grid grid-cols-2 gap-4">
-            <button
-              onClick={() => loginAsTestStudent('karen')}
-              className="w-full px-6 py-3.5 rounded-2xl bg-gradient-to-r from-cyan-500 to-teal-600 hover:from-cyan-400 hover:to-teal-500 text-slate-950 font-bold text-sm shadow-lg shadow-cyan-950/40 transition-all flex items-center justify-center gap-2 transform hover:scale-[1.02]"
-            >
-              <UserPlus className="w-4 h-4" />
-              <span>Probar con Karen</span>
-            </button>
-            <button
-              onClick={() => loginAsTestStudent('mauricio')}
-              className="w-full px-6 py-3.5 rounded-2xl bg-gradient-to-r from-pink-500 to-rose-600 hover:from-pink-400 hover:to-rose-500 text-slate-950 font-bold text-sm shadow-lg shadow-pink-950/40 transition-all flex items-center justify-center gap-2 transform hover:scale-[1.02]"
-            >
-              <UserPlus className="w-4 h-4" />
-              <span>Probar con Mauricio</span>
-            </button>
-          </div>
-        </div>
-      </section>
-
-      {admissionModalOpen && (
-        <NewStudentModal
-          isOpen={admissionModalOpen}
-          onClose={() => setAdmissionModalOpen(false)}
-        />
-      )}
+      <Footer />
     </div>
   );
 };

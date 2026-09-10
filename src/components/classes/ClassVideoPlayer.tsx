@@ -9,8 +9,8 @@ import {
   RefreshCw,
   Play,
   Pause,
+  StopCircle,
   Volume2,
-  VolumeX,
   Sparkles,
   BookOpen,
   HelpCircle,
@@ -38,11 +38,10 @@ export const ClassVideoPlayer: React.FC<ClassVideoPlayerProps> = ({
   const [customInput, setCustomInput] = useState('');
   const [showCustomBar, setShowCustomBar] = useState(false);
 
-  // Interactive slide & speech synthesis state
+  // Interactive slide & speech synthesis state (narración SOLO manual: nunca se reproduce sola)
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const [speechRate, setSpeechRate] = useState<number>(1.0);
-  const [voiceGender, setVoiceGender] = useState<'female' | 'male'>('female');
+  const [isPausedNarration, setIsPausedNarration] = useState(false);
 
   const activeVideoUrl = videoUrlOverride || currentClass.videoUrl;
   const isEnglishSubject = subject?.id?.startsWith('ing') || subject?.name?.toLowerCase().includes('inglés');
@@ -197,13 +196,19 @@ export const ClassVideoPlayer: React.FC<ClassVideoPlayerProps> = ({
   useEffect(() => {
     return () => {
       ttsService.stop();
+      setIsSpeaking(false);
+      setIsPausedNarration(false);
     };
   }, [currentClass.id, currentSlideIndex]);
 
   const handleSpeak = (text: string) => {
+    if (isSpeaking && isPausedNarration) {
+      ttsService.resume();
+      setIsPausedNarration(false);
+      return;
+    }
     if (isSpeaking) {
       ttsService.pause();
-      setIsSpeaking(true);
       return;
     }
 
@@ -212,15 +217,16 @@ export const ClassVideoPlayer: React.FC<ClassVideoPlayerProps> = ({
       messageId: `video-${currentClass.id}-${currentSlideIndex}`,
       text,
       teacherName,
-      onEnd: () => { setIsSpeaking(false); },
-      onPause: () => { setIsSpeaking(true); },
-      onPlay: () => { setIsSpeaking(true); },
+      onEnd: () => { setIsSpeaking(false); setIsPausedNarration(false); },
+      onPause: () => { setIsPausedNarration(true); },
+      onPlay: () => { setIsSpeaking(true); setIsPausedNarration(false); },
     });
   };
 
   const handleStopSpeech = () => {
     ttsService.stop();
     setIsSpeaking(false);
+    setIsPausedNarration(false);
   };
 
   return (
@@ -247,13 +253,13 @@ export const ClassVideoPlayer: React.FC<ClassVideoPlayerProps> = ({
         </div>
 
         {/* Tab Switcher */}
-        <div className="flex items-center gap-1 bg-slate-950/70 p-1 rounded-xl border border-slate-800 text-xs">
+        <div className="flex items-center gap-1 bg-slate-950/70 p-1 rounded-xl border border-slate-800 text-xs max-w-full overflow-x-auto overscroll-x-contain touch-scroll-x scrollbar-none">
           <button
             onClick={() => {
               handleStopSpeech();
               setPlayerTab('video');
             }}
-            className={`px-3 py-1.5 rounded-lg font-semibold flex items-center gap-1.5 transition-all ${
+            className={`px-3 py-1.5 min-h-[40px] shrink-0 rounded-lg font-semibold flex items-center gap-1.5 transition-all ${
               playerTab === 'video'
                 ? 'bg-rose-600 text-white shadow-md'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
@@ -267,7 +273,7 @@ export const ClassVideoPlayer: React.FC<ClassVideoPlayerProps> = ({
             onClick={() => {
               setPlayerTab('interactive');
             }}
-            className={`px-3 py-1.5 rounded-lg font-semibold flex items-center gap-1.5 transition-all ${
+            className={`px-3 py-1.5 min-h-[40px] shrink-0 rounded-lg font-semibold flex items-center gap-1.5 transition-all ${
               playerTab === 'interactive'
                 ? 'bg-indigo-600 text-white shadow-md'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
@@ -282,7 +288,7 @@ export const ClassVideoPlayer: React.FC<ClassVideoPlayerProps> = ({
               handleStopSpeech();
               setPlayerTab('channels');
             }}
-            className={`px-3 py-1.5 rounded-lg font-semibold flex items-center gap-1.5 transition-all ${
+            className={`px-3 py-1.5 min-h-[40px] shrink-0 rounded-lg font-semibold flex items-center gap-1.5 transition-all ${
               playerTab === 'channels'
                 ? 'bg-amber-600 text-white shadow-md'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
@@ -432,40 +438,30 @@ export const ClassVideoPlayer: React.FC<ClassVideoPlayerProps> = ({
                   {slides[currentSlideIndex].badge} • Diapositiva {currentSlideIndex + 1} de {slides.length}
                 </span>
 
-                {/* Audio Narration Bar */}
+                {/* Audio Narration Bar — controles manuales siempre disponibles durante la reproducción */}
                 <div className="flex items-center gap-2 bg-slate-900/90 px-3 py-1.5 rounded-xl border border-slate-700">
                   <button
                     onClick={() => handleSpeak(slides[currentSlideIndex].speechText)}
-                    className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-all ${
-                      isSpeaking
-                        ? 'bg-rose-600 text-white shadow-md'
+                    className={`flex items-center gap-1.5 px-3 py-1 min-h-[40px] rounded-lg text-xs font-bold transition-all active:scale-95 ${
+                      isSpeaking && !isPausedNarration
+                        ? 'bg-amber-600 text-white shadow-md'
                         : 'bg-indigo-600 hover:bg-indigo-500 text-white'
                     }`}
                   >
-                    {isSpeaking ? <Pause className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
-                    <span>{isSpeaking ? 'Pausar Narración' : 'Escuchar Clase con Voz'}</span>
+                    {isSpeaking && !isPausedNarration ? <Pause className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
+                    <span>{isSpeaking ? (isPausedNarration ? 'Reanudar Narración' : 'Pausar Narración') : 'Escuchar Clase con Voz'}</span>
                   </button>
 
                   {isSpeaking && (
                     <button
                       onClick={handleStopSpeech}
-                      className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white"
+                      className="flex items-center gap-1 px-2.5 py-1 min-h-[36px] rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-[11px] font-bold transition-all active:scale-95"
                       title="Detener voz"
                     >
-                      <VolumeX className="w-3.5 h-3.5" />
+                      <StopCircle className="w-3.5 h-3.5" />
+                      <span>DETENER</span>
                     </button>
                   )}
-
-                  <select
-                    value={speechRate}
-                    onChange={(e) => setSpeechRate(parseFloat(e.target.value))}
-                    className="text-[11px] bg-slate-800 border border-slate-700 text-slate-300 rounded px-1.5 py-0.5 focus:outline-none"
-                    title="Velocidad de reproducción"
-                  >
-                    <option value="0.8">0.8x</option>
-                    <option value="1.0">1.0x</option>
-                    <option value="1.2">1.2x</option>
-                  </select>
                 </div>
               </div>
 
@@ -479,7 +475,7 @@ export const ClassVideoPlayer: React.FC<ClassVideoPlayerProps> = ({
                 </div>
               )}
 
-              <div className="text-xs sm:text-sm text-slate-300 whitespace-pre-line leading-relaxed max-h-56 overflow-y-auto pr-2 custom-scrollbar">
+              <div className="text-xs sm:text-sm text-slate-300 whitespace-pre-line leading-relaxed max-h-56 overflow-y-auto overscroll-contain pr-2 custom-scrollbar">
                 {slides[currentSlideIndex].content}
               </div>
             </div>
@@ -492,7 +488,7 @@ export const ClassVideoPlayer: React.FC<ClassVideoPlayerProps> = ({
                   setCurrentSlideIndex((prev) => Math.max(0, prev - 1));
                 }}
                 disabled={currentSlideIndex === 0}
-                className="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-white text-xs font-semibold flex items-center gap-1.5 transition-all"
+                className="px-3.5 py-1.5 min-h-[44px] rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-white text-xs font-semibold flex items-center gap-1.5 transition-all touch-lift"
               >
                 <ChevronLeft className="w-4 h-4" />
                 <span>Anterior</span>
@@ -506,12 +502,17 @@ export const ClassVideoPlayer: React.FC<ClassVideoPlayerProps> = ({
                       handleStopSpeech();
                       setCurrentSlideIndex(idx);
                     }}
-                    className={`w-2.5 h-2.5 rounded-full transition-all ${
-                      currentSlideIndex === idx
-                        ? 'bg-indigo-400 scale-125'
-                        : 'bg-slate-700 hover:bg-slate-600'
-                    }`}
-                  />
+                    aria-label={`Ir a la diapositiva ${idx + 1}`}
+                    className="relative p-2.5 -m-1 rounded-full after:absolute after:-inset-1 after:content-['']"
+                  >
+                    <span
+                      className={`block w-2.5 h-2.5 rounded-full transition-all ${
+                        currentSlideIndex === idx
+                          ? 'bg-indigo-400 scale-125'
+                          : 'bg-slate-700 hover:bg-slate-600'
+                      }`}
+                    />
+                  </button>
                 ))}
               </div>
 
@@ -521,7 +522,7 @@ export const ClassVideoPlayer: React.FC<ClassVideoPlayerProps> = ({
                   setCurrentSlideIndex((prev) => Math.min(slides.length - 1, prev + 1));
                 }}
                 disabled={currentSlideIndex === slides.length - 1}
-                className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white text-xs font-semibold flex items-center gap-1.5 transition-all shadow-md"
+                className="px-3.5 py-1.5 min-h-[44px] rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white text-xs font-semibold flex items-center gap-1.5 transition-all shadow-md touch-lift"
               >
                 <span>Siguiente</span>
                 <ChevronRight className="w-4 h-4" />

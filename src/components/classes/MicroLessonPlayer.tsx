@@ -22,13 +22,23 @@ interface MicroLessonPlayerProps {
   student: Student;
   onGoToLab: () => void;
   onStepsResolved?: (steps: { title: string; text: string }[]) => void;
+  /** Índices de micro-lecciones ya superadas (estado persistente del progreso). */
+  cleared: number[];
+  onMarkCleared: (index: number) => void;
+  onResetRoute: () => void;
+  onRouteComplete?: () => void;
 }
 
 type BiteState = { status: 'loading' } | { status: 'failed' } | { status: 'ready'; lesson: MicroLesson };
 type AiHelp = { status: 'idle' | 'loading' | 'ready' | 'failed'; text: string | null };
 
-const MICRO_TOTAL = 3;
+export const MICRO_TOTAL = 3;
 const OPTION_LETTERS = ['A', 'B', 'C'];
+
+const firstUnclearedIndex = (arr: number[]) => {
+  for (let i = 0; i < MICRO_TOTAL; i++) if (!arr.includes(i)) return i;
+  return MICRO_TOTAL - 1;
+};
 
 // Contenido de relleno instantáneo (y definitivo si la IA no responde): el learningPath ya escrito de la clase.
 const fallbackLesson = (dailyClass: DailyClass, i: number): MicroLesson => {
@@ -44,7 +54,7 @@ const fallbackLesson = (dailyClass: DailyClass, i: number): MicroLesson => {
   };
 };
 
-export const MicroLessonPlayer: React.FC<MicroLessonPlayerProps> = ({ dailyClass, subject, student, onGoToLab, onStepsResolved }) => {
+export const MicroLessonPlayer: React.FC<MicroLessonPlayerProps> = ({ dailyClass, subject, student, onGoToLab, onStepsResolved, cleared, onMarkCleared, onResetRoute, onRouteComplete }) => {
   const theme = getWorldTheme(student);
   const world = getWorldDecor(student);
   const teacher = subject.teacher;
@@ -57,7 +67,6 @@ export const MicroLessonPlayer: React.FC<MicroLessonPlayerProps> = ({ dailyClass
   const [wrongCount, setWrongCount] = useState(0);
   const [celebrate, setCelebrate] = useState(false);
   const [finished, setFinished] = useState(false);
-  const [cleared, setCleared] = useState<number[]>([]);
   const requestingRef = useRef<Set<number>>(new Set());
   const aiCallsRef = useRef<Record<number, number>>({});
 
@@ -88,13 +97,12 @@ export const MicroLessonPlayer: React.FC<MicroLessonPlayerProps> = ({ dailyClass
 
   useEffect(() => {
     setBites({});
-    setLessonIndex(0);
+    setLessonIndex(firstUnclearedIndex(cleared));
     setSelectedOption(null);
     setReviewOpen(false);
     setAiHelp({ status: 'idle', text: null });
     setWrongCount(0);
     setFinished(false);
-    setCleared([]);
     requestingRef.current = new Set();
     aiCallsRef.current = {};
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -128,9 +136,12 @@ export const MicroLessonPlayer: React.FC<MicroLessonPlayerProps> = ({ dailyClass
   const isCorrect = answered && !!quiz && selectedOption === quiz.correctIndex;
   const isLast = lessonIndex >= MICRO_TOTAL - 1;
   const canAdvance = !quiz || cleared.includes(lessonIndex);
+  // Secuencia guiada: se puede releer lo ya visto y avanzar UN paso cuando el reto
+  // actual está superado (o la lección no trae reto). Nunca saltar hacia adelante.
+  const maxUnlocked = canAdvance ? Math.min(lessonIndex + 1, MICRO_TOTAL - 1) : lessonIndex;
 
   const goTo = (i: number) => {
-    if (i < 0 || i >= MICRO_TOTAL) return;
+    if (i < 0 || i >= MICRO_TOTAL || i > maxUnlocked) return;
     setLessonIndex(i);
     setSelectedOption(null);
     setReviewOpen(false);
@@ -145,7 +156,7 @@ export const MicroLessonPlayer: React.FC<MicroLessonPlayerProps> = ({ dailyClass
       setCelebrate(true);
       window.setTimeout(() => setCelebrate(false), 1600);
       setReviewOpen(false);
-      setCleared((c) => (c.includes(lessonIndex) ? c : [...c, lessonIndex]));
+      onMarkCleared(lessonIndex);
       return;
     }
     // FALLÓ: explicación determinista INMEDIATA (con el contenido real de la ficha) + versión del profe en paralelo.
@@ -190,15 +201,21 @@ export const MicroLessonPlayer: React.FC<MicroLessonPlayerProps> = ({ dailyClass
 
   const routeCompleted = (isLast && answered && isCorrect) || finished;
 
+  // Cierre de ciclo: al completar la ruta se persiste el avance (una sola vez por render de éxito).
+  useEffect(() => {
+    if (routeCompleted) onRouteComplete?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [routeCompleted]);
+
   const restart = () => {
     setFinished(false);
     setReviewOpen(false);
     setSelectedOption(null);
     setAiHelp({ status: 'idle', text: null });
-    setCleared([]);
     setWrongCount(0);
     setLessonIndex(0);
     aiCallsRef.current = {};
+    onResetRoute();
   };
 
   const accentBg = `linear-gradient(135deg, ${theme.accent}, ${theme.accent}cc)`;
@@ -252,7 +269,7 @@ export const MicroLessonPlayer: React.FC<MicroLessonPlayerProps> = ({ dailyClass
             Lección {lessonIndex + 1} de {MICRO_TOTAL}
           </span>
           {bite?.status === 'loading' && (
-            <span className="text-[10px] text-slate-500 inline-flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" /> {teacher?.name} la está puliendo con IA…</span>
+            <span className="text-[11px] text-slate-500 inline-flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" /> {teacher?.name} está preparando tu reto…</span>
           )}
         </div>
 
@@ -285,7 +302,7 @@ export const MicroLessonPlayer: React.FC<MicroLessonPlayerProps> = ({ dailyClass
                 <p className="text-xs text-indigo-100 leading-relaxed"><span className="text-slate-500 font-black uppercase tracking-wider text-[9px] block mb-0.5">Con el ejemplo de la lección</span>{lesson.example}</p>
               )}
               {aiHelp.status === 'loading' && (
-                <p className="text-[11px] text-slate-400 flex items-center gap-1.5"><Loader2 className="w-3 h-3 animate-spin" /> {teacher?.name} además te lo cuenta con otras palabras…</p>
+                <p className="text-[11px] text-slate-400 flex items-center gap-1.5"><Loader2 className="w-3 h-3 animate-spin" /> {teacher?.name} te lo explica con otras palabras…</p>
               )}
               {aiHelp.status === 'ready' && aiHelp.text && (
                 <div className="pt-1 border-t border-slate-800 mt-1">
@@ -294,17 +311,15 @@ export const MicroLessonPlayer: React.FC<MicroLessonPlayerProps> = ({ dailyClass
                 </div>
               )}
             </div>
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+            <div className="flex flex-col gap-2">
               <button
                 onClick={retryQuiz}
-                className="flex-1 px-4 py-3 rounded-xl text-sm font-black text-white shadow-lg transition-all active:scale-[0.98] flex items-center justify-center gap-2 hover:brightness-110"
+                className="w-full px-4 py-3 rounded-xl text-sm font-black text-white shadow-lg transition-all active:scale-[0.98] flex items-center justify-center gap-2 hover:brightness-110"
                 style={{ background: accentBg, boxShadow: `0 8px 22px ${theme.accent}44` }}
               >
-                <RotateCcw className="w-4 h-4" /> Reintentar el reto (ahora sí)
+                <RotateCcw className="w-4 h-4" /> Reintentar el reto
               </button>
-              <button onClick={handleContinue} className="px-4 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-xs font-bold transition-all flex items-center justify-center gap-1.5">
-                Continuar sin reintentar <ArrowRight className="w-3.5 h-3.5" />
-              </button>
+              <p className="text-[11px] text-slate-400 text-center">Relee la ficha de arriba y elige otra vez. Tú puedes.</p>
             </div>
           </div>
         )}
@@ -364,14 +379,14 @@ export const MicroLessonPlayer: React.FC<MicroLessonPlayerProps> = ({ dailyClass
         {quizPreparing && !answered && (
           <div className="p-4 rounded-2xl border border-dashed border-slate-700 bg-slate-900/40 flex items-center gap-3">
             <Loader2 className="w-4 h-4 animate-spin shrink-0" style={{ color: theme.accent }} />
-            <p className="text-xs text-slate-400">Relee tranquilo/a la ficha: mientras tanto {teacher?.name} está terminando tu reto de opción múltiple para esta lección…</p>
+            <p className="text-xs text-slate-400">Relee la ficha. {teacher?.name} está terminando tu reto de esta lección…</p>
           </div>
         )}
 
         {bite?.status === 'failed' && !quiz && (
           <div className="p-3.5 rounded-xl bg-slate-900/50 border border-slate-700/70 flex items-center justify-between gap-3 flex-wrap">
             <p className="text-[11px] text-slate-400">El reto con IA tarda por la red gratuita — usa el chat con {teacher?.name} para repasar 💬</p>
-            <button onClick={() => void ensureBite(lessonIndex, true)} className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-black uppercase tracking-wider">Reintentar</button>
+            <button onClick={() => void ensureBite(lessonIndex, true)} className="px-3 py-1.5 min-h-[40px] rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-black uppercase tracking-wider">Reintentar</button>
           </div>
         )}
 
@@ -391,22 +406,38 @@ export const MicroLessonPlayer: React.FC<MicroLessonPlayerProps> = ({ dailyClass
           <button
             onClick={() => goTo(lessonIndex - 1)}
             disabled={lessonIndex === 0}
-            className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed text-slate-200 text-xs font-black flex items-center gap-1.5 transition-all"
+            className="px-4 py-2.5 min-h-[44px] rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed text-slate-200 text-xs font-black flex items-center gap-1.5 transition-all touch-lift"
           >
             <ChevronLeft className="w-4 h-4" /> Volver
           </button>
-          <div className="flex items-center gap-1.5">
-            {Array.from({ length: MICRO_TOTAL }).map((__, i) => (
-              <span key={i} className={`w-2 h-2 rounded-full ${cleared.includes(i) ? 'bg-emerald-400' : i === lessonIndex ? 'animate-pulse' : 'bg-slate-700'}`} style={i === lessonIndex && !cleared.includes(i) ? { background: theme.accent } : undefined} title={`Lección ${i + 1}${cleared.includes(i) ? ' · superada ✔' : ''}`} />
-            ))}
+          <div className="flex items-center gap-1">
+            {Array.from({ length: MICRO_TOTAL }).map((__, i) => {
+              const isUnlocked = i <= maxUnlocked;
+              return (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => goTo(i)}
+                  disabled={!isUnlocked}
+                  className="relative p-2.5 -m-1 rounded-full after:absolute after:-inset-1 after:content-[''] disabled:cursor-not-allowed"
+                  title={`Lección ${i + 1}${cleared.includes(i) ? ' · superada ✔' : isUnlocked ? '' : ' · bloqueada'}`}
+                  aria-label={`Ir a la lección ${i + 1}`}
+                >
+                  <span
+                    className={`block w-2.5 h-2.5 rounded-full ${cleared.includes(i) ? 'bg-emerald-400' : i === lessonIndex ? 'animate-pulse' : isUnlocked ? 'bg-slate-600' : 'bg-slate-800'}`}
+                    style={i === lessonIndex && !cleared.includes(i) ? { background: theme.accent } : undefined}
+                  />
+                </button>
+              );
+            })}
           </div>
           {isLast ? (
             <button
               onClick={handleContinue}
               disabled={!canAdvance && !finished}
-              className="px-4 py-2.5 rounded-xl text-xs font-black text-white flex items-center gap-1.5 transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
+              className="px-4 py-2.5 min-h-[44px] rounded-xl text-xs font-black text-white flex items-center gap-1.5 transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
               style={{ background: canAdvance ? 'linear-gradient(135deg,#10b981,#34d399)' : '#334155', color: canAdvance ? '#052e16' : '#94a3b8' }}
-              title={!canAdvance ? 'Primero supera el reto (o usa «Continuar sin reintentar»)' : undefined}
+              title={!canAdvance ? 'Primero supera el reto de esta lección' : undefined}
             >
               Finalizar ruta <CheckCircle2 className="w-4 h-4" />
             </button>
@@ -414,7 +445,7 @@ export const MicroLessonPlayer: React.FC<MicroLessonPlayerProps> = ({ dailyClass
             <button
               onClick={handleContinue}
               disabled={!canAdvance}
-              className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-black flex items-center gap-1.5 transition-all"
+              className="px-4 py-2.5 min-h-[44px] rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-black flex items-center gap-1.5 transition-all touch-lift"
               title={!canAdvance ? 'Responde bien el reto para desbloquear' : undefined}
             >
               Avanzar <ArrowRight className="w-4 h-4" />
@@ -449,7 +480,7 @@ export const MicroLessonPlayer: React.FC<MicroLessonPlayerProps> = ({ dailyClass
               </span>
               <ArrowRight className="w-5 h-5" />
             </button>
-            <button onClick={restart} className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold flex items-center gap-1.5 transition-all">
+            <button onClick={restart} className="px-4 py-2 min-h-[44px] rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold flex items-center gap-1.5 transition-all touch-lift">
               <RotateCcw className="w-3.5 h-3.5" /> Repasar la ruta
             </button>
           </div>

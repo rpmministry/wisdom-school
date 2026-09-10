@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import {
   Student,
   StudentId,
@@ -57,6 +57,13 @@ interface SchoolContextType {
   setIsTeacherDrawerOpen: (open: boolean) => void;
   openTeacherDrawerWithContext: (subject?: Subject, dailyClass?: DailyClass) => void;
   toggleActivityCompletion: (classId: string, activityId: string) => void;
+  completeClass: (classId: string) => void;
+  /** Progreso de la ruta de micro-lecciones por clase: índices superados (0..N-1). */
+  microRouteProgress: Record<string, number[]>;
+  markMicroCleared: (classId: string, index: number) => void;
+  resetMicroRoute: (classId: string) => void;
+  /** Marca temporal del último guardado real de progreso (para el indicador "Guardado"). */
+  lastSavedAt: number | null;
   studentSchedule: ScheduleEntry[];
   todaySchedule: ScheduleEntry[];
   classesList: DailyClass[];
@@ -65,6 +72,12 @@ interface SchoolContextType {
   changePassword: (studentId: StudentId, currentPass: string, newPass: string) => { success: boolean; error?: string };
   resetPasswordWithPin: (identifier: string, pin: string, newPass: string) => { success: boolean; error?: string };
   loginAsTestStudent: (testStudentId: StudentId) => void;
+  /** true cuando el perfil activo es un perfil de prueba (Karen o Mauricio). */
+  isDemoMode: boolean;
+  /** Controla el modal de "candado demo" al intentar completar/avanzar. */
+  isDemoLockOpen: boolean;
+  openDemoLock: () => void;
+  closeDemoLock: () => void;
 }
 
 const SchoolContext = createContext<SchoolContextType | undefined>(undefined);
@@ -164,6 +177,10 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [activeSubject, setActiveSubject] = useState<Subject | null>(null);
   const [activeClass, setActiveClass] = useState<DailyClass | null>(null);
   const [isTeacherDrawerOpen, setIsTeacherDrawerOpen] = useState<boolean>(false);
+  const [isDemoLockOpen, setIsDemoLockOpen] = useState<boolean>(false);
+
+  const openDemoLock = () => setIsDemoLockOpen(true);
+  const closeDemoLock = () => setIsDemoLockOpen(false);
 
   const navigateBack = () => {
     setNavigationHistory((prev) => {
@@ -238,6 +255,15 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     } catch { return {}; }
   });
 
+  const [microRouteProgress, setMicroRouteProgress] = useState<Record<string, number[]>>(() => {
+    try {
+      const saved = localStorage.getItem('wisdom_micro_route_v2026');
+      return saved ? JSON.parse(saved) : {};
+    } catch { return {}; }
+  });
+
+  const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
+
   useEffect(() => { localStorage.setItem('wisdom_students_v2026', JSON.stringify(studentsList.filter(s => !s.isDemo))); }, [studentsList]);
   
   useEffect(() => {
@@ -257,6 +283,27 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   useEffect(() => { localStorage.setItem('wisdom_schedules_v2026', JSON.stringify(allSchedules)); }, [allSchedules]);
   useEffect(() => { localStorage.setItem('wisdom_classes_v2026', JSON.stringify(classesList)); }, [classesList]);
   useEffect(() => { localStorage.setItem('wisdom_submissions_v2026', JSON.stringify(submissions)); }, [submissions]);
+  useEffect(() => { localStorage.setItem('wisdom_micro_route_v2026', JSON.stringify(microRouteProgress)); }, [microRouteProgress]);
+
+  // Indicador honesto de guardado: se actualiza solo con cambios REALES de progreso,
+  // nunca en el montaje inicial, para no mostrar "Guardado" sin que el niño haga nada.
+  const didPersistRef = useRef(false);
+  useEffect(() => {
+    if (!didPersistRef.current) { didPersistRef.current = true; return; }
+    setLastSavedAt(Date.now());
+  }, [classesList, submissions, microRouteProgress, customAvatars]);
+
+  const markMicroCleared = (classId: string, index: number) => {
+    setMicroRouteProgress((prev) => {
+      const current = prev[classId] || [];
+      if (current.includes(index)) return prev;
+      return { ...prev, [classId]: [...current, index].sort((a, b) => a - b) };
+    });
+  };
+
+  const resetMicroRoute = (classId: string) => {
+    setMicroRouteProgress((prev) => ({ ...prev, [classId]: [] }));
+  };
 
   const updateStudentAvatar = (studentId: StudentId, avatarUrl: string) => {
     setCustomAvatars((prev) => {
@@ -303,7 +350,13 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const loginAsTestStudent = (testStudentId: StudentId) => {
     const demoStudent = studentsList.find((s) => s.id === testStudentId && s.isDemo);
     if (!demoStudent) return;
-    setAuthenticatedStudentId(testStudentId); setCurrentStudentId(testStudentId); setActiveTab('space');
+    // Bypass de autenticación tradicional: el Modo Demo entra directo con estado global.
+    setAuthenticatedStudentId(testStudentId);
+    setCurrentStudentId(testStudentId);
+    setNavigationHistory([]);
+    setIsDemoLockOpen(false);
+    setSelectedDayOfWeek('Lunes');
+    setActiveTab('space');
   };
 
   const registerNewStudent = (input: NewStudentInput) => {
@@ -331,6 +384,7 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   const currentStudent = studentsList.find((s) => s.id === currentStudentId) || studentsList[0];
+  const isDemoMode = !!authenticatedStudentId && !!studentsList.find((s) => s.id === authenticatedStudentId)?.isDemo;
 
   const studentSubjects: Subject[] = allSubjects.filter((sub) => sub.studentId === currentStudentId).map((sub) => {
     const subjectClasses = classesList.filter((c) => c.subjectId === sub.id && c.studentId === currentStudentId);
@@ -371,12 +425,31 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const updateSubmission = (id: string, updates: Partial<StudentSubmission>) => { setSubmissions((prev) => prev.map((sub) => (sub.id === id ? { ...sub, ...updates } : sub))); };
   const openTeacherDrawerWithContext = (subject?: Subject, dailyClass?: DailyClass) => { if (subject) setActiveSubject(subject); if (dailyClass) setActiveClass(dailyClass); setIsTeacherDrawerOpen(true); };
   
-  const toggleActivityCompletion = (classId: string, activityId: string) => {
+  // Fuente única de verdad para la regla de "clase completada": se deriva siempre
+  // de que todas las actividades estén completas, sin importar quién actualice.
+  const updateClassActivities = (
+    classId: string,
+    update: (activity: DailyClass['activities'][number]) => DailyClass['activities'][number],
+  ) => {
     setClassesList((prev) => prev.map((cls) => {
       if (cls.id !== classId) return cls;
-      const updatedActivities = cls.activities.map((act) => act.id === activityId ? { ...act, completed: !act.completed } : act);
+      const updatedActivities = cls.activities.map(update);
       return { ...cls, activities: updatedActivities, isCompleted: updatedActivities.every((a) => a.completed) };
     }));
+  };
+
+  const toggleActivityCompletion = (classId: string, activityId: string) => {
+    updateClassActivities(classId, (act) => act.id === activityId ? { ...act, completed: !act.completed } : act);
+  };
+
+  const completeClass = (classId: string) => {
+    // Candado del Modo Demo: la clase de prueba se puede cursar completa con la IA,
+    // pero no se registra avance ni se desbloquea el plan completo.
+    if (currentStudent.isDemo) {
+      setIsDemoLockOpen(true);
+      return;
+    }
+    updateClassActivities(classId, (act) => ({ ...act, completed: true }));
   };
 
   return (
@@ -415,7 +488,12 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         isTeacherDrawerOpen, 
         setIsTeacherDrawerOpen, 
         openTeacherDrawerWithContext, 
-        toggleActivityCompletion, 
+        toggleActivityCompletion,
+    completeClass,
+        microRouteProgress,
+        markMicroCleared,
+        resetMicroRoute,
+        lastSavedAt,
         studentSchedule, 
         todaySchedule, 
         classesList, 
@@ -426,7 +504,11 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         navigationHistory, 
         navigateBack, 
         navigateToHome, 
-        loginAsTestStudent 
+        loginAsTestStudent,
+        isDemoMode,
+        isDemoLockOpen,
+        openDemoLock,
+        closeDemoLock,
       }}
     >
       {children}

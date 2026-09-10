@@ -192,7 +192,7 @@ export const StudentPhotoModal: React.FC<StudentPhotoModalProps> = ({
         </div>
 
         {/* Modal Body */}
-        <div className="p-6 overflow-y-auto space-y-6">
+        <div className="p-6 overflow-y-auto overscroll-contain space-y-6">
           {/* Main Preview & Dropzone */}
           <div className="flex flex-col sm:flex-row items-center gap-6">
             {/* Live Portrait Frame */}

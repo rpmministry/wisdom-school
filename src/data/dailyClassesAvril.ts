@@ -860,7 +860,6 @@ export const AVRIL_DAILY_CLASSES: DailyClass[] = [
     "introduction": "Hoy trabajaremos la lectura comprensiva y el ensayo.",
     "reading": "Texto modelo: \"El poder de la palabra\"",
     "socraticQuestions": [
-      "Aplica el método del contexto: lee el texto y pregúntate: ¿qué dice?, ¿por qué lo dice?, ¿qué quiere que yo piense? ¿Cuál es la idea central (tesis)?",
       "Identifica una razón/argumento del autor y explica cómo te diste cuenta."
     ],
     "resources": [
@@ -930,7 +929,7 @@ export const AVRIL_DAILY_CLASSES: DailyClass[] = [
             "Relacionar el concepto con ejemplos de la vida cotidiana."
           ]
         },
-        "guidingQuestion": "Aplica el método del contexto: lee el texto y pregúntate: ¿qué dice?, ¿por qué lo dice?, ¿qué quiere que yo piense? ¿Cuál es la idea central (tesis)?",
+        "guidingQuestion": "¿Cuál es la idea central del concepto que acabas de leer?",
         "socraticHints": [
           "Piensa en cómo se aplica esto en tu día a día.",
           "Observa los detalles en el material de lectura."
@@ -1030,7 +1029,7 @@ export const AVRIL_DAILY_CLASSES: DailyClass[] = [
         "id": "class-len-avril-01-pause-1",
         "trigger": "afterStage",
         "targetStageId": "class-len-avril-01-stage-1",
-        "prompt": "Aplica el método del contexto: lee el texto y pregúntate: ¿qué dice?, ¿por qué lo dice?, ¿qué quiere que yo piense? ¿Cuál es la idea central (tesis)?",
+        "prompt": "¿Cuál es la idea central que has entendido hasta ahora?",
         "followUpQuestion": "¿Por qué crees que este concepto es relevante en tu vida escolar?",
         "reflectionPrompt": "Tómate un momento para pensar antes de responder."
       },

@@ -668,15 +668,10 @@ const systemInstruction = `
   }
   
   console.error("[Corte de Energía IA] Ambos motores fallaron tras reintentos:", lastAuxError);
-  
-  return `⚠️ **SISTEMA DE EMERGENCIA: Fallo de Conexión IA**
 
-No he podido generar una respuesta debido a un fallo en cascada en los motores:
+  return `¡Uy, ${req.student.name}! Se me trabó la voz un momento. 🙈
 
-1. **Fallo Motor Principal (3.6 Flash):** ${primaryErrorMsg} (tras ${MAX_RETRIES} reintentos a 2s/4s/6s)
-2. **Fallo Motor Auxiliar (OpenRouter):** ${lastAuxError}
-
-*Por favor, presiona **F12** y revisa la Consola, o verifica que tus API Keys estén escritas correctamente.*`;
+No pasa nada: **tu avance sigue guardado**. Puedes volver a escribir tu idea, o repasar la ficha de la lección de arriba mientras se recupera la conexión.`;
 }
 
 export async function analyzeWork(req: AnalyzeWorkRequest): Promise<WorkAnalysisResult> {

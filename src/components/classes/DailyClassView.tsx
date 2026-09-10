@@ -8,13 +8,13 @@ import { downloadDailyGuidesBundle, routeGuideContent, DailyGuideBundleItem } fr
 import { requestGuideContent, readCachedBiteSteps } from '../../services/aiService';
 import { ActivityDetailModal } from '../activities/ActivityDetailModal';
 import { ClassVideoPlayer } from './ClassVideoPlayer';
-import { MicroLessonPlayer } from './MicroLessonPlayer';
+import { MicroLessonPlayer, MICRO_TOTAL } from './MicroLessonPlayer';
 import { ClassTeacherChat } from './ClassTeacherChat';
 import { LessonTimeline } from './LessonTimeline';
 import { PageHeader } from '../layout/PageHeader';
 import {
-  BookOpen, HelpCircle, ListTodo, Upload, Sparkles, ExternalLink,
-  CheckCircle2, ArrowRight, Cpu, Layers, Lightbulb, Calendar, AlertCircle, BrainCircuit,
+  ListTodo, Upload, Sparkles, ExternalLink,
+  CheckCircle2, Cpu, Layers, Lightbulb, Calendar, AlertCircle, BrainCircuit, Lock, ChevronDown,
 } from 'lucide-react';
 
 const DAYS_CONFIG: { day: DayOfWeekName; date: string; isStart?: boolean }[] = [
@@ -38,6 +38,20 @@ const forceSpanishUrl = (url: string) => {
 
 type ActiveSubTab = 'content' | 'simulator' | 'activities' | 'homework';
 
+const SUBTAB_ORDER: ActiveSubTab[] = ['content', 'simulator', 'activities', 'homework'];
+const SUBTAB_LABELS: Record<ActiveSubTab, string> = {
+  content: 'Masterclass',
+  simulator: 'Laboratorio',
+  activities: 'Taller',
+  homework: 'Evidencias',
+};
+const SUBTAB_HINTS: Record<ActiveSubTab, string> = {
+  content: `Completa las ${MICRO_TOTAL} mini-lecciones con sus retos.`,
+  simulator: 'Refuerza lo aprendido con video y simulador.',
+  activities: 'Resuelve las actividades pendientes del taller.',
+  homework: 'Descarga tu guía y entrega la evidencia.',
+};
+
 export const DailyClassView: React.FC = () => {
   const [isReviewWeek, setIsReviewWeek] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
@@ -50,11 +64,13 @@ export const DailyClassView: React.FC = () => {
   const {
     activeClass, todayClasses, allStudentClasses, selectedDayOfWeek, setSelectedDayOfWeek,
     setActiveClass, studentSubjects, activeSubject, setActiveSubject, openTeacherDrawerWithContext,
-    toggleActivityCompletion, setActiveTab, currentStudent, completeClass,
+    toggleActivityCompletion, currentStudent,
+    microRouteProgress, markMicroCleared, resetMicroRoute,
   } = useSchool();
 
   const [activeSubTab, setActiveSubTab] = useState<ActiveSubTab>('content');
   const [viewMode, setViewMode] = useState<'focus' | 'all-classes'>('focus');
+  const [showResources, setShowResources] = useState(false);
   const [routeSteps, setRouteSteps] = useState<{ title: string; text: string }[]>([]);
   const [batchProgress, setBatchProgress] = useState<{ done: number; total: number } | null>(null);
   const [batchMessage, setBatchMessage] = useState<{ kind: 'ok' | 'warn' | 'error'; text: string } | null>(null);
@@ -74,6 +90,20 @@ export const DailyClassView: React.FC = () => {
   const nextClass = currentClassIndex >= 0 && currentClassIndex < todayClasses.length - 1 ? todayClasses[currentClassIndex + 1] : null;
 
   const allActivitiesCompleted = activitiesList.length > 0 && activitiesList.every((a: any) => a.completed);
+
+  // --- Ruta guiada: un único "siguiente paso" derivado del progreso real ---
+  const microCleared = (currentClass && microRouteProgress[currentClass.id]) || [];
+  const microDone = microCleared.length >= MICRO_TOTAL || Boolean(currentClass?.isCompleted);
+  const stepDone: Record<ActiveSubTab, boolean> = {
+    content: microDone,
+    simulator: completedSteps.has('simulator'),
+    activities: allActivitiesCompleted,
+    homework: completedSteps.has('homework') && allActivitiesCompleted,
+  };
+  const firstIncomplete = SUBTAB_ORDER.find((s) => !stepDone[s]) || 'homework';
+  const firstIncompleteIndex = SUBTAB_ORDER.indexOf(firstIncomplete);
+  const lockedSteps = SUBTAB_ORDER.filter((s) => !stepDone[s] && SUBTAB_ORDER.indexOf(s) > firstIncompleteIndex);
+  const nextStepLabel = `${SUBTAB_LABELS[firstIncomplete]}${firstIncomplete === 'content' && !microDone ? ` · ${microCleared.length}/${MICRO_TOTAL}` : ''}`;
 
   // Materias programadas HOY para el estudiante activo (según el horario) → contenido del diario.
   const dayClassCount = todayClasses.filter((c: any) => c.studentId === currentStudent.id).length;
@@ -136,6 +166,7 @@ export const DailyClassView: React.FC = () => {
   };
 
   const handleStepClick = (stepId: string) => {
+    if (lockedSteps.includes(stepId as ActiveSubTab)) return;
     setActiveSubTab(stepId as ActiveSubTab);
     setCompletedSteps((prev) => {
       const next = new Set<string>(prev);
@@ -144,25 +175,39 @@ export const DailyClassView: React.FC = () => {
     });
   };
 
-  const handleCompleteClass = () => {
-    if (currentClass) {
-      completeClass(currentClass.id);
-      setCompletedSteps(new Set(['content', 'simulator', 'activities', 'homework']));
-    }
-  };
-
   const handleAskTeacher = (promptText: string) => {
     openTeacherDrawerWithContext(subject, currentClass);
   };
 
-  const handleGoToSubmitWork = () => setActiveTab('activities');
+  // La entrega de evidencias vive dentro de la propia clase (Taller), ya no en una pestaña aparte.
+  const handleGoToSubmitWork = () => handleStepClick('activities');
 
-  if (!isMounted) return null;
+  if (!isMounted) {
+    return (
+      <div className="space-y-6 animate-pulse" aria-hidden>
+        <div className="h-10 w-56 rounded-xl bg-slate-800/70" />
+        <div className="h-24 rounded-3xl bg-slate-800/60" />
+        <div className="h-48 rounded-3xl bg-slate-800/60" />
+        <div className="h-64 rounded-3xl bg-slate-800/60" />
+      </div>
+    );
+  }
   if (!currentClass || !subject) return (<div className="p-12 text-center rounded-3xl bg-slate-800/40 border border-slate-700/40 text-white">No hay clases seleccionadas</div>);
 
   return (
     <div className="space-y-6 animate-fade-in">
       <PageHeader title={isReviewWeek ? "Clases de Entrenamiento (Modo Repaso)" : "Clases del Día"} />
+
+      {currentStudent.isDemo && (
+        <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs flex items-start gap-2.5">
+          <Lock className="w-4 h-4 shrink-0 mt-0.5 text-amber-400" />
+          <p className="leading-relaxed">
+            Estás en <strong className="text-amber-100">Modo Demo</strong>: puedes cursar la clase completa con tu
+            profesor IA y la voz, pero al intentar <strong className="text-amber-100">completar o avanzar</strong> el
+            progreso no se guardará.
+          </p>
+        </div>
+      )}
 
       {/* Day Selector */}
       <div className="p-5 rounded-3xl bg-slate-800/90 border border-slate-700/80 space-y-4 shadow-xl">
@@ -173,7 +218,7 @@ export const DailyClassView: React.FC = () => {
               const isSelected = day === selectedDayOfWeek;
               const countForDay = allStudentClasses.filter((c: any) => c.studentId === currentStudent.id && c.dayOfWeek === day).length;
               return (
-                <button key={day} onClick={() => { setSelectedDayOfWeek(day); const classesOnDay = allStudentClasses.filter((c: any) => c.studentId === currentStudent.id && c.dayOfWeek === day); if (classesOnDay.length > 0) { setActiveClass(classesOnDay[0]); const clsSub = studentSubjects.find((s: any) => s.id === classesOnDay[0].subjectId); if (clsSub) setActiveSubject(clsSub); } }} className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${isSelected ? 'bg-indigo-600 text-white shadow-md ring-2 ring-indigo-400' : 'bg-slate-900/80 text-slate-300 hover:bg-slate-700 border border-slate-700/60'}`}>
+                <button key={day} onClick={() => { setSelectedDayOfWeek(day); const classesOnDay = allStudentClasses.filter((c: any) => c.studentId === currentStudent.id && c.dayOfWeek === day); if (classesOnDay.length > 0) { setActiveClass(classesOnDay[0]); const clsSub = studentSubjects.find((s: any) => s.id === classesOnDay[0].subjectId); if (clsSub) setActiveSubject(clsSub); } }} className={`touch-lift px-3.5 py-1.5 min-h-[44px] rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${isSelected ? 'bg-indigo-600 text-white shadow-md ring-2 ring-indigo-400' : 'bg-slate-900/80 text-slate-300 hover:bg-slate-700 border border-slate-700/60'}`}>
                   <span>{day}</span><span className={`text-[10px] px-1.5 py-0.5 rounded font-mono ${isSelected ? 'bg-indigo-700 text-indigo-100' : 'bg-slate-800 text-slate-400'}`}>{date}</span><span className={`text-[10px] px-1.5 py-0.2 rounded-full ${isSelected ? 'bg-indigo-800 text-white font-mono' : 'bg-slate-800 text-slate-400 font-mono'}`}>{countForDay}</span>
                 </button>
               );
@@ -188,8 +233,12 @@ export const DailyClassView: React.FC = () => {
           <LessonTimeline
             activeStep={activeSubTab}
             onStepClick={handleStepClick}
-            completedSteps={Array.from(completedSteps)}
+            completedSteps={SUBTAB_ORDER.filter((s) => stepDone[s])}
             totalMinutes={currentClass.timeBreakdown?.reduce((sum, p) => sum + p.minutes, 0) || 90}
+            lockedSteps={lockedSteps}
+            nextStepId={stepDone[firstIncomplete] ? undefined : firstIncomplete}
+            nextStepLabel={stepDone[firstIncomplete] ? undefined : nextStepLabel}
+            nextStepSublabel={stepDone[firstIncomplete] ? undefined : SUBTAB_HINTS[firstIncomplete]}
           />
 
           {/* Main Class Card */}
@@ -199,9 +248,11 @@ export const DailyClassView: React.FC = () => {
                 <span className="px-3 py-1 rounded-full text-xs font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">{subject.name}</span>
                 <span className="text-xs text-slate-400 font-medium">{currentClass.date}</span>
               </div>
-              <button onClick={() => handleCompleteClass()} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-sm ${allActivitiesCompleted ? 'bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-200' : 'bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-200'}`}>
-                {allActivitiesCompleted ? <><CheckCircle2 className="w-4 h-4" /><span>Clase Completada ✓</span></> : <><CheckCircle2 className="w-4 h-4" /><span>Completar Clase</span></>}
-              </button>
+              {allActivitiesCompleted && (
+                <span className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-emerald-500/20 border border-emerald-500/40 text-emerald-200">
+                  <CheckCircle2 className="w-4 h-4" /><span>Clase Completada ✓</span>
+                </span>
+              )}
             </div>
             <div><h1 className="text-2xl sm:text-3xl font-extrabold text-white mt-1">{currentClass.theme}</h1></div>
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
@@ -212,21 +263,6 @@ export const DailyClassView: React.FC = () => {
             </div>
           </div>
 
-          {/* Navigation Sub-Tabs - Now 4 steps only */}
-          <div className="flex items-center gap-2 border-b border-slate-800 pb-2 overflow-x-auto">
-            {[
-              { id: 'content', label: '1. Clase en Vivo con tu Profesor', icon: BookOpen },
-              { id: 'simulator', label: '2. Laboratorio Digital', icon: Cpu },
-              { id: 'activities', label: '3. Taller Práctico', icon: ListTodo, badge: `${isReviewWeek ? 0 : activitiesList.filter((a: any) => a.completed).length}/${activitiesList.length}` },
-              { id: 'homework', label: '4. Guía & Evidencias', icon: Upload },
-            ].map((tab) => (
-              <button key={tab.id} onClick={() => handleStepClick(tab.id)} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${activeSubTab === tab.id ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-800/60 text-slate-400 hover:text-slate-200 hover:bg-slate-800'}`}>
-                <tab.icon className="w-3.5 h-3.5" /><span>{tab.label}</span>
-                {tab.badge && <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${activeSubTab === tab.id ? 'bg-indigo-700 text-white' : 'bg-slate-700 text-slate-300'}`}>{tab.badge}</span>}
-              </button>
-            ))}
-          </div>
-
           {/* SUB-TAB 1: CLASE EN VIVO — EL PROFESOR IA PROTAGONIZA EL ESPACIO CENTRAL */}
           {activeSubTab === 'content' && (
             <div className="space-y-6 animate-fade-in">
@@ -234,20 +270,8 @@ export const DailyClassView: React.FC = () => {
                 <div>
                   <h2 className="text-xl sm:text-2xl font-black text-white flex items-center gap-2"><BrainCircuit className="w-6 h-6 text-indigo-400" /> Tu Sala de Clase Interactiva</h2>
                   <p className="text-indigo-200 mt-1 text-xs sm:text-sm">
-                    {subject.teacher.name} preparó tu ruta en mini-lecciones con retos. Avanza una tarjeta a la vez, responde con opción múltiple y usa el chat con él/ella cuando lo necesites.
+                    {subject.teacher.name} te acompaña en {MICRO_TOTAL} mini-lecciones con retos. Avanza una y responde su reto.
                   </p>
-                </div>
-                <div className="w-full sm:w-auto flex flex-col gap-2">
-                  <button onClick={handleDownloadDailyGuides} disabled={!!batchProgress} className="w-full sm:w-auto px-5 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 disabled:opacity-70 disabled:cursor-wait text-slate-950 font-black text-xs shadow-lg transition-all flex items-center justify-center gap-2">
-                    <Layers className={`w-4 h-4 ${batchProgress ? "animate-pulse" : ""}`} />
-                    {batchProgress
-                      ? `Generando diario ${batchProgress.done}/${batchProgress.total}…`
-                      : `Descargar diario del día (${dayClassCount} materias)`}
-                  </button>
-                  <p className="text-[10px] text-slate-400 sm:text-right max-w-xs">Todas las materias del horario en un solo PDF · 1 hoja por clase.</p>
-                  {batchMessage && (
-                    <p className={`text-[11px] font-semibold max-w-xs ${batchMessage.kind === 'ok' ? 'text-emerald-300' : batchMessage.kind === 'warn' ? 'text-amber-300' : 'text-rose-300'}`}>{batchMessage.text}</p>
-                  )}
                 </div>
               </div>
 
@@ -258,6 +282,10 @@ export const DailyClassView: React.FC = () => {
                     dailyClass={currentClass}
                     subject={subject}
                     student={currentStudent}
+                    cleared={microCleared}
+                    onMarkCleared={(index) => markMicroCleared(currentClass.id, index)}
+                    onResetRoute={() => resetMicroRoute(currentClass.id)}
+                    onRouteComplete={() => setCompletedSteps((prev) => new Set(prev).add('content'))}
                     onGoToLab={() => handleStepClick('simulator')}
                     onStepsResolved={(steps) => { routeStepsForClass.current = currentClass.id; setRouteSteps(steps); }}
                   />
@@ -266,27 +294,37 @@ export const DailyClassView: React.FC = () => {
                 {/* COLUMNA LATERAL: COMPAÑERO IA + RECURSOS */}
                 <aside className="lg:col-span-4 space-y-6">
                   <ClassTeacherChat compact />
-                  <div className="p-6 rounded-3xl bg-slate-800/80 border border-slate-700/80 space-y-4 shadow-xl">
-                    <h3 className="text-base font-bold text-white flex items-center gap-2 border-b border-slate-700 pb-3"><Layers className="w-5 h-5 text-indigo-400" /><span>Recursos de Apoyo</span></h3>
-                    {resourcesList.length > 0 && (
-                      <div className="flex items-start gap-2 p-3 mb-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[10px] text-amber-200">
-                        <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
-                        <p>Usa estos enlaces si necesitas ayuda extra para pasar los niveles.</p>
+                  <div className="rounded-3xl bg-slate-800/80 border border-slate-700/80 shadow-xl overflow-hidden">
+                    <button
+                      type="button"
+                      onClick={() => setShowResources((v) => !v)}
+                      aria-expanded={showResources}
+                      className="w-full min-h-[56px] px-6 py-4 flex items-center justify-between gap-3 text-left hover:bg-slate-800 transition-colors"
+                    >
+                      <span className="text-base font-bold text-white flex items-center gap-2"><Layers className="w-5 h-5 text-indigo-400" /><span>Herramientas de apoyo</span></span>
+                      <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${showResources ? 'rotate-180' : ''}`} />
+                    </button>
+                    {showResources && (
+                      <div className="px-6 pb-6 space-y-3">
+                        {resourcesList.length > 0 && (
+                          <div className="flex items-start gap-2 p-3 mb-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[10px] text-amber-200">
+                            <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
+                            <p>Úsalos si necesitas ayuda extra para pasar los niveles.</p>
+                          </div>
+                        )}
+                        {resourcesList.length > 0 ? (
+                          resourcesList.map((res: any) => (
+                            <div key={res.id} className="p-3.5 rounded-2xl bg-slate-900/60 border border-slate-700/60 space-y-2 hover:border-slate-500 transition-all">
+                              <div className="flex items-center justify-between"><span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">{res.type}</span></div>
+                              <h4 className="text-xs font-bold text-slate-200 line-clamp-2">{res.title}</h4>
+                              {res.url && res.url !== '#' && <a href={forceSpanishUrl(res.type === 'video' ? getYouTubeWatchUrl(res.url, res.title) : res.url)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-[11px] font-bold text-indigo-400 hover:text-indigo-300 pt-1.5"><span>{res.type === 'video' ? 'Ver video' : 'Abrir recurso'}</span><ExternalLink className="w-3 h-3" /></a>}
+                            </div>
+                          ))
+                        ) : (
+                          <div className="p-4 rounded-2xl bg-slate-900/40 border border-slate-700/60 text-xs text-slate-400 text-center italic">Material incluido en la Masterclass y la Guía.</div>
+                        )}
                       </div>
                     )}
-                    <div className="space-y-3">
-                      {resourcesList.length > 0 ? (
-                        resourcesList.map((res: any) => (
-                          <div key={res.id} className="p-3.5 rounded-2xl bg-slate-900/60 border border-slate-700/60 space-y-2 hover:border-slate-500 transition-all">
-                            <div className="flex items-center justify-between"><span className="text-[9px] font-black uppercase px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">{res.type}</span></div>
-                            <h4 className="text-xs font-bold text-slate-200 line-clamp-2">{res.title}</h4>
-                            {res.url && res.url !== '#' && <a href={forceSpanishUrl(res.type === 'video' ? getYouTubeWatchUrl(res.url, res.title) : res.url)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-[11px] font-bold text-indigo-400 hover:text-indigo-300 pt-1.5"><span>{res.type === 'video' ? 'Ver video' : 'Abrir recurso'}</span><ExternalLink className="w-3 h-3" /></a>}
-                          </div>
-                        ))
-                      ) : (
-                        <div className="p-4 rounded-2xl bg-slate-900/40 border border-slate-700/60 text-xs text-slate-400 text-center italic">Material incluido en la Masterclass y la Guía.</div>
-                      )}
-                    </div>
                   </div>
                 </aside>
               </div>
@@ -354,7 +392,7 @@ export const DailyClassView: React.FC = () => {
                     return (
                       <div key={act.id} className={`p-5 rounded-2xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${displayActCompleted ? 'bg-emerald-950/20 border-emerald-500/40 text-slate-200' : 'bg-slate-900/80 border-slate-700/80 hover:border-indigo-500/50 hover:bg-slate-900 text-slate-300'}`}>
                         <div className="flex items-start gap-3.5 flex-1 cursor-pointer" onClick={() => setSelectedActivityForModal(act)}>
-                          <button type="button" onClick={(e) => { e.stopPropagation(); toggleActivityCompletion(currentClass.id, act.id); }} className={`w-7 h-7 rounded-xl flex items-center justify-center shrink-0 mt-0.5 transition-all text-xs font-bold ${displayActCompleted ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20' : 'border border-slate-600 bg-slate-800 text-slate-400 hover:border-indigo-400 hover:text-white'}`} title={displayActCompleted ? 'Marcar como pendiente' : 'Marcar como completada'}>
+                          <button type="button" onClick={(e) => { e.stopPropagation(); toggleActivityCompletion(currentClass.id, act.id); }} className={`relative w-7 h-7 rounded-xl flex items-center justify-center shrink-0 mt-0.5 transition-all text-xs font-bold after:absolute after:-inset-2 after:content-[''] ${displayActCompleted ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20' : 'border border-slate-600 bg-slate-800 text-slate-400 hover:border-indigo-400 hover:text-white'}`} title={displayActCompleted ? 'Marcar como pendiente' : 'Marcar como completada'}>
                             {displayActCompleted ? '✓' : index + 1}
                           </button>
                           <div className="space-y-1">
@@ -369,7 +407,7 @@ export const DailyClassView: React.FC = () => {
 
                         <div className="flex items-center justify-between sm:justify-end gap-3 pt-3 sm:pt-0 border-t sm:border-t-0 border-slate-800 shrink-0">
                           <span className="text-xs font-bold text-amber-400 font-mono bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 rounded-lg">+{act.points} pts</span>
-                          <button type="button" onClick={() => setSelectedActivityForModal(act)} className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm ${displayActCompleted ? 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-600' : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/30'}`}>
+                          <button type="button" onClick={() => setSelectedActivityForModal(act)} className={`min-h-[44px] px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm ${displayActCompleted ? 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-600' : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/30'}`}>
                             <Sparkles className="w-3.5 h-3.5" />
                             <span>{displayActCompleted ? 'Ver / Editar' : 'Resolver ▶'}</span>
                           </button>
