@@ -2,8 +2,6 @@ import express, { Request, Response } from 'express';
 import path from 'path';
 import fs from 'fs';
 import dotenv from 'dotenv';
-import { GoogleGenAI } from '@google/genai';
-import nodemailer from 'nodemailer';
 
 dotenv.config();
 // Las claves del servidor (sin prefijo VITE_) se guardan en .env.local; se cargan sin pisar las variables ya existentes (producción/Vercel las inyecta el entorno).
@@ -43,6 +41,14 @@ app.use((req, res, next) => {
 });
 
 // Paso 3: habilitamos JSON y formularios extensos porque la app genera fotos, textos largos y payloads de IA.
+// En Vercel (@vercel/node) el cuerpo llega YA parseado; marcamos req._body para que body-parser no intente
+// releer un stream consumido (era la causa de los 500 en todos los POST de /api/ai/*).
+app.use((req: any, _res: Response, next) => {
+  if (req.body !== undefined && req.body !== null && typeof req.body === 'object') {
+    req._body = true;
+  }
+  next();
+});
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
@@ -141,6 +147,7 @@ app.post('/api/send-pin', async (req: Request, res: Response) => {
     return res.status(400).json({ error: 'Missing email or pinCode' });
   }
   try {
+    const { default: nodemailer } = await import('nodemailer');
     const transporter = nodemailer.createTransport({
       service: 'gmail',
       auth: {
@@ -162,12 +169,14 @@ app.post('/api/send-pin', async (req: Request, res: Response) => {
 });
 
 // Paso 9: inicializamos el cliente de Gemini solo cuando se necesita, con validación de la clave de entorno para no fallar en runtime.
-function getGeminiClient(): GoogleGenAI | null {
+// Carga perezosa: así los endpoints de IA no arrastran @google/genai en el arranque de la función serverless.
+async function getGeminiClient(): Promise<any> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     console.warn('GEMINI_API_KEY is not defined in environment variables.');
     return null;
   }
+  const { GoogleGenAI } = await import('@google/genai');
   return new GoogleGenAI({
     apiKey,
     httpOptions: {
@@ -206,7 +215,7 @@ function wait(ms: number) {
 
 // Paso 11: esta función intenta varios modelos de Gemini en orden de prioridad y reintenta ante caídas temporales o alta demanda.
 async function callGeminiWithModelFallback(
-  ai: GoogleGenAI,
+  ai: any,
   requestParams: {
     contents: any;
     config?: any;
@@ -1082,7 +1091,7 @@ app.post('/api/ai/analyze-work', async (req: Request, res: Response) => {
       studentNotes,
     } = req.body;
 
-    const ai = getGeminiClient();
+    const ai = await getGeminiClient();
     if (!ai) {
       return res.json({
         analysis: {
@@ -1203,6 +1212,14 @@ if (process.env.VERCEL) {
     res.sendFile(path.join(distPath, 'index.html'));
   });
 }
+
+// Manejo de errores: cualquier fallo de middleware o ruta responde JSON con el detalle real
+// (visible en la pestaña Network y en los logs de la función de Vercel) en vez de un 500 opaco.
+app.use((err: any, _req: Request, res: Response, next: any) => {
+  console.error('[API Error]', err?.stack || err?.message || err);
+  if (res.headersSent) return next(err);
+  res.status(500).json({ error: 'internal_error', message: err?.message || String(err) });
+});
 
 // Paso 18: el servidor decide si ejecuta Vite en desarrollo o sirve archivos estáticos en producción, según el entorno actual.
 async function start() {
