@@ -183,10 +183,12 @@ app.get('/api/health', async (req: Request, res: Response) => {
     status: 'ok',
     service: 'Wisdom School Backend',
     ai: {
+      deepSeekConfigured: Boolean(process.env.DEEPSEEK_API_KEY?.trim()),
+      deepSeekModel: (process.env.DEEPSEEK_MODEL || 'deepseek-chat').trim(),
       geminiConfigured: isUsableGeminiKey(process.env.GEMINI_API_KEY),
       openRouterConfigured: Boolean(process.env.OPENROUTER_API_KEY?.trim()),
       openCodeConfigured: Boolean(process.env.OPENCODE_API_KEY?.trim()),
-      freeFirst: true,
+      freeFirst: !process.env.DEEPSEEK_API_KEY?.trim(),
       hierarchy: hierarchySummary,
     },
     time: new Date().toISOString(),
@@ -353,17 +355,18 @@ function cleanReasoningLeak(rawText: string | null | undefined): string | null {
 }
 
 /**
- * Paso 13: Motor de Jerarquía de IA con Respaldo Secuencial — 100% FREE-FIRST.
+ * Paso 13: Motor de Jerarquía de IA con Respaldo Secuencial.
  *
- * Prioridades (todas sin costo por defecto):
- *   1) OpenRouter: caza modelos ":free" dinámicamente, probando cada modelo hasta que uno conteste.
- *   2) OpenCode Zen: catálogo de modelos "-free" (requiere OPENCODE_API_KEY gratuita; sin clave se omite).
- *   3) Gemini Flash (último recurso, API gratuita de Google AI Studio).
+ * Prioridades:
+ *   1) DeepSeek (PRINCIPAL · plan de pago)  ← se activa con DEEPSEEK_API_KEY
+ *   2) OpenRouter: caza modelos ":free" (gratis) hasta que uno conteste.
+ *   3) OpenCode Zen: catálogo "-free" (gratuito; requiere OPENCODE_API_KEY).
+ *   4) Gemini Flash: último recurso (free tier de Google AI Studio).
  * Cada intento de modelo tiene su presupuesto (AI_MODEL_TIMEOUT_MS, defecto 6 s). Si un modelo falla o
- * calla, se prueba el siguiente modelo free dentro del presupuesto de la capa (AI_TIER_BUDGET_MS).
- * Errores terminales (clave inválida, 402 sin crédito, 404 modelo) cambian de capa inmediatamente.
- * Si la última capa falla, se lanza el mensaje pedagógico de contingencia (503).
- * Opcional de pago: AI_PAID_MODEL (p. ej. 'qwen/qwen3.8-flash') añade una capa premium AL FINAL, solo si se define.
+ * calla, se prueba el siguiente modelo/capa según el alcance del error (credencial → salta capa,
+ * modelo roto → siguiente modelo, transitorio → reintento dentro del presupuesto).
+ * Si TODAS las capas fallan, se lanza el mensaje pedagógico de contingencia (503) y el cliente
+ * cae a su cascada local. Opcional: AI_PAID_MODEL añade una capa premium de OpenRouter al final.
  */
 
 type AIErrorKind = 'timeout' | 'http' | 'empty' | 'network' | 'auth' | 'model';
@@ -447,11 +450,26 @@ function getOpenCodeFreeModels(): string[] {
 }
 
 async function getAIHierarchy(): Promise<AIChatLayer[]> {
+  const deepSeekKey = process.env.DEEPSEEK_API_KEY?.trim();
   const openRouterKey = process.env.OPENROUTER_API_KEY?.trim();
   const openCodeKey = process.env.OPENCODE_API_KEY?.trim();
   const geminiKey = process.env.GEMINI_API_KEY?.trim();
 
   const layers: AIChatLayer[] = [];
+
+  // CAPA 0 (PRINCIPAL, plan de pago): DeepSeek. API compatible con OpenAI.
+  // Base oficial: https://api.deepseek.com  ·  endpoint compatible: /v1/chat/completions
+  // Modelos: 'deepseek-chat' (V3, rápido, ideal para el profesor IA) o 'deepseek-reasoner' (razonamiento).
+  if (deepSeekKey) {
+    layers.push({
+      id: 'deepseek',
+      label: 'DeepSeek (principal · plan de pago)',
+      provider: 'openai-compatible',
+      baseUrl: (process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com/v1').replace(/\/+$/, ''),
+      apiKey: deepSeekKey,
+      models: (process.env.DEEPSEEK_MODEL || 'deepseek-chat').split(',').map((s) => s.trim()).filter(Boolean),
+    });
+  }
 
   if (openRouterKey) {
     layers.push({
@@ -669,7 +687,7 @@ async function executeResilientAIPipeline(params: {
     for (let mi = 0; mi < layer.models.length; mi++) {
       if (abandonLayer || deadline - Date.now() < 700) break;
       const model = layer.models[mi];
-      const maxTries = isLast ? 2 : 1; // la última capa tiene una segunda oportunidad por modelo (503 alta demanda)
+      const maxTries = isLast || i === 0 ? 2 : 1; // la capa principal (DeepSeek) y la última merecen un reintento propio
 
       for (let t = 0; t < maxTries; t++) {
         const callTimeout = Math.min(deadline - Date.now(), modelTryMs);
