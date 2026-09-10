@@ -1,5 +1,6 @@
-const GOOGLE_API_KEY = import.meta.env.VITE_GOOGLE_TTS_API_KEY || '';
-const isGoogleTTSAvailable = !!GOOGLE_API_KEY;
+// La clave de Google TTS vive SOLO en el servidor (GOOGLE_TTS_API_KEY).
+// El cliente pide el audio a /api/tts; si el servidor no tiene clave, cae a la voz del navegador.
+let serverTTSDisabled = false;
 
 export interface TTSOptions {
   messageId: string;
@@ -23,22 +24,6 @@ interface TTSService {
   clearCache: () => void;
 }
 
-const FEMALE_FIRST_NAMES = [
-  'sofia', 'sarah', 'valentina', 'carla', 'clara', 'lucia', 'maya',
-  'emma', 'pincelita', 'mariana', 'camila', 'valeria', 'paula', 'maria',
-];
-
-const isTeacherFemale = (teacherName: string): boolean => {
-  if (!teacherName) return false;
-  const lower = teacherName.toLowerCase().trim();
-  const parts = lower.replace(/[.,]/g, '').split(/\s+/);
-  if (parts.some((p) => FEMALE_FIRST_NAMES.includes(p))) return true;
-  if (lower.includes('dra.') || lower.includes('maestra') || lower.includes('profesora') ||
-      lower.includes('miss') || lower.includes('tía ') || lower.includes('tia ') ||
-      lower.includes('mba')) return true;
-  return false;
-};
-
 const synthesizeWithBrowser = (opts: TTSOptions): void => {
   if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
   window.speechSynthesis.cancel();
@@ -51,24 +36,27 @@ const synthesizeWithBrowser = (opts: TTSOptions): void => {
 };
 
 const fetchGoogleAudio = async (opts: TTSOptions): Promise<string | null> => {
-  if (!isGoogleTTSAvailable) return null;
-  const isFemale = isTeacherFemale(opts.teacherName);
-  const voiceName = isFemale ? 'es-US-Neural2-A' : 'es-US-Neural2-B';
-  const cleanText = opts.text.replace(/[*_#`~]/g, '').substring(0, 5000);
-  const response = await fetch(`https://texttospeech.googleapis.com/v1/text:synthesize?key=${GOOGLE_API_KEY}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      input: { text: cleanText },
-      voice: { languageCode: 'es-US', name: voiceName },
-      audioConfig: { audioEncoding: 'MP3', speakingRate: 1.05, pitch: isFemale ? 1.0 : -2.0 },
-    }),
-  });
-  const data = await response.json();
-  if (data.audioContent) {
-    return 'data:audio/mp3;base64,' + data.audioContent;
+  if (serverTTSDisabled) return null;
+  const cleanText = opts.text.replace(/[*_#`~]/g, '').slice(0, 5000);
+  try {
+    const response = await fetch('/api/tts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: cleanText, teacherName: opts.teacherName }),
+    });
+    if (!response.ok) {
+      // 503 = servidor sin clave TTS; 404 = endpoint no disponible. No reintentar en esta sesión.
+      if (response.status === 503 || response.status === 404) serverTTSDisabled = true;
+      return null;
+    }
+    const data = await response.json();
+    if (data?.audioContent) {
+      return 'data:audio/mp3;base64,' + data.audioContent;
+    }
+    return null;
+  } catch {
+    return null;
   }
-  return null;
 };
 
 const playWithGoogle = async (opts: TTSOptions): Promise<void> => {

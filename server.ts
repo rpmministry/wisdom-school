@@ -202,11 +202,75 @@ app.get('/api/health', async (req: Request, res: Response) => {
       geminiConfigured: isUsableGeminiKey(process.env.GEMINI_API_KEY),
       openRouterConfigured: Boolean(process.env.OPENROUTER_API_KEY?.trim()),
       openCodeConfigured: Boolean(process.env.OPENCODE_API_KEY?.trim()),
+      ttsConfigured: Boolean(process.env.GOOGLE_TTS_API_KEY?.trim() || process.env.GEMINI_API_KEY?.trim()),
       freeFirst: !process.env.DEEPSEEK_API_KEY?.trim(),
       hierarchy: hierarchySummary,
     },
     time: new Date().toISOString(),
   });
+});
+
+// --- TTS: voz Neuronal2 de Google (la clave vive SOLO en el servidor) ---
+// El cliente pide el audio aquí; nunca ve la API key.
+const TTS_FEMALE_FIRST_NAMES = [
+  'sofia', 'sarah', 'valentina', 'carla', 'clara', 'lucia', 'maya',
+  'emma', 'pincelita', 'mariana', 'camila', 'valeria', 'paula', 'maria',
+];
+
+function isFemaleTeacherName(teacherName: string): boolean {
+  const lower = (teacherName || '').toLowerCase().trim();
+  if (!lower) return false;
+  const parts = lower.replace(/[.,]/g, '').split(/\s+/);
+  if (parts.some((p) => TTS_FEMALE_FIRST_NAMES.includes(p))) return true;
+  return ['dra.', 'maestra', 'profesora', 'miss', 'tía ', 'tia ', 'mba'].some((t) => lower.includes(t));
+}
+
+function getTTSKeys(): string[] {
+  return [process.env.GOOGLE_TTS_API_KEY, process.env.GEMINI_API_KEY]
+    .map((k) => (k || '').trim())
+    .filter(Boolean)
+    .filter((k, i, arr) => arr.indexOf(k) === i);
+}
+
+app.post('/api/tts', async (req: Request, res: Response) => {
+  try {
+    const { text, teacherName } = req.body || {};
+    if (!text || typeof text !== 'string' || !text.trim()) {
+      return res.status(400).json({ error: 'text_required' });
+    }
+
+    const keys = getTTSKeys();
+    if (keys.length === 0) {
+      return res.status(503).json({ error: 'tts_not_configured' });
+    }
+
+    const isFemale = isFemaleTeacherName(teacherName || '');
+    const voiceName = isFemale ? 'es-US-Neural2-A' : 'es-US-Neural2-B';
+    const cleanText = text.replace(/[*_#`~]/g, '').slice(0, 5000);
+
+    let lastDetail = '';
+    for (const key of keys) {
+      const r = await fetch(`https://texttospeech.googleapis.com/v1/text:synthesize?key=${encodeURIComponent(key)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          input: { text: cleanText },
+          voice: { languageCode: 'es-US', name: voiceName },
+          audioConfig: { audioEncoding: 'MP3', speakingRate: 1.05, pitch: isFemale ? 1.0 : -2.0 },
+        }),
+      });
+      if (r.ok) {
+        const data: any = await r.json().catch(() => null);
+        if (data?.audioContent) return res.json({ audioContent: data.audioContent, voice: voiceName });
+        lastDetail = 'respuesta sin audioContent';
+      } else {
+        lastDetail = (await r.text().catch(() => '')).slice(0, 200);
+      }
+    }
+    return res.status(502).json({ error: 'tts_failed', detail: lastDetail });
+  } catch (err: any) {
+    return res.status(500).json({ error: 'tts_error', message: err?.message || String(err) });
+  }
 });
 
 function wait(ms: number) {
