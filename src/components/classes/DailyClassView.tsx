@@ -4,10 +4,9 @@ import { useScrollToTopOnChange } from '../../hooks/useScrollToTopOnChange';
 import { scrollAppToTop } from '../../utils/scrollToTop';
 import { DailyClass, ClassActivity } from '../../types';
 import { formatYouTubeEmbedUrl, getYouTubeWatchUrl, getYouTubeSearchUrl } from '../../utils/youtube';
-import { downloadClassGuide, routeGuideContent } from '../../utils/guideGenerator';
-import { downloadConsolidatedDailyGuide } from '../../utils/consolidatedGuideGenerator';
+import { downloadClassGuide, downloadDailyGuidesBundle, routeGuideContent, DailyGuideBundleItem } from '../../utils/guideGenerator';
+import { requestGuideContent, requestLessonBite, readCachedBiteSteps } from '../../services/aiService';
 import { ActivityDetailModal } from '../activities/ActivityDetailModal';
-import { requestGuideContent, requestLessonBite } from '../../services/aiService';
 import { ClassVideoPlayer } from './ClassVideoPlayer';
 import { MicroLessonPlayer } from './MicroLessonPlayer';
 import { ClassTeacherChat } from './ClassTeacherChat';
@@ -59,6 +58,7 @@ export const DailyClassView: React.FC = () => {
   const [downloadSuccess, setDownloadSuccess] = useState(false);
   const [isGeneratingGuide, setIsGeneratingGuide] = useState(false);
   const [routeSteps, setRouteSteps] = useState<{ title: string; text: string }[]>([]);
+  const [batchProgress, setBatchProgress] = useState<{ done: number; total: number } | null>(null);
   const routeStepsForClass = useRef<string | null>(null);
   const [selectedActivityForModal, setSelectedActivityForModal] = useState<ClassActivity | null>(null);
   const [completedSteps, setCompletedSteps] = useState<Set<string>>(new Set());
@@ -88,8 +88,10 @@ export const DailyClassView: React.FC = () => {
 
   const handleDownloadGuide = async (mode?: 'single' | 'consolidated') => {
     if (mode === 'consolidated' || (mode === undefined && todayClasses.length > 1)) {
-      renderConsolidatedGuide();
-    } else if (currentClass) {
+      void renderConsolidatedGuide();
+      return;
+    }
+    if (currentClass) {
       setIsGeneratingGuide(true);
       try {
         // Asegurar los 3 conceptos reales ANTES de componer (cache: lo ya generado no gasta red).
@@ -125,17 +127,37 @@ export const DailyClassView: React.FC = () => {
     setTimeout(() => setDownloadSuccess(false), 4000);
   };
 
-  const renderConsolidatedGuide = () => {
+  // DESCARGA POR LOTES: todas las asignaturas del horario del día → un único PDF combinado.
+  // Por cada clase reutiliza los pasos REALES ya generados en la Ruta Interactiva (caché local, sin red);
+  // si la IA responde, añade intro y taller A/B; si no, compone localmente con esos mismos pasos.
+  const renderConsolidatedGuide = async () => {
     const dayClasses = todayClasses.filter((c: any) => c.studentId === currentStudent.id);
-    const daySubjects = studentSubjects.filter((s: any) => dayClasses.some((c: any) => c.subjectId === s.id));
-    const date = selectedDayOfWeek === 'Lunes' ? '07 Sep' : selectedDayOfWeek === 'Martes' ? '08 Sep' : selectedDayOfWeek === 'Miércoles' ? '09 Sep' : selectedDayOfWeek === 'Jueves' ? '10 Sep' : '11 Sep';
-    downloadConsolidatedDailyGuide({
-      student: currentStudent,
-      dayClasses,
-      daySubjects,
-      selectedDay: selectedDayOfWeek,
-      dateStr: date
-    });
+    if (!dayClasses.length) return;
+    const dateStr = String(dayClasses.map((c: any) => c.date).find(Boolean) || 'Fecha del día');
+    setBatchProgress({ done: 0, total: dayClasses.length });
+    try {
+      const items: DailyGuideBundleItem[] = [];
+      let done = 0;
+      for (const cls of dayClasses) {
+        done++;
+        setBatchProgress({ done, total: dayClasses.length });
+        const subj: any = studentSubjects.find((s: any) => s.id === cls.subjectId) || subject;
+        let steps = readCachedBiteSteps(currentStudent, cls, 3);
+        if (steps.length < 2 && routeStepsForClass.current === cls.id && routeSteps.length >= 2) steps = routeSteps;
+        let ai: any = null;
+        if (steps.length >= 2 && subj) {
+          try {
+            ai = await requestGuideContent({ student: currentStudent, subject: subj, dailyClass: cls, steps });
+          } catch { ai = null; }
+          if (!ai) ai = routeGuideContent(steps as any, { theme: cls.theme, studentName: currentStudent.name, subjectName: subj.name, withSplit: /cienc|mat|natur|hist|bio|quim/i.test(`${subj.id}${subj.name}`) });
+        }
+        items.push({ currentClass: cls as DailyClass, subject: subj, ai });
+      }
+      downloadDailyGuidesBundle({ studentName: currentStudent.name, studentGrade: currentStudent.grade, dateStr, dayLabel: selectedDayOfWeek, items });
+      setDownloadSuccess(true);
+      setTimeout(() => setDownloadSuccess(false), 5000);
+    } catch { /* si algo falla, la vista nunca se rompe */ }
+    finally { setBatchProgress(null); }
   };
 
   const handleStepClick = (stepId: string) => {
@@ -399,11 +421,20 @@ export const DailyClassView: React.FC = () => {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <button onClick={() => handleDownloadGuide('single')} disabled={isGeneratingGuide} className="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-70 disabled:cursor-wait text-white font-bold text-xs shadow-md transition-all flex items-center justify-center gap-2">
+                  <button onClick={() => handleDownloadGuide('single')} disabled={isGeneratingGuide || !!batchProgress} className="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-70 disabled:cursor-wait text-white font-bold text-xs shadow-md transition-all flex items-center justify-center gap-2">
                     <Download className={`w-4 h-4 ${isGeneratingGuide ? "animate-bounce" : ""}`} /><span>{isGeneratingGuide ? "Desarrollando tu guía…" : "Descargar Guía Didáctica"}</span>
                   </button>
+                  <button onClick={() => handleDownloadGuide('consolidated')} disabled={isGeneratingGuide || !!batchProgress} className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-70 disabled:cursor-wait text-white font-bold text-xs shadow-md transition-all flex items-center justify-center gap-2">
+                    <Layers className={`w-4 h-4 ${batchProgress ? "animate-pulse" : ""}`} />
+                    <span>
+                      {batchProgress
+                        ? `Generando guía ${batchProgress.done}/${batchProgress.total}…`
+                        : `Descargar las ${todayClasses.filter((c: any) => c.studentId === currentStudent.id).length} guías del día (PDF combinado)`}
+                    </span>
+                  </button>
                   {downloadSuccess && <p className="text-xs text-emerald-400 text-center font-semibold animate-fade-in">✓ Guía lista para imprimir o firmar.</p>}
-                  {isGeneratingGuide && <p className="text-[10px] text-indigo-300 text-center">Toma 5-15 s: es contenido real desarrollado para este tema, no una plantilla vacía.</p>}
+                  {(isGeneratingGuide || batchProgress) && <p className="text-[10px] text-indigo-300 text-center">Contenido real de tus clases; puede tardar unos segundos por asignatura.</p>}
+                  <p className="text-[10px] text-slate-500 text-center leading-relaxed">El PDF combinado incluye una portada con el horario del día y una página por asignatura.</p>
                 </div>
               </div>
 

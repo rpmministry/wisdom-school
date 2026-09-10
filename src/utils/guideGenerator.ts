@@ -248,19 +248,123 @@ export function downloadClassGuide(
   let raw = currentClass.guideTitle || `Guia_${subject?.code || "clase"}_${currentClass.theme}.html`;
   raw = raw.replace(/\.pdf$/i, ".html");
   if (!raw.endsWith(".html")) raw += ".html";
+  downloadHTML(html, raw);
+}
 
+// ============================================================
+// DESCARGA POR LOTES: un único PDF combinado con TODAS las guías
+// didácticas del día (una página por asignatura + portada).
+// Reutiliza el MISMO diseño de la guía individual extrayendo su
+// <style> y su <body> generados por nosotros (contrato estable).
+// Reconstruye el diseño de una guía individual extrayendo su CSS y su cuerpo.
+const extractGuideParts = (html: string): { css: string; body: string } => {
+  const css = html.match(/<style>([\s\S]*?)<\/style>/i)?.[1] || "";
+  let body = html.split(/<body[^>]*>/i)[1]?.split(/<\/body>/i)[0] || html;
+  body = body.replace(/<div class="print-btn-bar">[\s\S]*?<\/div>/i, ""); // una sola barra de impresión: en la portada
+  return { css, body: body.trim() };
+};
+
+const downloadHTML = (html: string, filename: string): void => {
   const blob = new Blob([html], { type: "text/html;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = raw;
+  a.download = filename;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
-
   try {
     const win = window.open("", "_blank");
     if (win) { win.document.write(html); win.document.close(); }
   } catch { /* bloqueado: la descarga ya ocurrió */ }
+};
+
+export interface DailyGuideBundleItem {
+  currentClass: DailyClass;
+  subject?: Subject;
+  ai?: GuideAiContent | null;
+}
+
+// Un solo documento imprimible = un solo PDF combinado al usar Imprimir → Guardar como PDF.
+export function generateDailyGuidesBundleHTML(opts: {
+  studentName: string;
+  studentGrade: string;
+  dateStr: string;
+  dayLabel?: string;
+  items: DailyGuideBundleItem[];
+}): string {
+  const { studentName, studentGrade, dateStr, dayLabel } = opts;
+  const items = (opts.items || []).filter((it) => it && it.currentClass);
+  const parts = items.map((it) => extractGuideParts(generateClassGuideHTML(it.currentClass, it.subject, studentName, studentGrade, it.ai ?? null)));
+  const css = parts[0]?.css || "";
+  const printBar = `<div class="print-btn-bar"><button class="btn-print" onclick="window.print()">🖨️ Imprimir / Guardar PDF combinado</button></div>`;
+
+  const cover = `
+  <section class="cover">
+    <div class="brand">
+      <span class="ws">☀️ WISDOM SCHOOL</span>
+      <small>ECUADOR · 2026-2027 · CONFESIÓN EVANGÉLICA</small>
+    </div>
+    <h1>Guías Didácticas del Día <span style="color:#64748b">|</span> PDF combinado</h1>
+    <div class="sub">${items.length} asignatura${items.length === 1 ? "" : "s"} programada${items.length === 1 ? "" : "s"} en el horario escolar</div>
+    <div class="cover-meta">
+      <span><b>Alumno:</b> ${esc(studentName)}</span>
+      <span><b>Grado:</b> ${esc(studentGrade)}</span>
+      <span><b>Fecha:</b> ${esc(dateStr)}</span>
+      ${dayLabel ? `<span><b>Día escolar:</b> ${esc(dayLabel)}</span>` : ""}
+    </div>
+    <div class="cover-box">
+      <strong style="font:700 12px 'Segoe UI'; color:#1e3a8a;">Contenido de este documento</strong>
+      <ol class="cover-list">
+        ${items.map((it) => `<li><b>${esc(it.subject?.name || "Materia")}</b> — ${esc(it.currentClass.theme)} <span style="color:#64748b">(Paso a paso + Taller A/B)</span></li>`).join("")}
+      </ol>
+    </div>
+    <p style="font-size:11px;color:#475569;text-align:justify;">Cada asignatura ocupa su propia página al imprimir: usa <b>Imprimir / Guardar PDF combinado</b> y elige «Guardar como PDF» para obtener un único archivo con todas las guías del día, listas para trabajar y firmar.</p>
+    <div class="fin">
+      <div class="firma">Firma del estudiante</div>
+      <div class="firma">Firma del representante / docente guía</div>
+    </div>
+    <div style="text-align:center;color:#94a3b8;font-size:9px;margin-top:14px;">Wisdom School · Paquete diario de guías didácticas · ${esc(dateStr)}</div>
+  </section>`;
+
+  const sections = parts
+    .map((p, i) => `<section class="guia${i > 0 ? " salto" : ""}" data-index="${i + 1}">${p.body}</section>`)
+    .join("\n");
+
+  return `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Guías Didácticas del Día — ${esc(dateStr)}</title>
+  <style>${css}
+    .cover { page-break-after: always; }
+    .cover h1 { margin-top: 10px; }
+    .cover-meta { display:flex; flex-wrap:wrap; gap:14px; font:10.5px 'Segoe UI',Arial; color:#475569; border-bottom:1px solid #cbd5e1; padding-bottom:8px; margin-bottom:12px; }
+    .cover-box { border:1.5px solid #cbd5e1; border-radius:8px; padding:10px 16px; margin:10px 0; }
+    .cover-list { font:12px 'Segoe UI',Arial; color:#1f2937; margin:6px 0 2px 18px; padding:0; }
+    .cover-list li { margin-bottom:4px; }
+    section.guia.salto { page-break-before: always; }
+    section.guia { page-break-inside: auto; }
+  </style>
+</head>
+<body>
+  ${printBar}
+  ${cover}
+  ${sections}
+</body>
+</html>`;
+}
+
+export function downloadDailyGuidesBundle(opts: {
+  studentName: string;
+  studentGrade: string;
+  dateStr: string;
+  dayLabel?: string;
+  items: DailyGuideBundleItem[];
+}): void {
+  const html = generateDailyGuidesBundleHTML(opts);
+  const safeDate = (opts.dateStr || "dia").replace(/[^\w\-]+/g, "_");
+  const safeStudent = (opts.studentName || "estudiante").split(" ")[0].replace(/[^\w\-]+/g, "");
+  downloadHTML(html, `Guias_Didacticas_${safeDate}_${safeStudent}.html`);
 }

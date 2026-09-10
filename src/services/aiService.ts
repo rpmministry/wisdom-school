@@ -210,6 +210,23 @@ export async function requestGuideContent(req: {
   }
 }
 
+// Lee los pasos de la ruta YA generados para una clase, sin tocar la red (para la descarga por lotes del día).
+// Devuelve [] si esa clase aún no tiene micro-lecciones generadas.
+export function readCachedBiteSteps(student: Student, dailyClass: DailyClass, total = 3): { title: string; text: string }[] {
+  const out: { title: string; text: string }[] = [];
+  const dateKey = dailyClass?.date || new Date().toISOString().slice(0, 10);
+  for (let i = 1; i <= total; i++) {
+    try {
+      const raw = localStorage.getItem(biteCacheKey(student?.id || 'x', dailyClass?.id || 'c', dateKey, i));
+      const l = raw ? JSON.parse(raw)?.lesson : null;
+      if (l && typeof l.theory === 'string' && l.theory.trim()) {
+        out.push({ title: String(l.title || `Lección ${i}`), text: [l.theory, l.analogy, l.example].filter(Boolean).join(' ') });
+      }
+    } catch { /* entrada corrupta: se ignora */ }
+  }
+  return out;
+}
+
 // Re-explicación afectuosa con sustento teórico (usa /api/ai/reexplain; null => el UI mantiene la explicación determinista).
 export async function requestReExplanation(req: {
   student: Student;
