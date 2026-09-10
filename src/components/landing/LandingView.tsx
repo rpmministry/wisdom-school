@@ -4,6 +4,7 @@ import { SchoolLogo } from '../common/SchoolLogo';
 import { StudentAvatar } from '../common/StudentAvatar';
 import { Footer } from '../layout/Footer';
 import { NewStudentModal } from './NewStudentModal';
+import { AccessRestrictedModal } from '../auth/AccessRestrictedModal';
 import { CurriculumLevelsSection } from './CurriculumLevelsSection';
 import { AITeacherTryoutWidget } from './AITeacherTryoutWidget';
 import {
@@ -49,6 +50,7 @@ export const LandingView: React.FC = () => {
     : false;
 
   const [admissionModalOpen, setAdmissionModalOpen] = useState(false);
+  const [restrictedEmail, setRestrictedEmail] = useState<string | null>(null);
 
   const googleButtonRef = useRef<HTMLDivElement>(null);
   const [googleReady, setGoogleReady] = useState(false);
@@ -78,11 +80,14 @@ export const LandingView: React.FC = () => {
         return;
       }
 
-      const found = studentsList.find((s) => s.email?.toLowerCase() === email);
+      // Lista blanca: solo alumnos inscritos (los perfiles demo entran por su propia vía, sin Google).
+      const found = studentsList.find((s) => !s.isDemo && s.email?.toLowerCase() === email);
 
       if (!found) {
-        console.error(`Cuenta de Google (${email}) no registrada en Wisdom School`);
-        alert(`Tu cuenta de Google (${email}) no está registrada en Wisdom School. Contacta a la administración.`);
+        // Auth Guard: se detiene el acceso y se muestra la cápsula de información en vez de un error.
+        console.warn(`[AuthGuard] Cuenta de Google no registrada en Wisdom School: ${email}`);
+        try { window.google?.accounts?.id?.disableAutoSelect?.(); } catch { /* no-op */ }
+        setRestrictedEmail(email);
         return;
       }
 
@@ -455,6 +460,13 @@ export const LandingView: React.FC = () => {
           onClose={() => setAdmissionModalOpen(false)}
         />
       )}
+
+      {/* Cápsula de Información (Auth Guard) para cuentas de Google no inscritas. */}
+      <AccessRestrictedModal
+        isOpen={!!restrictedEmail}
+        onClose={() => setRestrictedEmail(null)}
+        email={restrictedEmail || undefined}
+      />
 
       <Footer />
     </div>

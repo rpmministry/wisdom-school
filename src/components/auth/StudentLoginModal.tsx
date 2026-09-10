@@ -3,6 +3,7 @@ import { useSchool } from '../../context/SchoolContext';
 import { Student } from '../../types';
 import { SchoolLogo } from '../common/SchoolLogo';
 import { StudentAvatar } from '../common/StudentAvatar';
+import { AccessRestrictedModal } from './AccessRestrictedModal';
 import {
   Lock,
   KeyRound,
@@ -46,6 +47,7 @@ const {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [googleReady, setGoogleReady] = useState(false);
+  const [restrictedEmail, setRestrictedEmail] = useState<string | null>(null);
   const googleButtonRef = useRef<HTMLDivElement>(null);
 
   // Clear form fields when modal closes
@@ -55,6 +57,7 @@ const {
       setPassword('');
       setErrorMsg(null);
       setSuccessMsg(null);
+      setRestrictedEmail(null);
     }
   }, [isOpen]);
 
@@ -84,12 +87,17 @@ const {
         return;
       }
 
-      const found = studentsList.find((s) => s.email?.toLowerCase() === email);
+      // Lista blanca: solo alumnos inscritos (los perfiles demo acceden por otra vía, sin Google).
+      const found = studentsList.find((s) => !s.isDemo && s.email?.toLowerCase() === email);
 
       if (!found) {
-        setErrorMsg(
-          `Tu cuenta de Google (${email}) no está registrada en Wisdom School. Contacta a la administración.`
-        );
+        // Auth Guard: interceptor de cuentas no inscritas.
+        // Se detiene la autenticación, se limpia el token temporal y se muestra la cápsula de contacto.
+        setErrorMsg(null);
+        setIdentifier('');
+        setPassword('');
+        try { window.google?.accounts?.id?.disableAutoSelect?.(); } catch { /* no-op */ }
+        setRestrictedEmail(email);
         return;
       }
 
@@ -201,6 +209,7 @@ try {
   if (!isOpen) return null;
 
   return (
+    <>
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in">
       <div className="relative w-full max-w-md bg-slate-900 border border-slate-700/80 rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] text-slate-100">
         
@@ -311,5 +320,13 @@ try {
         </div>
       </div>
     </div>
+
+      {/* Cápsula de Información: se activa cuando el Auth Guard rechaza una cuenta no inscrita. */}
+      <AccessRestrictedModal
+        isOpen={!!restrictedEmail}
+        onClose={() => setRestrictedEmail(null)}
+        email={restrictedEmail || undefined}
+      />
+    </>
   );
 };
