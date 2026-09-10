@@ -371,11 +371,13 @@ export function downloadDailyGuidesBundle(opts: {
   dateStr: string;
   dayLabel?: string;
   items: DailyGuideBundleItem[];
-}): void {
+}): string {
   const html = generateDailyGuidesBundleHTML(opts);
   const n = new Date();
   const hhmm = `${String(n.getHours()).padStart(2, '0')}${String(n.getMinutes()).padStart(2, '0')}`;
   const safeDate = (opts.dateStr || "dia").replace(/[^\w\-]+/g, "_");
   const safeStudent = (opts.studentName || "estudiante").split(" ")[0].replace(/[^\w\-]+/g, "");
-  downloadHTML(html, `Guias_Didacticas_${safeDate}_${safeStudent}_${hhmm}.html`);
+  const filename = `Guias_Didacticas_${safeDate}_${safeStudent}_${hhmm}.html`;
+  downloadHTML(html, filename);
+  return filename;
 }

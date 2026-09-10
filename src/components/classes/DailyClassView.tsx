@@ -59,6 +59,7 @@ export const DailyClassView: React.FC = () => {
   const [isGeneratingGuide, setIsGeneratingGuide] = useState(false);
   const [routeSteps, setRouteSteps] = useState<{ title: string; text: string }[]>([]);
   const [batchProgress, setBatchProgress] = useState<{ done: number; total: number } | null>(null);
+  const [batchMessage, setBatchMessage] = useState<{ kind: 'ok' | 'warn' | 'error'; text: string } | null>(null);
   const routeStepsForClass = useRef<string | null>(null);
   const [selectedActivityForModal, setSelectedActivityForModal] = useState<ClassActivity | null>(null);
   const [completedSteps, setCompletedSteps] = useState<Set<string>>(new Set());
@@ -131,8 +132,18 @@ export const DailyClassView: React.FC = () => {
   // Por cada clase reutiliza los pasos REALES ya generados en la Ruta Interactiva (caché local, sin red);
   // si la IA responde, añade intro y taller A/B; si no, compone localmente con esos mismos pasos.
   const renderConsolidatedGuide = async () => {
-    const dayClasses = todayClasses.filter((c: any) => c.studentId === currentStudent.id);
-    if (!dayClasses.length) return;
+    setBatchMessage(null);
+    // 1) Asignaturas programadas para el día seleccionado. Si el día no tuviera clases, usa el día de la clase activa.
+    let dayClasses = todayClasses.filter((c: any) => c.studentId === currentStudent.id);
+    let origenDia = 'horario del día seleccionado';
+    if (!dayClasses.length && currentClass?.date) {
+      dayClasses = allStudentClasses.filter((c: any) => c.studentId === currentStudent.id && c.date === currentClass.date);
+      origenDia = 'horario del día de la clase activa';
+    }
+    if (!dayClasses.length) {
+      setBatchMessage({ kind: 'warn', text: 'No hay asignaturas programadas en el horario para este día. Cambia de día en el selector y vuelve a intentar.' });
+      return;
+    }
     const dateStr = String(dayClasses.map((c: any) => c.date).find(Boolean) || 'Fecha del día');
     setBatchProgress({ done: 0, total: dayClasses.length });
     try {
@@ -153,11 +164,14 @@ export const DailyClassView: React.FC = () => {
         }
         items.push({ currentClass: cls as DailyClass, subject: subj, ai });
       }
-      downloadDailyGuidesBundle({ studentName: currentStudent.name, studentGrade: currentStudent.grade, dateStr, dayLabel: selectedDayOfWeek, items });
+      const filename = downloadDailyGuidesBundle({ studentName: currentStudent.name, studentGrade: currentStudent.grade, dateStr, dayLabel: selectedDayOfWeek, items });
+      setBatchMessage({ kind: 'ok', text: `Diario listo: ${items.length} guía${items.length === 1 ? '' : 's'} (${origenDia}) en un solo documento → ${filename}. Ábrelo y usa «Imprimir / Guardar PDF combinado».` });
+      setTimeout(() => setBatchMessage(null), 15000);
       setDownloadSuccess(true);
       setTimeout(() => setDownloadSuccess(false), 5000);
-    } catch { /* si algo falla, la vista nunca se rompe */ }
-    finally { setBatchProgress(null); }
+    } catch (e: any) {
+      setBatchMessage({ kind: 'error', text: `No se pudo armar el diario: ${e?.message || 'error inesperado'}. Vuelve a intentarlo.` });
+    } finally { setBatchProgress(null); }
   };
 
   const handleStepClick = (stepId: string) => {
@@ -262,9 +276,20 @@ export const DailyClassView: React.FC = () => {
                     {subject.teacher.name} preparó tu ruta en mini-lecciones con retos. Avanza una tarjeta a la vez, responde con opción múltiple y usa el chat con él/ella cuando lo necesites.
                   </p>
                 </div>
-                <button onClick={() => handleDownloadGuide('single')} disabled={isGeneratingGuide} className="w-full sm:w-auto px-5 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-70 disabled:cursor-wait text-slate-950 font-black text-xs shadow-lg transition-all flex items-center justify-center gap-2">
-                  <Download className={`w-4 h-4 ${isGeneratingGuide ? "animate-bounce" : ""}`} /> {isGeneratingGuide ? "Desarrollando tu guía…" : "Descargar Guía Didáctica"}
-                </button>
+                <div className="w-full sm:w-auto flex flex-col gap-2">
+                  <button onClick={() => handleDownloadGuide('single')} disabled={isGeneratingGuide || !!batchProgress} className="w-full sm:w-auto px-5 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-70 disabled:cursor-wait text-slate-950 font-black text-xs shadow-lg transition-all flex items-center justify-center gap-2">
+                    <Download className={`w-4 h-4 ${isGeneratingGuide ? "animate-bounce" : ""}`} /> {isGeneratingGuide ? "Desarrollando tu guía…" : "Descargar Guía Didáctica"}
+                  </button>
+                  <button onClick={() => handleDownloadGuide('consolidated')} disabled={isGeneratingGuide || !!batchProgress} className="w-full sm:w-auto px-5 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 disabled:opacity-70 disabled:cursor-wait text-slate-950 font-black text-xs shadow-lg transition-all flex items-center justify-center gap-2">
+                    <Layers className={`w-4 h-4 ${batchProgress ? "animate-pulse" : ""}`} />
+                    {batchProgress
+                      ? `Generando diario ${batchProgress.done}/${batchProgress.total}…`
+                      : `Descargar diario del día (${todayClasses.filter((c: any) => c.studentId === currentStudent.id).length} materias)`}
+                  </button>
+                  {batchMessage && (
+                    <p className={`text-[11px] font-semibold max-w-xs ${batchMessage.kind === 'ok' ? 'text-emerald-300' : batchMessage.kind === 'warn' ? 'text-amber-300' : 'text-rose-300'}`}>{batchMessage.text}</p>
+                  )}
+                </div>
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
@@ -428,11 +453,14 @@ export const DailyClassView: React.FC = () => {
                     <Layers className={`w-4 h-4 ${batchProgress ? "animate-pulse" : ""}`} />
                     <span>
                       {batchProgress
-                        ? `Generando guía ${batchProgress.done}/${batchProgress.total}…`
-                        : `Descargar las ${todayClasses.filter((c: any) => c.studentId === currentStudent.id).length} guías del día (PDF combinado)`}
+                        ? `Generando diario ${batchProgress.done}/${batchProgress.total}…`
+                        : `Descargar diario del día (${todayClasses.filter((c: any) => c.studentId === currentStudent.id).length} materias)`}
                     </span>
                   </button>
-                  {downloadSuccess && <p className="text-xs text-emerald-400 text-center font-semibold animate-fade-in">✓ Guía lista para imprimir o firmar.</p>}
+                  {downloadSuccess && <p className="text-xs text-emerald-400 text-center font-semibold animate-fade-in">✓ Documento listo para imprimir o firmar.</p>}
+                  {batchMessage && (
+                    <p className={`text-[11px] text-center font-semibold ${batchMessage.kind === 'ok' ? 'text-emerald-300' : batchMessage.kind === 'warn' ? 'text-amber-300' : 'text-rose-300'}`}>{batchMessage.text}</p>
+                  )}
                   {(isGeneratingGuide || batchProgress) && <p className="text-[10px] text-indigo-300 text-center">Contenido real de tus clases; puede tardar unos segundos por asignatura.</p>}
                   <p className="text-[10px] text-slate-500 text-center leading-relaxed">El PDF combinado incluye una portada con el horario del día y una página por asignatura.</p>
                 </div>
