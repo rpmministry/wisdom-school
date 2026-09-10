@@ -1,507 +1,233 @@
-import { DailyClass, Subject } from '../types';
+import { DailyClass, Subject } from "../types";
 
-/**
- * Generates an official, printable educational worksheet (Guía de Trabajo)
- * formatted according to Ministry of Education / Wisdom School standards.
- */
+// Tipos del contenido desarrollado por IA (POST /api/ai/guide-content)
+export interface GuideStep { title: string; text: string }
+export interface GuideAiContent {
+  intro: string;
+  steps: GuideStep[];        // 2-3 pasos con nombre real del contenido
+  questionA: string;         // A. Expresa con tus propias palabras
+  questionB: string;         // B. Pensamiento crítico (escenario + mayordomía)
+  providerUsed?: string;
+}
+
+const clean = (s: string, max = 300): string => (s || "").replace(/\s+/g, " ").trim().slice(0, max).replace(/[,;:\s]+$/g, "");
+const firstSentences = (s: string, n = 3): string => (s || "").split(/(?<=[.!?])\s+/).filter(Boolean).slice(0, n).join(" ");
+const chunkList = <T,>(arr: T[], k: number): T[][] => {
+  const out: T[][] = [];
+  for (let i = 0; i < arr.length; i += k) out.push(arr.slice(i, i + k));
+  return out;
+};
+
+// Fallback determinista: DESARROLLA con el texto real de la lección (reading/introduction),
+// nunca con etiquetas metodológicas. Se usa si la IA no responde.
+const buildFromReading = (c: DailyClass): GuideAiContent => {
+  const src = clean(c.reading || c.introduction || `Hoy trabajamos "${c.theme}". ${c.objective || ""}`, 1000);
+  const sentences = src.split(/(?<=[.!?])\s+/).filter((s) => s.trim().length > 25);
+  const intro = clean(sentences.shift() || firstSentences(src, 1), 260);
+  const groups = chunkList(sentences.slice(0, 12), Math.max(1, Math.ceil(Math.min(sentences.length, 12) / 3) || 1)).slice(0, 3);
+  const steps: GuideStep[] = groups.map((g, i) => {
+    const text = clean(g.join(" "), 230);
+    const firstWords = text.split(" ").slice(0, 6).join(" ").replace(/[.,;:].*$/, "");
+    return { title: `${firstWords.charAt(0).toUpperCase()}${firstWords.slice(1)}… (Parte ${i + 1})`, text };
+  });
+  const act = c.activities && c.activities[0];
+  if (!steps.length) steps.push({ title: `${clean(c.theme, 60)} (Idea central)`, text: firstSentences(src, 2) });
+  return {
+    intro,
+    steps: steps.length ? steps : [{ title: clean(c.theme, 60), text: firstSentences(src, 2) }],
+    questionA: clean(`¿Por qué este proceso de "${c.theme}" ocurre tal como lo leíste y no de otra manera? Respóndelo con tus palabras, como se lo explicarías a un compañero.`, 340),
+    questionB: clean(
+      (c.reflectionPrompt || `Imagina que algo falla en la parte ${steps.length > 1 ? "del proceso que más te costó" : "que aprendiste hoy"}. ¿Qué pasaría y cómo actuarías con responsabilidad?`) +
+        " Cierra explicando qué parte de esta mayordomía refleja el carácter de Dios.",
+      400
+    ),
+    providerUsed: act ? "fallback lectura real de la clase" : "fallback lectura real de la clase",
+  };
+};
+
+const withSplit = (subject?: Subject): boolean => {
+  const blob = `${subject?.id || ""} ${subject?.name || ""} ${subject?.description || ""}`.toLowerCase();
+  return /(cienc|natur|biolog|fisica|física|quimica|química|salud|cuerpo|ecolog|astro|matem|mat-|geo|hist)/.test(blob);
+};
+
+// Composición LOCAL de la guía a partir de los pasos que la ruta interactiva ya resolvió (con sus nombres reales).
+// Cero red, cero plantillas vacías: funciona incluso si todos los proveedores gratuitos caen, y garantiza
+// coherencia perfecta entre lo que el niño estudió y la guía que imprime.
+export function routeGuideContent(
+  routeSteps: GuideStep[],
+  meta: { theme: string; studentName: string; subjectName?: string; withSplit?: boolean }
+): GuideAiContent | null {
+  const steps = (routeSteps || [])
+    .filter((s) => s && typeof s.title === "string" && s.title.trim() && typeof s.text === "string" && s.text.trim().length > 30)
+    .slice(0, 3)
+    .map((s) => ({ title: clean(s.title, 80), text: clean(s.text, 300) }));
+  if (steps.length < 2) return null;
+  // "Continuación: X" / "Repaso: X" → quedarse con X para leer natural dentro de una frase.
+  const tema = clean(meta.theme.replace(/^(continuaci[oó]n|repaso|ampliaci[oó]n|conexi[oó]n)\s*[:\-–—]\s*/i, ""), 80);
+  const names = steps.map((s) => `«${clean(s.title.split("(")[0], 42)}»`).join(", ");
+  const ultimoNombre = clean(steps[steps.length - 1].title.split("(")[0], 42);
+  const intro = clean(
+    `En "${tema}" (${meta.subjectName || "tu materia"}) aprendiste una secuencia que no es casualidad: ${names}. Los primeros pasos ponen la base que te permite entender el tema; los últimos lo conectan con lo que ves cada día. Dios, en su sabiduría, puso orden y propósito en todo lo que hizo —y entender ese orden es el primer paso para cuidarlo.`,
+    470
+  );
+  // Sirve para cualquier ruta ordenada (procesos, categorías, historia): se pregunta por EL VINCULO entre pasos, no por un mecanismo inventado.
+  const questionA = clean(
+    `¿Qué aporta cada paso (${names}) para que "${tema}" se entienda completo? Da un ejemplo propio de cada uno y responde: ¿qué quedaría confuso si empezaríamos la lección al revés, desde «${ultimoNombre}» hacia el principio?`,
+    340
+  );
+  const q2 = meta.withSplit
+    ? " Al cerrar, llena dos cajas: 🧪 lo que has observado o puedes comprobar, y 📖 lo que Dios enseña sobre cuidarlo (orden, mayordomía, servicio)."
+    : " Cierra con una decisión concreta: \"Me comprometo a…\".";
+  const questionB = clean(
+    `Lleva el tema a tu vida: ¿qué pasaría con tu día a día si nunca pudieras aplicar «${ultimoNombre}»? ¿Qué parte de lo que Dios puso a tu cuidado se vería afectada, y qué harías tú para protegerlo?${q2}`,
+    430
+  );
+  return { intro, steps, questionA, questionB, providerUsed: "compuesta desde la ruta del estudiante (local)" };
+}
+
+const esc = (s: string): string => (s || "").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
 export function generateClassGuideHTML(
   currentClass: DailyClass,
   subject?: Subject,
-  studentName: string = 'Estudiante',
-  studentGrade: string = 'Educación General Básica'
+  studentName: string = "Estudiante",
+  studentGrade: string = "Educación General Básica",
+  ai?: GuideAiContent | null
 ): string {
-  const dateStr = currentClass.date || new Date().toLocaleDateString('es-EC');
-  const subjectName = subject?.name || 'Materia General';
-  const teacherName = subject?.teacher?.name || 'Docente Asignado';
-  const title = currentClass.theme || 'Guía de Trabajo Diaria';
+  const dateStr = currentClass.date || new Date().toLocaleDateString("es-EC");
+  const subjectName = subject?.name || "Materia General";
+  const teacherName = subject?.teacher?.name || "Docente Asignado";
+  const theme = currentClass.theme;
+  const unit = currentClass.unit || "Unidad Curricular";
+  const docTitle = clean(currentClass.guideTitle?.replace(/\.pdf$/i, "") || `Guía Didáctica — ${theme}`, 90);
+  const content: GuideAiContent = ai && ai.steps && ai.steps.length >= 2 ? ai : buildFromReading(currentClass);
+  const split = withSplit(subject);
 
-  const activitiesList = currentClass.activities || [];
-  const socraticQuestions = currentClass.socraticQuestions || [];
-  const timeBreakdown = currentClass.timeBreakdown || [];
-
-  const isAvril = currentClass.studentId === 'avril' || currentClass.studentId === 'karen' || studentName.toLowerCase().includes('avril') || studentName.toLowerCase().includes('karen');
-  const isGael = currentClass.studentId === 'gael' || studentName.toLowerCase().includes('gael');
-
-  const themeBannerHTML = isAvril
-    ? `
-    <div style="background: linear-gradient(135deg, #fef3c7 0%, #fffbe2 100%); border: 2px solid #f59e0b; border-radius: 10px; padding: 12px 16px; margin-bottom: 20px;">
-      <div style="display: flex; justify-content: space-between; align-items: center;">
-        <span style="font-weight: bold; color: #b45309; font-size: 13px;">🐶 MUNDO DE SNOOPY & PEANUTS • GUÍA DIDÁCTICA</span>
-        <span style="font-size: 10px; background-color: #fef3c7; color: #92400e; padding: 2px 8px; border-radius: 12px; font-weight: bold; border: 1px solid #fde68a;">Método Montessori & Charlotte Mason</span>
+  const stepsHtml = content.steps.map((s, i) => `
+    <div class="paso">
+      <span class="paso-n">Paso ${i + 1}</span>
+      <div class="paso-c">
+        <strong>${esc(clean(s.title, 90))}</strong>
+        <p>${esc(clean(s.text, 300))}</p>
       </div>
-      <p style="font-size: 11.5px; color: #78350f; margin: 6px 0 0 0; line-height: 1.4;">
-        <em>"Como dice Charlie Brown: Cada lección es una historia viva por descubrir y narrar con tus propias palabras."</em> — Snoopy en su máquina de escribir te guía paso a paso.
-      </p>
+    </div>`).join("");
+
+  const cajon = (pista?: string) => `
+    <div class="caja">
+      <strong style="font-size:10px;color:#1d4ed8;display:block;text-align:center;border-bottom:1px dashed #93c5fd;padding-bottom:2px;margin-bottom:6px;">✍️ CAJÓN DE ESCRITURA</strong>
+      <div class="raya"></div><div class="raya"></div><div class="raya"></div><div class="raya"></div>
     </div>
-    `
-    : isGael
-    ? `
-    <div style="background: linear-gradient(135deg, #fee2e2 0%, #fef2f2 100%); border: 2px solid #ef4444; border-radius: 10px; padding: 12px 16px; margin-bottom: 20px;">
-      <div style="display: flex; justify-content: space-between; align-items: center;">
-        <span style="font-weight: bold; color: #b91c1c; font-size: 13px;">🍄 SUPER MARIO BROS KINGDOM • MISIÓN DE CLASE</span>
-        <span style="font-size: 10px; background-color: #fef2f2; color: #991b1b; padding: 2px 8px; border-radius: 12px; font-weight: bold; border: 1px solid #fecaca;">🪙 +10 Monedas de Aprendizaje</span>
-      </div>
-      <p style="font-size: 11.5px; color: #7f1d1d; margin: 6px 0 0 0; line-height: 1.4;">
-        <em>"¡Mamma Mia! Abre las Cajas de Interrogación [?] (Montessori) y narra tu misión a Yoshi (Charlotte Mason) para tocar la bandera de meta 🏁."</em>
-      </p>
-    </div>
-    `
-    : '';
+    ${pista ? `<div class="pista">💡 <strong>Pista:</strong> ${pista}</div>` : ""}
+    <div style="height:6px"></div>`;
+
+  const introText = /[.!?…]$/.test(content.intro.trim()) ? content.intro : `${content.intro}.`;
+
+  const banner = currentClass.studentId === "avril" || currentClass.studentId === "karen"
+    ? `<div class="banner" style="background:#7c9cff14;border:1px solid #7c9cff55;" >🐶 Snoopy confía en tu prosa: el mundo tiene orden porque Dios lo pensó. <em>Guía Peanuts</em></div>`
+    : currentClass.studentId === "gael"
+    ? `<div class="banner" style="background:#e11d4814;border:1px solid #e11d4855;">🍄 ¡Power-up de conocimiento! Mario cuenta contigo para cuidar lo que Dios creó. <em>Guía Super Mario</em></div>`
+    : `<div class="banner">🎓 Un aprendizaje con orden refleja al Dios que dio forma a la Tierra. <em>Guía Wisdom</em></div>`;
 
   return `<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>${currentClass.guideTitle || `Guia_${subjectName}_${currentClass.theme}`}</title>
+  <title>${esc(docTitle)}</title>
   <style>
-    @page {
-      size: letter;
-      margin: 1.8cm;
-    }
-    body {
-      font-family: 'Segoe UI', Arial, Helvetica, sans-serif;
-      color: #1e293b;
-      background-color: #ffffff;
-      line-height: 1.6;
-      margin: 0;
-      padding: 20px;
-    }
-    .header-table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-bottom: 16px;
-      border: 2px solid #334155;
-    }
-    .header-table td {
-      border: 1px solid #64748b;
-      padding: 8px 12px;
-      font-size: 12px;
-    }
-    .logo-cell {
-      width: 22%;
-      text-align: center;
-      background-color: #f8fafc;
-      font-weight: bold;
-      color: #1e3a8a;
-    }
-    .title-cell {
-      width: 58%;
-      text-align: center;
-      background-color: #f1f5f9;
-    }
-    .title-cell h1 {
-      margin: 0;
-      font-size: 14px;
-      color: #0f172a;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-    .title-cell h2 {
-      margin: 4px 0 0 0;
-      font-size: 11.5px;
-      color: #475569;
-      font-weight: normal;
-    }
-    .meta-cell {
-      width: 20%;
-      font-size: 10px;
-      line-height: 1.4;
-      background-color: #f8fafc;
-    }
-    .info-box {
-      background-color: #f8fafc;
-      border: 1px solid #cbd5e1;
-      border-radius: 8px;
-      padding: 12px 16px;
-      margin-bottom: 16px;
-      font-size: 12px;
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 8px;
-    }
-    .info-item {
-      display: flex;
-      gap: 6px;
-    }
-    .info-label {
-      font-weight: bold;
-      color: #334155;
-    }
-    .section-title {
-      font-size: 13px;
-      font-weight: bold;
-      color: #1e3a8a;
-      background-color: #e0e7ff;
-      padding: 6px 12px;
-      border-left: 4px solid #3b82f6;
-      border-radius: 0 6px 6px 0;
-      margin-top: 20px;
-      margin-bottom: 12px;
-      text-transform: uppercase;
-    }
-    .objective-box {
-      background-color: #f0fdf4;
-      border: 1px solid #bbf7d0;
-      border-radius: 8px;
-      padding: 12px 16px;
-      font-size: 12px;
-      color: #166534;
-      margin-bottom: 16px;
-    }
-    .step-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-      margin-bottom: 16px;
-    }
-    .step-card {
-      border: 1px solid #cbd5e1;
-      border-radius: 6px;
-      padding: 10px;
-      background-color: #f8fafc;
-      font-size: 11px;
-    }
-    .step-card-title {
-      font-weight: bold;
-      color: #1e3a8a;
-      margin-bottom: 4px;
-    }
-    .reading-box {
-      background-color: #fafafa;
-      border: 1px dashed #cbd5e1;
-      border-radius: 8px;
-      padding: 14px;
-      font-size: 12px;
-      white-space: pre-line;
-      line-height: 1.7;
-      margin-bottom: 16px;
-    }
-    .breakdown-table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-bottom: 16px;
-      font-size: 11px;
-    }
-    .breakdown-table th {
-      background-color: #1e293b;
-      color: #ffffff;
-      padding: 6px 10px;
-      text-align: left;
-    }
-    .breakdown-table td {
-      border: 1px solid #cbd5e1;
-      padding: 6px 10px;
-    }
-    .socratic-card {
-      background-color: #eef2ff;
-      border-left: 3px solid #6366f1;
-      padding: 10px 14px;
-      margin-bottom: 10px;
-      border-radius: 0 6px 6px 0;
-      font-size: 12px;
-    }
-    .handwriting-lines {
-      border-bottom: 1px solid #cbd5e1;
-      height: 24px;
-      margin-top: 8px;
-    }
-    .activity-card {
-      border: 1px solid #e2e8f0;
-      border-radius: 8px;
-      padding: 12px;
-      margin-bottom: 12px;
-      background-color: #ffffff;
-    }
-    .activity-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-weight: bold;
-      font-size: 12px;
-      color: #0f172a;
-      margin-bottom: 6px;
-    }
-    .activity-badge {
-      background-color: #dbeafe;
-      color: #1e40af;
-      font-size: 10px;
-      padding: 2px 8px;
-      border-radius: 12px;
-      font-weight: bold;
-    }
-    .homework-box {
-      background-color: #fffbeb;
-      border: 1px solid #fef3c7;
-      border-left: 4px solid #f59e0b;
-      padding: 14px;
-      border-radius: 6px;
-      font-size: 12px;
-      color: #78350f;
-    }
-    .signatures-table {
-      width: 100%;
-      margin-top: 35px;
-      border-collapse: collapse;
-    }
-    .signatures-table td {
-      width: 50%;
-      text-align: center;
-      vertical-align: bottom;
-      padding-top: 45px;
-      font-size: 11px;
-      color: #475569;
-    }
-    .signature-line {
-      border-top: 1px solid #64748b;
-      width: 70%;
-      margin: 0 auto 6px auto;
-    }
-    .print-btn-bar {
-      text-align: right;
-      margin-bottom: 15px;
-    }
-    .btn-print {
-      background-color: #2563eb;
-      color: white;
-      border: none;
-      padding: 8px 18px;
-      font-size: 13px;
-      font-weight: bold;
-      border-radius: 6px;
-      cursor: pointer;
-    }
-    @media print {
-      .print-btn-bar { display: none; }
-      body { padding: 0; background-color: #fff; }
-    }
+    @page { size: letter; margin: 1.9cm 1.7cm; }
+    * { box-sizing: border-box; }
+    body { font-family: Georgia, 'Times New Roman', serif; color:#1f2937; line-height:1.55; margin:0 auto; padding:34px 40px; background:#fff; max-width:816px; }
+    .print-btn-bar { position:fixed; top:12px; right:14px; }
+    .btn-print { background:#2563eb; color:#fff; border:none; padding:8px 16px; border-radius:6px; font:700 13px 'Segoe UI',Arial; cursor:pointer; }
+    .brand { display:flex; align-items:baseline; justify-content:space-between; border-bottom:3px double #1e3a8a; padding-bottom:6px; }
+    .brand .ws { font-size:14px; font-weight:bold; color:#1e3a8a; }
+    .brand small { font-size:9px; color:#64748b; letter-spacing:1px; }
+    h1 { text-align:center; font: bold 17px/1.3 'Segoe UI',Arial,sans-serif; color:#0f172a; margin:14px 0 3px; }
+    .sub { text-align:center; font:600 10.5px 'Segoe UI',Arial,sans-serif; color:#475569; margin-bottom:10px; }
+    .tema { font-size:12.5px; margin:8px 0 4px; } .tema strong{ color:#1e3a8a; }
+    .meta { display:flex; flex-wrap:wrap; gap:14px; font:10.5px 'Segoe UI', Arial; color:#475569; border-bottom:1px solid #cbd5e1; padding-bottom:8px; margin-bottom:12px;}
+    .banner { font:11px 'Segoe UI',Arial; padding:7px 12px; border-radius:7px; margin-bottom:12px; }
+    h2 { font:bold 13px 'Segoe UI',Arial; color:#fff; background:#1e3a8a; display:inline-block; padding:3px 12px; border-radius:4px; margin:14px 0 8px; }
+    .intro { font-size:12.5px; margin:0 0 10px; text-align:justify; }
+    .paso { display:flex; gap:10px; margin:6px 0 8px; font-size:12px; }
+    .paso-n { flex:0 0 66px; font:bold 10px/1.9 'Segoe UI'; color:#1e3a8a; background:#e0e7ff; border-radius:4px; text-align:center; height:fit-content; padding:1px 4px; margin-top:2px; }
+    .paso-c strong { display:block; font:700 12px 'Segoe UI'; color:#0f172a; margin-bottom:1px; }
+    .paso-c p { margin:0; }
+    .cons { font-size:12.5px; margin:12px 0 6px; }
+    .cons em { color:#1e3a8a; }
+    .caja { border:1.5px dashed #94a3b8; border-radius:6px; padding:10px 14px; margin-bottom:4px; background:#fcfdff; }
+    .raya { border-bottom:1px solid #cbd5e1; height:23px; }
+    .pista { font-size:10.5px; color:#475569; background:#dbeafe; border:1px solid #93c5fd; border-radius:5px; padding:5px 9px; }
+    .fin { display:flex; justify-content:space-between; gap:20px; margin-top:26px; font:10px 'Segoe UI'; color:#475569; }
+    .firma { flex:1; border-top:1px solid #64748b; padding-top:5px; text-align:center; }
+    @media print { .print-btn-bar{display:none;} body{ padding:0; } }
   </style>
 </head>
 <body>
+  <div class="print-btn-bar"><button class="btn-print" onclick="window.print()">🖨️ Imprimir / Guardar PDF</button></div>
 
-  <div class="print-btn-bar">
-    <button class="btn-print" onclick="window.print()">🖨️ Imprimir / Guardar como PDF</button>
+  <div class="brand">
+    <span class="ws">☀️ WISDOM SCHOOL</span>
+    <small>ECUADOR · 2026-2027 · CONFESED EVANGÉLICA</small>
   </div>
 
-  <!-- Header Table -->
-  <table class="header-table">
-    <tr>
-      <td class="logo-cell">
-        🎓 WISDOM SCHOOL<br>
-        <span style="font-size: 9px; color: #64748b;">Ecuador 2026-2027</span>
-      </td>
-      <td class="title-cell">
-        <h1>GUÍA DIDÁCTICA Y TALLER PRÁCTICO DE CLASE</h1>
-        <h2>Enfoque Montessori y Charlotte Mason • Homologación Ministerio de Educación</h2>
-      </td>
-      <td class="meta-cell">
-        <strong>Código:</strong> WIS-${subject?.code || 'GEN'}-2026<br>
-        <strong>Emisión:</strong> ${dateStr}<br>
-        <strong>Estado:</strong> Oficial
-      </td>
-    </tr>
-  </table>
-
-  ${themeBannerHTML}
-
-  <!-- Info Box -->
-  <div class="info-box">
-    <div class="info-item"><span class="info-label">Estudiante:</span> <span>${studentName}</span></div>
-    <div class="info-item"><span class="info-label">Nivel Educativo:</span> <span>${studentGrade}</span></div>
-    <div class="info-item"><span class="info-label">Materia:</span> <span>${subjectName}</span></div>
-    <div class="info-item"><span class="info-label">Docente Asignado:</span> <span>${teacherName}</span></div>
-    <div class="info-item"><span class="info-label">Unidad Temática:</span> <span>${currentClass.unit || 'Unidad Curricular'}</span></div>
-    <div class="info-item"><span class="info-label">Horario / Duración:</span> <span>${currentClass.scheduleTime || 'Sesión de Clase'}</span></div>
+  <h1>Guía Didáctica y Taller Práctico <span style="color:#64748b">|</span> Tiempo estimado: 45 minutos</h1>
+  <div class="sub">Guía del estudiante · enfoque Montessori-Charlotte Mason</div>
+  <div class="tema"><strong>Tema:</strong> ${esc(theme)} — <span style="color:#475569">${esc(unit)}</span></div>
+  <div class="meta">
+    <span><b>Alumno:</b> ${esc(studentName)}</span>
+    <span><b>Grado:</b> ${esc(studentGrade)}</span>
+    <span><b>Materia:</b> ${esc(subjectName)}</span>
+    <span><b>Docente asignado:</b> ${esc(teacherName)}</span>
+    <span><b>Fecha:</b> ${esc(dateStr)}</span>
+    ${content.providerUsed ? `<span><b>Origen contenido:</b> ${esc(content.providerUsed)}</span>` : ""}
   </div>
 
-  <!-- Objective -->
-  <div class="objective-box">
-    <strong>🎯 OBJETIVO DE APRENDIZAJE:</strong><br>
-    ${currentClass.objective}
+  ${banner}
+
+  <h2>1. Desarrollo del Tema (Texto Base)</h2>
+  <p class="intro">${esc(introText)} Dios hizo todas las cosas con orden y propósito (Génesis 1:31; Colosenses 1:16-17), y estudiar este tema es descubrir ese diseño para cuidarlo.</p>
+  ${stepsHtml}
+
+  <h2>2. Taller Práctico (Análisis y Síntesis)</h2>
+  <div class="cons"><em>A. Expresa con tus propias palabras:</em> ${esc(content.questionA)}<br><span style="font:10.5px 'Segoe UI'; color:#64748b;">Escribe aquí tu análisis detallado basándote en la lectura:</span></div>
+  ${cajon("Ordena tu idea con conectores: \"Primero…\", \"Luego… (Paso N)…\", \"por eso…\". Si dudas, vuelve al paso correspondiente del Texto Base.")}
+  <div class="cons"><em>B. Pensamiento crítico:</em> ${esc(content.questionB)}<br><span style="font:10.5px 'Segoe UI'; color:#64748b;">Escribe aquí tu conclusión:</span></div>
+  ${cajon(withSplit ? "Distingue: primero lo que la evidencia muestra (🧪 se observa/Comprueba) y luego lo que enseña la Biblia (📖 principio, carácter de Dios). Cierra con \"Me comprometo a…\"." : "Marca el principio bíblico que ves (📖 orden, paciencia, fidelidad, servicio) y termina con tu decisión concreta: \"Me comprometo a…\".")}
+
+  <div class="fin">
+    <div class="firma">Firma del estudiante</div>
+    <div class="firma">Firma del representante / docente guía</div>
   </div>
-
-  <!-- Montessori & Charlotte Mason 4-Step Route -->
-  <div class="step-grid">
-    <div class="step-card">
-      <div class="step-card-title">1. Observación Concreta (Charlotte Mason)</div>
-      Observa la idea en la vida real. Relaciónala con tu entorno cotidiano y lecturas vivas.
-    </div>
-    <div class="step-card">
-      <div class="step-card-title">2. Descubrimiento Tactil (Montessori)</div>
-      Manipula objetos, dibuja esquemas en tu cuaderno o prueba los simuladores.
-    </div>
-    <div class="step-card">
-      <div class="step-card-title">3. Círculo de Narración</div>
-      Expresa con tus propias palabras lo que aprendiste ante un familiar o el Profesor IA.
-    </div>
-    <div class="step-card">
-      <div class="step-card-title">4. Misión Práctica y Evidencia</div>
-      Desarrolla las actividades en tu libreta para consolidar tu maestría.
-    </div>
-  </div>
-
-  <!-- Section 1: Intro -->
-  <div class="section-title">I. INTRODUCCIÓN Y PASO A PASO EXPLICATIVO</div>
-  <div style="font-size: 12px; margin-bottom: 12px; text-align: justify; line-height: 1.6;">
-    ${currentClass.introduction || `Bienvenido a la lección de ${subjectName} sobre "${currentClass.theme}".`}
-  </div>
-
-  ${
-    timeBreakdown.length > 0
-      ? `
-  <table class="breakdown-table">
-    <thead>
-      <tr>
-        <th style="width: 25%;">Momento Pedagógico</th>
-        <th style="width: 15%;">Tiempo</th>
-        <th>Descripción del Trabajo</th>
-      </tr>
-    </thead>
-    <tbody>
-      ${timeBreakdown
-        .map(
-          (tb) => `
-        <tr>
-          <td><strong>${tb.phase}</strong></td>
-          <td>${tb.minutes} min</td>
-          <td>${tb.description}</td>
-        </tr>
-      `
-        )
-        .join('')}
-    </tbody>
-  </table>
-  `
-      : ''
-  }
-
-  <!-- Section 2: Core Content -->
-  <div class="section-title">II. LECTURA Y DESARROLLO CONCEPTUAL DE LA LECCIÓN</div>
-  <div class="reading-box">
-${currentClass.reading || 'Revisa la lectura guiada disponible en la plataforma digital.'}
-  </div>
-
-  <!-- Section 3: Socratic Questions -->
-  <div class="section-title">III. PREGUNTAS SOCRÁTICAS Y RAZONAMIENTO CRÍTICO</div>
-  <p style="font-size: 11px; color: #475569; margin-bottom: 10px;">
-    Responde en tu cuaderno o en los espacios asignados a continuación argumentando tu respuesta:
-  </p>
-  ${
-    socraticQuestions.length > 0
-      ? socraticQuestions
-          .map(
-            (q, idx) => `
-    <div class="socratic-card">
-      <strong>Pregunta ${idx + 1}:</strong> "${q}"
-      <div class="handwriting-lines"></div>
-      <div class="handwriting-lines"></div>
-    </div>
-  `
-          )
-          .join('')
-      : `
-    <div class="socratic-card">
-      <strong>Pregunta de Reflexión:</strong> "${currentClass.reflectionPrompt || '¿Cómo aplicas este concepto en tu vida cotidiana?'}"
-      <div class="handwriting-lines"></div>
-      <div class="handwriting-lines"></div>
-    </div>
-  `
-  }
-
-  <!-- Section 4: Practical Activities -->
-  <div class="section-title">IV. TALLER DE ACTIVIDADES Y RETOS PRÁCTICOS</div>
-  ${
-    activitiesList.length > 0
-      ? activitiesList
-          .map(
-            (act, idx) => `
-    <div class="activity-card">
-      <div class="activity-header">
-        <span>☐ Actividad ${idx + 1}: ${act.title}</span>
-        <span class="activity-badge">+${act.points} pts</span>
-      </div>
-      <p style="font-size: 11.5px; color: #334155; margin: 4px 0 8px 0;">${act.description}</p>
-      <div style="border: 1px dashed #cbd5e1; height: 50px; background-color: #fafafa; border-radius: 4px; padding: 6px; font-size: 10px; color: #94a3b8;">
-        [Espacio para resolución, fórmulas, esquemas o redacción del estudiante]
-      </div>
-    </div>
-  `
-          )
-          .join('')
-      : `
-    <div class="activity-card">
-      <div class="activity-header">
-        <span>☐ Taller en Libreta de Evidencias</span>
-        <span class="activity-badge">Práctica Guiada</span>
-      </div>
-      <p style="font-size: 11.5px; color: #334155;">Desarrolla en tu cuaderno la guía de ejercicios prácticos asignada.</p>
-    </div>
-  `
-  }
-
-  <!-- Section 5: Homework -->
-  <div class="section-title">V. TAREA DEL DÍA Y EVIDENCIA PARA EVALUACIÓN</div>
-  <div class="homework-box">
-    <strong>📌 CONSIGNA DE TAREA:</strong><br>
-    ${currentClass.homeworkTask || 'Completa los ejercicios de tu libreta y toma una fotografía clara para subirla a la plataforma.'}
-  </div>
-
-  <!-- Signatures -->
-  <table class="signatures-table">
-    <tr>
-      <td>
-        <div class="signature-line"></div>
-        Firma del Estudiante (${studentName})
-      </td>
-      <td>
-        <div class="signature-line"></div>
-        Firma del Representante / Tutor
-      </td>
-    </tr>
-  </table>
-
+  <div style="text-align:center;color:#94a3b8;font-size:9px;margin-top:14px;">Wisdom School · Guía Didáctica y Taller Práctico · ${esc(dateStr)}</div>
 </body>
 </html>`;
 }
 
-/**
- * Downloads the guide HTML document directly or opens it in a new printable window.
- */
 export function downloadClassGuide(
   currentClass: DailyClass,
   subject?: Subject,
-  studentName: string = 'Estudiante',
-  studentGrade: string = 'Educación General Básica'
+  studentName: string = "Estudiante",
+  studentGrade: string = "Educación General Básica",
+  ai?: GuideAiContent | null
 ): void {
-  const htmlContent = generateClassGuideHTML(currentClass, subject, studentName, studentGrade);
-  
-  // Format clean file name
-  let rawTitle = currentClass.guideTitle || `Guia_${subject?.code || 'Clase'}_${currentClass.theme}.html`;
-  if (rawTitle.endsWith('.pdf')) {
-    rawTitle = rawTitle.replace(/\.pdf$/i, '.html');
-  } else if (!rawTitle.endsWith('.html')) {
-    rawTitle += '.html';
-  }
+  const html = generateClassGuideHTML(currentClass, subject, studentName, studentGrade, ai ?? null);
+  let raw = currentClass.guideTitle || `Guia_${subject?.code || "clase"}_${currentClass.theme}.html`;
+  raw = raw.replace(/\.pdf$/i, ".html");
+  if (!raw.endsWith(".html")) raw += ".html";
 
-  // Create Blob and trigger download
-  const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+  const blob = new Blob([html], { type: "text/html;charset=utf-8" });
   const url = URL.createObjectURL(blob);
-
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = rawTitle;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = raw;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
   URL.revokeObjectURL(url);
 
-  // Also open print window preview automatically if popup allowed
   try {
-    const printWindow = window.open('', '_blank');
-    if (printWindow) {
-      printWindow.document.write(htmlContent);
-      printWindow.document.close();
-    }
-  } catch (err) {
-    console.log('Pop-up auto-preview blocked or non-interactive mode', err);
-  }
+    const win = window.open("", "_blank");
+    if (win) { win.document.write(html); win.document.close(); }
+  } catch { /* bloqueado: la descarga ya ocurrió */ }
 }
