@@ -1,4 +1,4 @@
-import app from '../../server';
+import app from '../_app';
 
 // Vercel Function: guarda la foto del estudiante. En serverless el FS es de solo
 // lectura, por lo que el endpoint devuelve error controlado; el avatar local sigue

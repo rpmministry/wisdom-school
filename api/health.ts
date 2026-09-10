@@ -1,4 +1,4 @@
-import app from '../server';
+import app from './_app';
 
 // Vercel Function: health check que reporta qué capas de IA están configuradas
 // (DeepSeek, OpenRouter, OpenCode, Gemini) y la jerarquía resultante.

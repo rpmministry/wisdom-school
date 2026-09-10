@@ -1,4 +1,4 @@
-import app from '../server';
+import app from './_app';
 
 // Vercel Function: envío del PIN de acceso por correo (nodemailer).
 export default function handler(req: any, res: any) {
