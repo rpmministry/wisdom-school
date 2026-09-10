@@ -48,8 +48,13 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Paso 4: aseguramos que exista la carpeta pública de imágenes de estudiantes para guardar fotos y archivos visuales.
 const publicStudentsDir = path.join(appRoot, 'public', 'students');
-if (!fs.existsSync(publicStudentsDir)) {
-  fs.mkdirSync(publicStudentsDir, { recursive: true });
+try {
+  if (!fs.existsSync(publicStudentsDir)) {
+    fs.mkdirSync(publicStudentsDir, { recursive: true });
+  }
+} catch (err: any) {
+  // En serverless (Vercel) el FS de la función es de solo lectura: no debe impedir el arranque de la API de IA.
+  console.warn('No se pudo preparar public/students:', err?.message || err);
 }
 
 // Paso 5: este endpoint resuelve imágenes de estudiantes sin depender del nombre exacto o la extensión exacta.
