@@ -102,7 +102,9 @@ export const DailyClassView: React.FC = () => {
   };
   const firstIncomplete = SUBTAB_ORDER.find((s) => !stepDone[s]) || 'homework';
   const firstIncompleteIndex = SUBTAB_ORDER.indexOf(firstIncomplete);
-  const lockedSteps = SUBTAB_ORDER.filter((s) => !stepDone[s] && SUBTAB_ORDER.indexOf(s) > firstIncompleteIndex);
+  // "Evidencias" (guía descargable + entrega) SIEMPRE accesible: no se bloquea por la ruta,
+  // para poder generar y descargar la guía didáctica en cualquier momento y en cualquier perfil.
+  const lockedSteps = SUBTAB_ORDER.filter((s) => s !== 'homework' && !stepDone[s] && SUBTAB_ORDER.indexOf(s) > firstIncompleteIndex);
   const nextStepLabel = `${SUBTAB_LABELS[firstIncomplete]}${firstIncomplete === 'content' && !microDone ? ` · ${microCleared.length}/${MICRO_TOTAL}` : ''}`;
 
   // Materias programadas HOY para el estudiante activo (según el horario) → contenido del diario.
@@ -248,12 +250,26 @@ export const DailyClassView: React.FC = () => {
                 <span className="px-3 py-1 rounded-full text-xs font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">{subject.name}</span>
                 <span className="text-xs text-slate-400 font-medium">{currentClass.date}</span>
               </div>
-              {allActivitiesCompleted && (
-                <span className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-emerald-500/20 border border-emerald-500/40 text-emerald-200">
-                  <CheckCircle2 className="w-4 h-4" /><span>Clase Completada ✓</span>
-                </span>
-              )}
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Descarga de la guía didáctica SIEMPRE visible (inscritos y demo) */}
+                <button
+                  onClick={handleDownloadDailyGuides}
+                  disabled={!!batchProgress}
+                  className="flex items-center gap-2 px-4 py-2.5 min-h-[44px] rounded-xl text-xs font-black bg-emerald-600 hover:bg-emerald-500 disabled:opacity-70 disabled:cursor-wait text-white shadow-md transition-all touch-lift"
+                >
+                  <Layers className={`w-4 h-4 ${batchProgress ? 'animate-pulse' : ''}`} />
+                  <span>{batchProgress ? `Generando diario ${batchProgress.done}/${batchProgress.total}…` : 'Descargar Guía Didáctica'}</span>
+                </button>
+                {allActivitiesCompleted && (
+                  <span className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-emerald-500/20 border border-emerald-500/40 text-emerald-200">
+                    <CheckCircle2 className="w-4 h-4" /><span>Clase Completada ✓</span>
+                  </span>
+                )}
+              </div>
             </div>
+            {batchMessage && (
+              <p className={`text-[11px] font-semibold ${batchMessage.kind === 'ok' ? 'text-emerald-300' : batchMessage.kind === 'warn' ? 'text-amber-300' : 'text-rose-300'}`}>{batchMessage.text}</p>
+            )}
             <div><h1 className="text-2xl sm:text-3xl font-extrabold text-white mt-1">{currentClass.theme}</h1></div>
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
               <div className="lg:col-span-2 p-4 rounded-2xl bg-indigo-950/40 border border-indigo-500/30 flex items-start gap-3">
