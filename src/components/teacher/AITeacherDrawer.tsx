@@ -4,6 +4,16 @@ import { askAITeacher, ChatMessage, renderMarkdownToHtml } from '../../services/
 import { ttsService } from '../../services/ttsService';
 import { Bot, X, Send, Loader2, Volume2, Play, Pause, StopCircle, Square } from 'lucide-react';
 
+/**
+ * Renderiza el Markdown UNA sola vez por contenido.
+ * Evita re-parsear todos los mensajes en cada re-render (p. ej. al alternar isLoading
+ * mientras la IA "piensa"), que es lo que podía sentirse como congelamiento.
+ */
+const MarkdownMessage = React.memo(({ content }: { content: string }) => (
+  <div className="markdown-body" dangerouslySetInnerHTML={{ __html: renderMarkdownToHtml(content) }} />
+));
+MarkdownMessage.displayName = 'MarkdownMessage';
+
 export const AITeacherDrawer: React.FC = () => {
   const {
     isTeacherDrawerOpen,
@@ -113,8 +123,12 @@ export const AITeacherDrawer: React.FC = () => {
   if (!isTeacherDrawerOpen || !teacher || !subject) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] overflow-hidden flex justify-end bg-black/60 backdrop-blur-sm transition-opacity duration-300">
-      <div className="w-full max-w-lg border-l shadow-2xl flex flex-col h-full bg-slate-900 transition-transform duration-300 translate-x-0" style={{ background: 'linear-gradient(180deg, rgba(15,23,42,0.98), rgba(15,23,42,0.94))', borderColor: `${studentTheme.accent}55` }}>
+    /* La envoltura es pointer-events-none para que el scroll/navegación de la clase
+       (que vive en <main>) siga funcionando; solo el panel del chat captura eventos.
+       Además se quitó backdrop-blur a pantalla completa: repintaba todo el viewport en
+       cada actualización de la IA y causaba el bloqueo aparente. */
+    <div className="fixed inset-0 z-[100] overflow-hidden flex justify-end pointer-events-none bg-black/60 transition-opacity duration-300">
+      <div className="pointer-events-auto w-full max-w-lg border-l shadow-2xl flex flex-col h-full max-h-[100dvh] bg-slate-900 transition-transform duration-300 translate-x-0" style={{ background: 'linear-gradient(180deg, rgba(15,23,42,0.98), rgba(15,23,42,0.94))', borderColor: `${studentTheme.accent}55` }}>
 
         <div className="p-4 sm:p-5 border-b flex items-center justify-between shadow-md" style={{ background: `linear-gradient(135deg, ${studentTheme.accent}22, rgba(15,23,42,0.92) 60%, rgba(2,6,23,0.96))` }}>
           <div className="flex items-center gap-3">
@@ -136,7 +150,7 @@ export const AITeacherDrawer: React.FC = () => {
           </div>
         </div>
 
-        <div ref={scrollBoxRef} className="flex-1 overflow-y-auto overscroll-contain p-4 space-y-5">
+        <div ref={scrollBoxRef} className="flex-1 overflow-y-auto overscroll-contain touch-pan-y p-4 space-y-5">
           <p className="text-[10px] text-slate-400 flex items-center gap-1.5">
             <Volume2 className="w-3 h-3" /> El audio se reproduce solo cuando tú presionas <strong className="text-emerald-400">REPRODUCIR</strong>.
           </p>
@@ -151,7 +165,7 @@ export const AITeacherDrawer: React.FC = () => {
                 <div className={`flex flex-col max-w-[90%] ${isUser ? 'items-end' : 'items-start'}`}>
 
                   <div className="p-4 rounded-2xl text-xs sm:text-sm leading-relaxed shadow-lg" style={isUser ? { background: `linear-gradient(135deg, ${studentTheme.accent}, ${studentTheme.accent}cc)`, color: '#fff', borderBottomRightRadius: 0 } : { background: 'rgba(15, 23, 42, 0.95)', border: `1px solid ${isActiveSpeech && !isPaused ? '#10b981' : studentTheme.accent + '55'}`, color: '#e2e8f0', borderBottomLeftRadius: 0 }}>
-                    {isUser ? <div className="whitespace-pre-line font-medium">{msg.content}</div> : <div className="markdown-body" dangerouslySetInnerHTML={{ __html: renderMarkdownToHtml(msg.content) }} />}
+                    {isUser ? <div className="whitespace-pre-line font-medium">{msg.content}</div> : <MarkdownMessage content={msg.content} />}
                   </div>
 
                   {!isUser && (

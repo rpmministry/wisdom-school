@@ -4,6 +4,12 @@ import { askAITeacher, ChatMessage, renderMarkdownToHtml } from '../../services/
 import { ttsService } from '../../services/ttsService';
 import { Bot, Send, Loader2, Volume2, VolumeX, Play, Pause, StopCircle, MessageSquare, ArrowRight, Target, GraduationCap, Square } from 'lucide-react';
 
+/** Markdown memoizado: solo se re-parsea cuando cambia el contenido del mensaje. */
+const MarkdownMessage = React.memo(({ content }: { content: string }) => (
+  <div className="markdown-body" dangerouslySetInnerHTML={{ __html: renderMarkdownToHtml(content) }} />
+));
+MarkdownMessage.displayName = 'MarkdownMessage';
+
 interface NextStepInfo {
   label: string;
   sublabel?: string;
@@ -186,7 +192,7 @@ export const ClassTeacherChat: React.FC<ClassTeacherChatProps> = ({ className = 
       </div>
 
       {/* ZONA CENTRAL: EL DESARROLLO DE LA CLASE (EXPLICACIÓN ↔ RESPUESTA) */}
-      <div ref={scrollBoxRef} className={`flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6 space-y-5 ${compact ? 'h-[340px] sm:h-[420px] xl:h-[520px]' : 'h-[420px] sm:h-[520px] lg:h-[560px] xl:h-[620px]'}`} style={{ scrollbarWidth: 'thin', scrollbarColor: studentTheme.accent }}>
+      <div ref={scrollBoxRef} className={`flex-1 overflow-y-auto overscroll-contain touch-pan-y p-4 sm:p-6 space-y-5 ${compact ? 'h-[340px] sm:h-[420px] xl:h-[520px]' : 'h-[420px] sm:h-[520px] lg:h-[560px] xl:h-[620px]'}`} style={{ scrollbarWidth: 'thin', scrollbarColor: studentTheme.accent }}>
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center py-12 text-center gap-2">
             <Bot className="w-12 h-12 mb-1" style={{ color: studentTheme.accent }} />
@@ -204,7 +210,7 @@ export const ClassTeacherChat: React.FC<ClassTeacherChatProps> = ({ className = 
               <div className={`flex flex-col max-w-[92%] sm:max-w-[85%] ${isUser ? 'items-end' : 'items-start'}`}>
                 {!isUser && <span className="text-[9px] font-black uppercase tracking-wider text-slate-500 mb-1 pl-1">{teacher?.name} explica</span>}
                 <div className="p-4 rounded-2xl text-sm sm:text-[15px] leading-relaxed shadow-lg" style={isUser ? { background: `linear-gradient(135deg, ${studentTheme.accent}, ${studentTheme.accent}cc)`, color: '#fff', borderBottomRightRadius: 0 } : { background: 'rgba(15, 23, 42, 0.95)', border: `1px solid ${isActiveSpeech && !isPaused ? '#10b981' : studentTheme.accent + '55'}`, color: '#e2e8f0', borderBottomLeftRadius: 0 }}>
-                  {isUser ? <div className="whitespace-pre-line"><span className="text-[9px] uppercase font-black opacity-70 block mb-0.5">Tu respuesta</span>{msg.content}</div> : <div className="markdown-body" dangerouslySetInnerHTML={{ __html: renderMarkdownToHtml(msg.content) }} />}
+                  {isUser ? <div className="whitespace-pre-line"><span className="text-[9px] uppercase font-black opacity-70 block mb-0.5">Tu respuesta</span>{msg.content}</div> : <MarkdownMessage content={msg.content} />}
                 </div>
 
                 {!isUser && (
