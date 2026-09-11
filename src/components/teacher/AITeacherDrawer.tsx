@@ -79,11 +79,20 @@ export const AITeacherDrawer: React.FC = () => {
     }
   }, [teacher?.id, currentStudent.id, subject?.id, dailyClass?.id, isTeacherDrawerOpen]);
 
-  // Solo la caja interna del drawer scrollea; scrollIntoView burbujeaba hasta el documento
-  // y podía saltar la vista al fondo al abrir el tutor.
+  useEffect(() => {
+    if (!isTeacherDrawerOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsTeacherDrawerOpen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isTeacherDrawerOpen, setIsTeacherDrawerOpen]);
+
+  // Auto-scroll del hilo SIN animación: 'smooth' disparaba trabajo de scroll continuo
+  // mientras llegaba la respuesta y agravaba el bloqueo percibido.
   useEffect(() => {
     const box = scrollBoxRef.current;
-    if (box) box.scrollTo({ top: box.scrollHeight, behavior: 'smooth' });
+    if (box) box.scrollTo({ top: box.scrollHeight, behavior: 'auto' });
   }, [messages, isLoading]);
 
   const handleSendMessage = async (customText?: string) => {
@@ -123,12 +132,18 @@ export const AITeacherDrawer: React.FC = () => {
   if (!isTeacherDrawerOpen || !teacher || !subject) return null;
 
   return (
-    /* La envoltura es pointer-events-none para que el scroll/navegación de la clase
-       (que vive en <main>) siga funcionando; solo el panel del chat captura eventos.
-       Además se quitó backdrop-blur a pantalla completa: repintaba todo el viewport en
-       cada actualización de la IA y causaba el bloqueo aparente. */
-    <div className="fixed inset-0 z-[100] overflow-hidden flex justify-end pointer-events-none bg-black/60 transition-opacity duration-300">
-      <div className="pointer-events-auto w-full max-w-lg border-l shadow-2xl flex flex-col h-full max-h-[100dvh] bg-slate-900 transition-transform duration-300 translate-x-0" style={{ background: 'linear-gradient(180deg, rgba(15,23,42,0.98), rgba(15,23,42,0.94))', borderColor: `${studentTheme.accent}55` }}>
+    /* Panel lateral SIN capa a pantalla completa.
+       Antes había un <div fixed inset-0 ... bg-black/60> que (a) capturaba todos los
+       eventos porque el scroll vive en <main>, y (b) obligaba a recomponer toda la app
+       en cada re-render de la IA. Ahora no hay overlay global: el resto de la interfaz
+       queda 100% usable (scroll y clics) y `contain:content` aísla el repintado al panel. */
+    <aside
+      role="dialog"
+      aria-modal="false"
+      aria-label={`Chat con ${teacher.name}`}
+      className="fixed top-0 right-0 bottom-0 z-[100] w-full max-w-lg pointer-events-auto flex flex-col h-[100dvh] max-h-[100dvh] border-l shadow-2xl bg-slate-900 [contain:content]"
+      style={{ background: 'linear-gradient(180deg, rgba(15,23,42,0.98), rgba(15,23,42,0.94))', borderColor: `${studentTheme.accent}55` }}
+    >
 
         <div className="p-4 sm:p-5 border-b flex items-center justify-between shadow-md" style={{ background: `linear-gradient(135deg, ${studentTheme.accent}22, rgba(15,23,42,0.92) 60%, rgba(2,6,23,0.96))` }}>
           <div className="flex items-center gap-3">
@@ -305,7 +320,6 @@ export const AITeacherDrawer: React.FC = () => {
             <button type="submit" disabled={!inputValue.trim() || isLoading} aria-label="Enviar mensaje" className="p-3.5 min-h-[48px] min-w-[48px] flex items-center justify-center rounded-xl text-white bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 transition-all shadow-lg shadow-indigo-600/30 active:scale-95 shrink-0"><Send className="w-5 h-5" /></button>
           </form>
         </div>
-      </div>
-    </div>
+    </aside>
   );
 };
