@@ -98,16 +98,18 @@ export const AITeacherDrawer: React.FC = () => {
     pinnedToBottomRef.current = box.scrollHeight - box.scrollTop - box.clientHeight < 72;
   };
 
-  // Auto-scroll condicionado: sin 'smooth' y sin interrumpir si el usuario está leyendo o tocando.
+  // Auto-scroll solo cuando entra/llega un MENSAJE (no al activarse isLoading) y
+  // solo si el usuario está al final y no está tocando. Sin 'smooth'.
   useEffect(() => {
     if (!pinnedToBottomRef.current || isTouchingRef.current) return;
     const box = scrollBoxRef.current;
     if (!box) return;
     const raf = requestAnimationFrame(() => {
+      if (isTouchingRef.current) return;
       box.scrollTop = box.scrollHeight;
     });
     return () => cancelAnimationFrame(raf);
-  }, [messages, isLoading]);
+  }, [messages]);
 
   const handleSendMessage = async (customText?: string) => {
     const textToSend = customText || inputValue.trim();
@@ -186,7 +188,7 @@ export const AITeacherDrawer: React.FC = () => {
           onTouchStart={() => { isTouchingRef.current = true; }}
           onTouchEnd={() => { isTouchingRef.current = false; }}
           onTouchCancel={() => { isTouchingRef.current = false; }}
-          className="flex-1 overflow-y-auto overscroll-contain touch-pan-y [overflow-anchor:none] p-4 space-y-5"
+          className="flex-1 min-h-0 overflow-y-auto overscroll-contain touch-pan-y [overflow-anchor:none] p-4 space-y-5"
         >
           <p className="text-[10px] text-slate-400 flex items-center gap-1.5">
             <Volume2 className="w-3 h-3" /> El audio se reproduce solo cuando tú presionas <strong className="text-emerald-400">REPRODUCIR</strong>.
@@ -299,7 +301,7 @@ export const AITeacherDrawer: React.FC = () => {
 
         {/* BARRA GLOBAL DE AUDIO: pausar/detener la voz disponible en CUALQUIER momento mientras hay reproducción */}
         {speakingId && (
-          <div className="px-4 py-2.5 border-t bg-slate-950/95 flex items-center justify-between gap-3 shadow-[0_-8px_20px_-6px_rgba(0,0,0,0.6)]">
+          <div className="px-4 py-2.5 border-t shrink-0 bg-slate-950/95 flex items-center justify-between gap-3 shadow-[0_-8px_20px_-6px_rgba(0,0,0,0.6)]">
             <span className="text-[10px] font-black uppercase tracking-widest flex items-center gap-2" style={{ color: isPaused ? '#fbbf24' : '#34d399' }}>
               {isPaused ? <><Pause className="w-3.5 h-3.5" /> Audio en pausa</> : <><Volume2 className="w-3.5 h-3.5 animate-pulse" /> {teacher.name} está hablando</>}
             </span>
@@ -329,16 +331,16 @@ export const AITeacherDrawer: React.FC = () => {
           </div>
         )}
 
-        <div className="p-3 border-t overflow-x-auto overscroll-x-contain touch-scroll-x flex items-center gap-2 scrollbar-none bg-slate-900/90 shadow-[0_-10px_15px_-3px_rgba(0,0,0,0.3)] z-10 relative">
-          <span className="text-[10px] text-slate-400 font-black uppercase tracking-wider shrink-0 pl-1">Atajos:</span>
+        <div className="p-3 border-t flex flex-wrap items-center gap-2 bg-slate-900/90 shadow-[0_-10px_15px_-3px_rgba(0,0,0,0.3)] z-10 relative shrink-0">
+          <span className="text-[10px] text-slate-400 font-black uppercase tracking-wider pl-1 w-full sm:w-auto">Atajos</span>
           {['¿Me das un ejemplo cotidiano?', '¿Por qué ocurre esto?', 'Ya lo entendí, siguiente paso'].map((promptText, idx) => (
-            <button key={idx} onClick={() => handleSendMessage(promptText)} disabled={isLoading} className="inline-flex items-center min-h-[40px] px-3 py-1.5 rounded-lg border bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-indigo-200 whitespace-nowrap transition-colors shadow-sm shrink-0">{promptText}</button>
+            <button key={idx} onClick={() => handleSendMessage(promptText)} disabled={isLoading} className="inline-flex items-center min-h-[40px] max-w-full px-3 py-1.5 rounded-lg border bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-indigo-200 text-left transition-colors shadow-sm">{promptText}</button>
           ))}
         </div>
 
-        <div className="px-4 pt-4 bg-slate-900 z-10 relative" style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom, 0px))' }}>
+        <div className="px-4 pt-4 bg-slate-900 z-10 relative shrink-0" style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom, 0px))' }}>
           <form onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }} className="flex items-center gap-2">
-            <input id="input-teacher-chat" type="text" enterKeyHint="send" autoCapitalize="sentences" autoComplete="off" value={inputValue} onChange={(e) => setInputValue(e.target.value)} placeholder={`Escribe tu respuesta para ${teacher.name}...`} disabled={isLoading} className="flex-1 min-w-0 rounded-xl px-4 py-3.5 text-base bg-slate-800 text-white focus:outline-none border-2 border-slate-700 focus:border-indigo-500 transition-all font-medium shadow-inner" />
+            <input id="input-teacher-chat" type="text" enterKeyHint="send" autoCapitalize="sentences" autoComplete="off" value={inputValue} onChange={(e) => setInputValue(e.target.value)} placeholder={`Escribe tu respuesta para ${teacher.name}...`} className="flex-1 min-w-0 rounded-xl px-4 py-3.5 text-base bg-slate-800 text-white focus:outline-none border-2 border-slate-700 focus:border-indigo-500 transition-all font-medium shadow-inner" />
             <button type="submit" disabled={!inputValue.trim() || isLoading} aria-label="Enviar mensaje" className="p-3.5 min-h-[48px] min-w-[48px] flex items-center justify-center rounded-xl text-white bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 transition-all shadow-lg shadow-indigo-600/30 active:scale-95 shrink-0"><Send className="w-5 h-5" /></button>
           </form>
         </div>

@@ -100,18 +100,18 @@ export const ClassTeacherChat: React.FC<ClassTeacherChatProps> = ({ className = 
     pinnedToBottomRef.current = box.scrollHeight - box.scrollTop - box.clientHeight < 72;
   };
 
-  // El auto-scroll solo mueve LA CAJA INTERNA del chat y sin 'smooth'.
-  // Condicionado a "estoy al final y no estoy tocando" para no robar el gesto táctil
-  // cuando llega la respuesta de la IA (eso era lo que dejaba el scroll trabado).
+  // El auto-scroll solo se dispara cuando llega/entra un MENSAJE (no al activarse isLoading),
+  // y solo si el usuario está al final y no está tocando. Sin 'smooth' y sin robar el gesto.
   useEffect(() => {
     if (!pinnedToBottomRef.current || isTouchingRef.current) return;
     const box = scrollBoxRef.current;
     if (!box) return;
     const raf = requestAnimationFrame(() => {
+      if (isTouchingRef.current) return;
       box.scrollTop = box.scrollHeight;
     });
     return () => cancelAnimationFrame(raf);
-  }, [messages, isLoading]);
+  }, [messages]);
 
   const handleSendMessage = async (customText?: string) => {
     const textToSend = customText || inputValue.trim();
@@ -213,7 +213,7 @@ export const ClassTeacherChat: React.FC<ClassTeacherChatProps> = ({ className = 
         onTouchStart={() => { isTouchingRef.current = true; }}
         onTouchEnd={() => { isTouchingRef.current = false; }}
         onTouchCancel={() => { isTouchingRef.current = false; }}
-        className={`flex-1 overflow-y-auto overscroll-contain touch-pan-y [overflow-anchor:none] p-4 sm:p-6 space-y-5 ${compact ? 'h-[340px] sm:h-[420px] xl:h-[520px]' : 'h-[420px] sm:h-[520px] lg:h-[560px] xl:h-[620px]'}`}
+        className={`flex-1 min-h-0 overflow-y-auto overscroll-contain touch-pan-y [overflow-anchor:none] p-4 sm:p-6 space-y-5 ${compact ? 'h-[340px] sm:h-[420px] xl:h-[520px]' : 'h-[420px] sm:h-[520px] lg:h-[560px] xl:h-[620px]'}`}
         style={{ scrollbarWidth: 'thin', scrollbarColor: studentTheme.accent }}
       >
         {messages.length === 0 && (
@@ -311,17 +311,17 @@ export const ClassTeacherChat: React.FC<ClassTeacherChatProps> = ({ className = 
           </div>
         )}
       </div>
-      {/* ATAJOS DE INTERACCIÓN */}
-      <div className="p-3 border-t overflow-x-auto overscroll-x-contain touch-scroll-x flex items-center gap-2 scrollbar-none bg-slate-900/90">
-        <span className="text-[10px] text-slate-400 font-black uppercase tracking-wider shrink-0 pl-1"><MessageSquare className="w-3 h-3 inline mr-1" />Atajos:</span>
+      {/* ATAJOS DE INTERACCIÓN — envuelven en varias líneas para no recortarse */}
+      <div className="p-3 border-t flex flex-wrap items-center gap-2 bg-slate-900/90 shrink-0">
+        <span className="text-[10px] text-slate-400 font-black uppercase tracking-wider pl-1 w-full sm:w-auto"><MessageSquare className="w-3 h-3 inline mr-1" />Atajos</span>
         {quickPrompts.map((promptText, idx) => (
-          <button key={idx} onClick={() => handleSendMessage(promptText)} disabled={isLoading} className="inline-flex items-center min-h-[40px] px-3 py-1.5 rounded-lg border bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-indigo-200 whitespace-nowrap transition-colors shadow-sm shrink-0">{promptText}</button>
+          <button key={idx} onClick={() => handleSendMessage(promptText)} disabled={isLoading} className="inline-flex items-center min-h-[40px] max-w-full px-3 py-1.5 rounded-lg border bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-indigo-200 text-left transition-colors shadow-sm">{promptText}</button>
         ))}
       </div>
 
       {/* SIGUIENTE PASO DE LA CLASE */}
       {nextStep && (
-        <div className="px-4 py-3 border-t flex items-center justify-between gap-3" style={{ background: `linear-gradient(90deg, ${studentTheme.accent}14, rgba(2,6,23,0.6))`, borderColor: '#1e293b' }}>
+        <div className="px-4 py-3 border-t shrink-0 flex items-center justify-between gap-3" style={{ background: `linear-gradient(90deg, ${studentTheme.accent}14, rgba(2,6,23,0.6))`, borderColor: '#1e293b' }}>
           <div className="min-w-0">
             <span className="text-[9px] font-black uppercase tracking-widest text-slate-500 block">Siguiente paso guiado</span>
             {nextStep.sublabel && <p className="text-[11px] text-slate-400 truncate">{nextStep.sublabel}</p>}
@@ -339,7 +339,7 @@ export const ClassTeacherChat: React.FC<ClassTeacherChatProps> = ({ className = 
 
       {/* BARRA GLOBAL DE AUDIO: pausar/detener disponible en CUALQUIER momento mientras hay voz */}
       {speakingId && (
-        <div className="px-4 py-2.5 border-t bg-slate-950/95 flex items-center justify-between gap-3">
+        <div className="px-4 py-2.5 border-t shrink-0 bg-slate-950/95 flex items-center justify-between gap-3">
           <span className="text-[10px] font-black uppercase tracking-widest flex items-center gap-2" style={{ color: isPaused ? '#fbbf24' : '#34d399' }}>
             {isPaused ? <><Pause className="w-3.5 h-3.5" /> Audio en pausa</> : <><Volume2 className="w-3.5 h-3.5 animate-pulse" /> {teacher?.name} está hablando</>}
           </span>
@@ -370,9 +370,9 @@ export const ClassTeacherChat: React.FC<ClassTeacherChatProps> = ({ className = 
       )}
 
       {/* ENTRADA DEL ESTUDIANTE */}
-      <div className="p-4 bg-slate-900 border-t">
+      <div className="p-4 bg-slate-900 border-t shrink-0">
         <form onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }} className="flex items-center gap-2">
-          <input id={`input-teacher-chat-${compact ? 'compact' : 'full'}`} type="text" enterKeyHint="send" autoCapitalize="sentences" autoComplete="off" value={inputValue} onChange={(e) => setInputValue(e.target.value)} placeholder={`Escribe tu respuesta para ${teacher?.name}...`} disabled={isLoading} className="flex-1 min-w-0 rounded-xl px-4 py-3.5 text-base bg-slate-800 text-white focus:outline-none border-2 border-slate-700 transition-all font-medium shadow-inner" style={{ caretColor: studentTheme.accent }} />
+          <input id={`input-teacher-chat-${compact ? 'compact' : 'full'}`} type="text" enterKeyHint="send" autoCapitalize="sentences" autoComplete="off" value={inputValue} onChange={(e) => setInputValue(e.target.value)} placeholder={`Escribe tu respuesta para ${teacher?.name}...`} className="flex-1 min-w-0 rounded-xl px-4 py-3.5 text-base bg-slate-800 text-white focus:outline-none border-2 border-slate-700 transition-all font-medium shadow-inner" style={{ caretColor: studentTheme.accent }} />
           <button type="submit" disabled={!inputValue.trim() || isLoading} aria-label="Enviar mensaje" className="p-3.5 min-h-[48px] min-w-[48px] flex items-center justify-center rounded-xl text-white hover:brightness-110 disabled:opacity-50 transition-all shadow-lg active:scale-95 shrink-0" style={{ background: studentTheme.accent, boxShadow: `0 6px 20px ${studentTheme.accent}55` }}><Send className="w-5 h-5" /></button>
         </form>
         {world && <p className="text-[9px] text-slate-600 italic mt-2 text-center">{world.quote}</p>}
