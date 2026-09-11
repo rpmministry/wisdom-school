@@ -109,6 +109,9 @@ textarea {
 
 .markdown-body {
   line-height: 1.6;
+  /* Evita que una palabra/URL larga desborde y rompa el scroll del chat. */
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .markdown-body p,

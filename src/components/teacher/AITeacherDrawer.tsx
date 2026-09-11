@@ -40,6 +40,10 @@ export const AITeacherDrawer: React.FC = () => {
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const scrollBoxRef = useRef<HTMLDivElement>(null);
+  // Solo auto-scrolleamos si el niño ya está al final y no está tocando la pantalla.
+  // Un scrollTo programático durante su gesto le "roba" el scroll y lo deja trabado.
+  const pinnedToBottomRef = useRef(true);
+  const isTouchingRef = useRef(false);
 
   const [speakingId, setSpeakingId] = useState<string | null>(null);
   const [isPaused, setIsPaused] = useState(false);
@@ -88,11 +92,21 @@ export const AITeacherDrawer: React.FC = () => {
     return () => window.removeEventListener('keydown', onKey);
   }, [isTeacherDrawerOpen, setIsTeacherDrawerOpen]);
 
-  // Auto-scroll del hilo SIN animación: 'smooth' disparaba trabajo de scroll continuo
-  // mientras llegaba la respuesta y agravaba el bloqueo percibido.
-  useEffect(() => {
+  const handleThreadScroll = () => {
     const box = scrollBoxRef.current;
-    if (box) box.scrollTo({ top: box.scrollHeight, behavior: 'auto' });
+    if (!box) return;
+    pinnedToBottomRef.current = box.scrollHeight - box.scrollTop - box.clientHeight < 72;
+  };
+
+  // Auto-scroll condicionado: sin 'smooth' y sin interrumpir si el usuario está leyendo o tocando.
+  useEffect(() => {
+    if (!pinnedToBottomRef.current || isTouchingRef.current) return;
+    const box = scrollBoxRef.current;
+    if (!box) return;
+    const raf = requestAnimationFrame(() => {
+      box.scrollTop = box.scrollHeight;
+    });
+    return () => cancelAnimationFrame(raf);
   }, [messages, isLoading]);
 
   const handleSendMessage = async (customText?: string) => {
@@ -104,6 +118,7 @@ export const AITeacherDrawer: React.FC = () => {
     const userMessage: ChatMessage = { id: `msg-${Date.now()}`, role: 'user', content: textToSend, timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) };
     const updatedMessages = [...messages, userMessage];
     setMessages(updatedMessages);
+    pinnedToBottomRef.current = true; // al enviar, siempre queremos ver el final
     setInputValue('');
     setIsLoading(true);
 
@@ -165,7 +180,14 @@ export const AITeacherDrawer: React.FC = () => {
           </div>
         </div>
 
-        <div ref={scrollBoxRef} className="flex-1 overflow-y-auto overscroll-contain touch-pan-y p-4 space-y-5">
+        <div
+          ref={scrollBoxRef}
+          onScroll={handleThreadScroll}
+          onTouchStart={() => { isTouchingRef.current = true; }}
+          onTouchEnd={() => { isTouchingRef.current = false; }}
+          onTouchCancel={() => { isTouchingRef.current = false; }}
+          className="flex-1 overflow-y-auto overscroll-contain touch-pan-y [overflow-anchor:none] p-4 space-y-5"
+        >
           <p className="text-[10px] text-slate-400 flex items-center gap-1.5">
             <Volume2 className="w-3 h-3" /> El audio se reproduce solo cuando tú presionas <strong className="text-emerald-400">REPRODUCIR</strong>.
           </p>

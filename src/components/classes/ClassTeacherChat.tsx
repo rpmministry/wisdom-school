@@ -60,6 +60,9 @@ export const ClassTeacherChat: React.FC<ClassTeacherChatProps> = ({ className = 
   const [speakingId, setSpeakingId] = useState<string | null>(null);
   const [isPaused, setIsPaused] = useState(false);
   const scrollBoxRef = useRef<HTMLDivElement>(null);
+  // Solo auto-scrolleamos si el niño ya está al final y no está tocando la pantalla.
+  const pinnedToBottomRef = useRef(true);
+  const isTouchingRef = useRef(false);
 
   const handlePlayVoice = async (text: string, messageId: string) => {
     await ttsService.play({
@@ -91,12 +94,23 @@ export const ClassTeacherChat: React.FC<ClassTeacherChatProps> = ({ className = 
     }
   }, [teacher?.id, currentStudent.id, subject?.id, dailyClass?.id]);
 
-  // El auto-scroll solo mueve LA CAJA INTERNA del chat (scrollTop propio).
-  // scrollIntoView burbujea hacia TODOS los scrollables ancestros incluido <main>:
-  // era el culpable de que al entrar a una clase la página saltara al fondo.
-  useEffect(() => {
+  const handleThreadScroll = () => {
     const box = scrollBoxRef.current;
-    if (box) box.scrollTo({ top: box.scrollHeight, behavior: 'smooth' });
+    if (!box) return;
+    pinnedToBottomRef.current = box.scrollHeight - box.scrollTop - box.clientHeight < 72;
+  };
+
+  // El auto-scroll solo mueve LA CAJA INTERNA del chat y sin 'smooth'.
+  // Condicionado a "estoy al final y no estoy tocando" para no robar el gesto táctil
+  // cuando llega la respuesta de la IA (eso era lo que dejaba el scroll trabado).
+  useEffect(() => {
+    if (!pinnedToBottomRef.current || isTouchingRef.current) return;
+    const box = scrollBoxRef.current;
+    if (!box) return;
+    const raf = requestAnimationFrame(() => {
+      box.scrollTop = box.scrollHeight;
+    });
+    return () => cancelAnimationFrame(raf);
   }, [messages, isLoading]);
 
   const handleSendMessage = async (customText?: string) => {
@@ -108,6 +122,7 @@ export const ClassTeacherChat: React.FC<ClassTeacherChatProps> = ({ className = 
     const userMessage: ChatMessage = { id: `msg-${Date.now()}`, role: 'user', content: textToSend, timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) };
     const updatedMessages = [...messages, userMessage];
     setMessages(updatedMessages);
+    pinnedToBottomRef.current = true; // al enviar, siempre queremos ver el final
     setInputValue('');
     setIsLoading(true);
 
@@ -192,7 +207,15 @@ export const ClassTeacherChat: React.FC<ClassTeacherChatProps> = ({ className = 
       </div>
 
       {/* ZONA CENTRAL: EL DESARROLLO DE LA CLASE (EXPLICACIÓN ↔ RESPUESTA) */}
-      <div ref={scrollBoxRef} className={`flex-1 overflow-y-auto overscroll-contain touch-pan-y p-4 sm:p-6 space-y-5 ${compact ? 'h-[340px] sm:h-[420px] xl:h-[520px]' : 'h-[420px] sm:h-[520px] lg:h-[560px] xl:h-[620px]'}`} style={{ scrollbarWidth: 'thin', scrollbarColor: studentTheme.accent }}>
+      <div
+        ref={scrollBoxRef}
+        onScroll={handleThreadScroll}
+        onTouchStart={() => { isTouchingRef.current = true; }}
+        onTouchEnd={() => { isTouchingRef.current = false; }}
+        onTouchCancel={() => { isTouchingRef.current = false; }}
+        className={`flex-1 overflow-y-auto overscroll-contain touch-pan-y [overflow-anchor:none] p-4 sm:p-6 space-y-5 ${compact ? 'h-[340px] sm:h-[420px] xl:h-[520px]' : 'h-[420px] sm:h-[520px] lg:h-[560px] xl:h-[620px]'}`}
+        style={{ scrollbarWidth: 'thin', scrollbarColor: studentTheme.accent }}
+      >
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center py-12 text-center gap-2">
             <Bot className="w-12 h-12 mb-1" style={{ color: studentTheme.accent }} />
