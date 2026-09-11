@@ -60,9 +60,11 @@ export const ClassTeacherChat: React.FC<ClassTeacherChatProps> = ({ className = 
   const [speakingId, setSpeakingId] = useState<string | null>(null);
   const [isPaused, setIsPaused] = useState(false);
   const scrollBoxRef = useRef<HTMLDivElement>(null);
-  // Solo auto-scrolleamos si el niño ya está al final y no está tocando la pantalla.
+  // Solo auto-scrolleamos si el niño ya está al final y no hay ningún puntero/touch activo.
+  // Un scroll programático durante un gesto deja el scroller "trabado" (sobre todo en iOS).
   const pinnedToBottomRef = useRef(true);
   const isTouchingRef = useRef(false);
+  const pointerDownRef = useRef(false);
 
   const handlePlayVoice = async (text: string, messageId: string) => {
     await ttsService.play({
@@ -100,14 +102,28 @@ export const ClassTeacherChat: React.FC<ClassTeacherChatProps> = ({ className = 
     pinnedToBottomRef.current = box.scrollHeight - box.scrollTop - box.clientHeight < 72;
   };
 
-  // El auto-scroll solo se dispara cuando llega/entra un MENSAJE (no al activarse isLoading),
-  // y solo si el usuario está al final y no está tocando. Sin 'smooth' y sin robar el gesto.
+  // Cualquier puntero activo (incluido el dedo sobre "Enviar") pausa el auto-scroll.
   useEffect(() => {
-    if (!pinnedToBottomRef.current || isTouchingRef.current) return;
+    const down = () => { pointerDownRef.current = true; };
+    const up = () => { pointerDownRef.current = false; };
+    window.addEventListener('pointerdown', down, { passive: true });
+    window.addEventListener('pointerup', up, { passive: true });
+    window.addEventListener('pointercancel', up, { passive: true });
+    return () => {
+      window.removeEventListener('pointerdown', down);
+      window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', up);
+    };
+  }, []);
+
+  // Auto-scroll solo cuando entra/llega un MENSAJE, si el usuario está al final y
+  // sin ningún puntero activo. Sin 'smooth'.
+  useEffect(() => {
+    if (!pinnedToBottomRef.current || isTouchingRef.current || pointerDownRef.current) return;
     const box = scrollBoxRef.current;
     if (!box) return;
     const raf = requestAnimationFrame(() => {
-      if (isTouchingRef.current) return;
+      if (isTouchingRef.current || pointerDownRef.current) return;
       box.scrollTop = box.scrollHeight;
     });
     return () => cancelAnimationFrame(raf);
@@ -151,7 +167,7 @@ export const ClassTeacherChat: React.FC<ClassTeacherChatProps> = ({ className = 
   const quickPrompts = ['¿Me das un ejemplo cotidiano?', '¿Por qué ocurre esto?', 'Ya lo entendí, siguiente paso'];
 
   return (
-    <div className={`flex flex-col rounded-3xl border overflow-hidden bg-slate-900/80 shadow-2xl ${className}`} style={{ borderColor: `${studentTheme.accent}44` }}>
+    <div className={`flex flex-col rounded-3xl border overflow-clip bg-slate-900/80 shadow-2xl ${className}`} style={{ borderColor: `${studentTheme.accent}44` }}>
 
       {/* CABECERA: EL PROFESOR COMO PROTAGONISTA DE LA CLASE */}
       <div className="p-5 sm:p-6 border-b space-y-4" style={{ background: `linear-gradient(135deg, ${studentTheme.accent}26, rgba(15,23,42,0.94) 55%, rgba(2,6,23,0.97))` }}>
@@ -213,7 +229,7 @@ export const ClassTeacherChat: React.FC<ClassTeacherChatProps> = ({ className = 
         onTouchStart={() => { isTouchingRef.current = true; }}
         onTouchEnd={() => { isTouchingRef.current = false; }}
         onTouchCancel={() => { isTouchingRef.current = false; }}
-        className={`flex-1 min-h-0 overflow-y-auto overscroll-contain touch-pan-y [overflow-anchor:none] p-4 sm:p-6 space-y-5 ${compact ? 'h-[340px] sm:h-[420px] xl:h-[520px]' : 'h-[420px] sm:h-[520px] lg:h-[560px] xl:h-[620px]'}`}
+        className={`shrink-0 overflow-y-auto touch-pan-y [overflow-anchor:none] p-4 sm:p-6 space-y-5 ${compact ? 'h-[340px] sm:h-[420px] xl:h-[520px]' : 'h-[420px] sm:h-[520px] lg:h-[560px] xl:h-[620px]'}`}
         style={{ scrollbarWidth: 'thin', scrollbarColor: studentTheme.accent }}
       >
         {messages.length === 0 && (

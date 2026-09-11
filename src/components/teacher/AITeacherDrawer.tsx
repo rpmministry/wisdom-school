@@ -44,6 +44,7 @@ export const AITeacherDrawer: React.FC = () => {
   // Un scrollTo programático durante su gesto le "roba" el scroll y lo deja trabado.
   const pinnedToBottomRef = useRef(true);
   const isTouchingRef = useRef(false);
+  const pointerDownRef = useRef(false);
 
   const [speakingId, setSpeakingId] = useState<string | null>(null);
   const [isPaused, setIsPaused] = useState(false);
@@ -98,14 +99,28 @@ export const AITeacherDrawer: React.FC = () => {
     pinnedToBottomRef.current = box.scrollHeight - box.scrollTop - box.clientHeight < 72;
   };
 
-  // Auto-scroll solo cuando entra/llega un MENSAJE (no al activarse isLoading) y
-  // solo si el usuario está al final y no está tocando. Sin 'smooth'.
+  // Cualquier puntero activo (incluido el dedo sobre "Enviar") pausa el auto-scroll.
   useEffect(() => {
-    if (!pinnedToBottomRef.current || isTouchingRef.current) return;
+    const down = () => { pointerDownRef.current = true; };
+    const up = () => { pointerDownRef.current = false; };
+    window.addEventListener('pointerdown', down, { passive: true });
+    window.addEventListener('pointerup', up, { passive: true });
+    window.addEventListener('pointercancel', up, { passive: true });
+    return () => {
+      window.removeEventListener('pointerdown', down);
+      window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', up);
+    };
+  }, []);
+
+  // Auto-scroll solo cuando entra/llega un MENSAJE, si el usuario está al final y
+  // sin ningún puntero activo. Sin 'smooth'.
+  useEffect(() => {
+    if (!pinnedToBottomRef.current || isTouchingRef.current || pointerDownRef.current) return;
     const box = scrollBoxRef.current;
     if (!box) return;
     const raf = requestAnimationFrame(() => {
-      if (isTouchingRef.current) return;
+      if (isTouchingRef.current || pointerDownRef.current) return;
       box.scrollTop = box.scrollHeight;
     });
     return () => cancelAnimationFrame(raf);
@@ -188,7 +203,7 @@ export const AITeacherDrawer: React.FC = () => {
           onTouchStart={() => { isTouchingRef.current = true; }}
           onTouchEnd={() => { isTouchingRef.current = false; }}
           onTouchCancel={() => { isTouchingRef.current = false; }}
-          className="flex-1 min-h-0 overflow-y-auto overscroll-contain touch-pan-y [overflow-anchor:none] p-4 space-y-5"
+          className="flex-1 min-h-0 overflow-y-auto touch-pan-y [overflow-anchor:none] p-4 space-y-5"
         >
           <p className="text-[10px] text-slate-400 flex items-center gap-1.5">
             <Volume2 className="w-3 h-3" /> El audio se reproduce solo cuando tú presionas <strong className="text-emerald-400">REPRODUCIR</strong>.
