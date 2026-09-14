@@ -1,5 +1,6 @@
 import { Student, Subject, DailyClass, ScheduleEntry, NewStudentInput } from '../types';
 import { AVRIL_SUBJECTS, GAEL_SUBJECTS } from '../data/mockData';
+import { getSchoolWeek, SCHOOL_START_DATE, toDayKey } from './schoolCalendar';
 
 export function createNewStudentProfile(input: NewStudentInput): {
   student: Student;
@@ -70,7 +71,7 @@ export function createNewStudentProfile(input: NewStudentInput): {
         {
           trimesterNumber: 1,
           title: '1.º TRIMESTRE: Adaptación e Investigación Inicial',
-          startDate: 'Martes 01 de Septiembre 2026',
+          startDate: 'Lunes 07 de Septiembre 2026',
           endDate: '24 de Noviembre 2026',
           valuationDate: 'Desde el 25 Nov 2026',
           description: 'Inicio lectivo, diagnóstico adaptativo y desarrollo del primer proyecto transversal.',
@@ -125,8 +126,11 @@ export function createNewStudentProfile(input: NewStudentInput): {
     };
   });
 
-  // Sample initial daily classes for the new student across week days
+  // Clases iniciales del nuevo estudiante, fechadas en la semana escolar vigente (nunca en una semana anterior).
   const days: ('Lunes' | 'Martes' | 'Miércoles' | 'Jueves' | 'Viernes')[] = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
+  const currentWeek = getSchoolWeek();
+  const dateForDay = (day: typeof days[number]): string =>
+    toDayKey(currentWeek.find((info) => info.day === day)?.date || SCHOOL_START_DATE);
   const newClasses: DailyClass[] = newSubjects.flatMap((sub, index) => {
     const day = days[index % days.length];
     return [
@@ -134,7 +138,7 @@ export function createNewStudentProfile(input: NewStudentInput): {
         id: `class-${sub.id}-01`,
         subjectId: sub.id,
         studentId: studentId,
-        date: '2026-09-01',
+        date: dateForDay(day),
         dayOfWeek: day,
         scheduleTime: '08:00 - 09:30 (90 min)',
         unit: 'Unidad 1: Fundamentos e Indagación',

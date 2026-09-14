@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useSchool, DayOfWeekName } from '../../context/SchoolContext';
+import { useSchool } from '../../context/SchoolContext';
 import { useScrollToTopOnChange } from '../../hooks/useScrollToTopOnChange';
 import { scrollAppToTop } from '../../utils/scrollToTop';
 import { DailyClass, ClassActivity } from '../../types';
@@ -16,14 +16,6 @@ import {
   ListTodo, Upload, Sparkles, ExternalLink,
   CheckCircle2, Cpu, Layers, Lightbulb, Calendar, AlertCircle, BrainCircuit, Lock, ChevronDown,
 } from 'lucide-react';
-
-const DAYS_CONFIG: { day: DayOfWeekName; date: string; isStart?: boolean }[] = [
-  { day: 'Lunes', date: '07 Sep', isStart: true },
-  { day: 'Martes', date: '08 Sep' },
-  { day: 'Miércoles', date: '09 Sep' },
-  { day: 'Jueves', date: '10 Sep' },
-  { day: 'Viernes', date: '11 Sep' },
-];
 
 const forceSpanishUrl = (url: string) => {
   if (!url || url === '#') return '#';
@@ -64,7 +56,7 @@ export const DailyClassView: React.FC = () => {
   const {
     activeClass, todayClasses, allStudentClasses, selectedDayOfWeek, setSelectedDayOfWeek,
     setActiveClass, studentSubjects, activeSubject, setActiveSubject, openTeacherDrawerWithContext,
-    toggleActivityCompletion, currentStudent,
+    toggleActivityCompletion, currentStudent, schoolWeek,
     microRouteProgress, markMicroCleared, resetMicroRoute,
   } = useSchool();
 
@@ -216,12 +208,12 @@ export const DailyClassView: React.FC = () => {
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div className="flex items-center gap-2"><Calendar className="w-5 h-5 text-indigo-400" /><span className="text-sm font-extrabold text-white">Día Escolar ({currentStudent.name}):</span></div>
           <div className="flex flex-wrap items-center gap-2">
-            {DAYS_CONFIG.map(({ day, date, isStart }) => {
+            {schoolWeek.map(({ day, dateLabel, isToday }) => {
               const isSelected = day === selectedDayOfWeek;
               const countForDay = allStudentClasses.filter((c: any) => c.studentId === currentStudent.id && c.dayOfWeek === day).length;
               return (
                 <button key={day} onClick={() => { setSelectedDayOfWeek(day); const classesOnDay = allStudentClasses.filter((c: any) => c.studentId === currentStudent.id && c.dayOfWeek === day); if (classesOnDay.length > 0) { setActiveClass(classesOnDay[0]); const clsSub = studentSubjects.find((s: any) => s.id === classesOnDay[0].subjectId); if (clsSub) setActiveSubject(clsSub); } }} className={`touch-lift px-3.5 py-1.5 min-h-[44px] rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${isSelected ? 'bg-indigo-600 text-white shadow-md ring-2 ring-indigo-400' : 'bg-slate-900/80 text-slate-300 hover:bg-slate-700 border border-slate-700/60'}`}>
-                  <span>{day}</span><span className={`text-[10px] px-1.5 py-0.5 rounded font-mono ${isSelected ? 'bg-indigo-700 text-indigo-100' : 'bg-slate-800 text-slate-400'}`}>{date}</span><span className={`text-[10px] px-1.5 py-0.2 rounded-full ${isSelected ? 'bg-indigo-800 text-white font-mono' : 'bg-slate-800 text-slate-400 font-mono'}`}>{countForDay}</span>
+                  <span>{day}</span><span className={`text-[10px] px-1.5 py-0.5 rounded font-mono ${isSelected ? 'bg-indigo-700 text-indigo-100' : 'bg-slate-800 text-slate-400'}`}>{dateLabel}</span>{isToday && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" title="Día de hoy" />}<span className={`text-[10px] px-1.5 py-0.2 rounded-full ${isSelected ? 'bg-indigo-800 text-white font-mono' : 'bg-slate-800 text-slate-400 font-mono'}`}>{countForDay}</span>
                 </button>
               );
             })}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useSchool, DayOfWeekName } from '../../context/SchoolContext';
+import { useSchool } from '../../context/SchoolContext';
 import { StudentAvatar } from '../common/StudentAvatar';
 import { WorldHeaderBanner } from '../common/WorldCharacters';
 import { DevocionalCard } from './DevocionalCard';
@@ -22,14 +22,6 @@ import {
   ChevronRight,
 } from 'lucide-react';
 
-const DAYS_CONFIG: { day: DayOfWeekName; date: string; isStart?: boolean }[] = [
-   { day: 'Lunes', date: '07 Sep', isStart: true },
-   { day: 'Martes', date: '08 Sep' },
-   { day: 'Miércoles', date: '09 Sep' },
-   { day: 'Jueves', date: '10 Sep' },
-   { day: 'Viernes', date: '11 Sep' },
- ];
-
 export const StudentDashboard: React.FC = () => {
   const isReviewWeek = new Date() < new Date('2026-09-07T00:00:00');
   const [isMounted, setIsMounted] = useState(false);
@@ -50,6 +42,7 @@ export const StudentDashboard: React.FC = () => {
     openTeacherDrawerWithContext,
     submissions,
     todaySchedule,
+    schoolWeek,
   } = useSchool();
 
   const studentSubmissions = submissions.filter((s: any) => s.studentId === currentStudent.id);
@@ -113,7 +106,7 @@ export const StudentDashboard: React.FC = () => {
         </div>
 
         <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-          {DAYS_CONFIG.map(({ day, date, isStart }) => {
+          {schoolWeek.map(({ day, dateLabel, isToday, isFirstSchoolDay }) => {
             const isSelected = day === selectedDayOfWeek;
             return (
               <button
@@ -135,10 +128,13 @@ export const StudentDashboard: React.FC = () => {
                       : 'bg-slate-700/80 text-slate-400'
                   }`}
                 >
-                  {date}
+                  {dateLabel}
                 </span>
-                {isStart && (
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" title="Primer Día de Clases (1 Sep 2026)" />
+                {isFirstSchoolDay && (
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" title="Primer Día de Clases (07 Sep 2026)" />
+                )}
+                {!isFirstSchoolDay && isToday && (
+                  <span className="w-2 h-2 rounded-full bg-amber-400" title="Día de hoy" />
                 )}
               </button>
             );

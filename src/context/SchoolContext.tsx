@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, useRef } from 'react';
 import {
   Student,
   StudentId,
@@ -17,6 +17,15 @@ import {
   SCHEDULE_DATA,
 } from '../data/mockData';
 import { createNewStudentProfile } from '../utils/studentRegistration';
+import {
+  getCurrentSchoolDay,
+  getSchoolWeek,
+  getSchoolWeekIndex,
+  normalizeDayKey,
+  parseDayKey,
+  toDayKey,
+  type SchoolDayInfo,
+} from '../utils/schoolCalendar';
 
 export type DayOfWeekName = 'Lunes' | 'Martes' | 'Miércoles' | 'Jueves' | 'Viernes';
 
@@ -66,6 +75,12 @@ interface SchoolContextType {
   lastSavedAt: number | null;
   studentSchedule: ScheduleEntry[];
   todaySchedule: ScheduleEntry[];
+  /** Día escolar real (lunes-viernes) según la fecha del sistema. */
+  currentSchoolDay: DayOfWeekName;
+  /** Semana escolar vigente (lunes-viernes) con fechas y etiquetas dinámicas. */
+  schoolWeek: SchoolDayInfo[];
+  /** Índice de la semana escolar (0 = semana del 7 de septiembre de 2026). */
+  schoolWeekIndex: number;
   classesList: DailyClass[];
   customAvatars: Record<StudentId, string>;
   updateStudentAvatar: (studentId: StudentId, avatarUrl: string) => void;
@@ -81,32 +96,6 @@ interface SchoolContextType {
 }
 
 const SchoolContext = createContext<SchoolContextType | undefined>(undefined);
-
-const SCHOOL_START_DATE = new Date('2026-09-07T00:00:00');
-const SCHOOL_START_DAY = 'Lunes'; // 7 de septiembre de 2026 es Lunes
-
-const getInitialDayOfWeek = (): DayOfWeekName => {
-  // Iniciar siempre en Lunes para el inicio de clases (7 sep 2026)
-  // Si aún no ha empezado el colegio, también mostrar Lunes
-  return SCHOOL_START_DAY;
-};
-
-const isBeforeSchoolStart = (): boolean => new Date() < SCHOOL_START_DATE;
-
-const daysSinceStart = (): number => {
-  const today = new Date();
-  const todayDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-  const startTime = SCHOOL_START_DATE.getTime();
-  return Math.ceil((todayDate.getTime() - startTime) / (1000 * 60 * 60 * 24));
-};
-
-const getCurrentSchoolDay = (): DayOfWeekName => {
-  const offset = daysSinceStart();
-  if (offset < 0) return SCHOOL_START_DAY; // Empezar en Lunes antes del inicio
-  const schoolDays: DayOfWeekName[] = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
-  const dayIndex = (offset % 5 + 5) % 5;
-  return schoolDays[dayIndex];
-};
 
 export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   useEffect(() => {
@@ -163,15 +152,40 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const openAuthModal = (studentId?: string) => { setTargetLoginStudentId(studentId); setIsAuthModalOpen(true); };
   const closeAuthModal = () => { setIsAuthModalOpen(false); setTargetLoginStudentId(undefined); };
 
-  const [selectedDayOfWeek, setSelectedDayOfWeek] = useState<DayOfWeekName>(getInitialDayOfWeek);
+  // La fecha real (clave local) gobierna la semana escolar vigente. Al cambiar de día se recalcula
+  // automáticamente, por lo que el horario salta solo a la semana nueva (incluido el cruce de fin de semana).
+  const [calendarDay, setCalendarDay] = useState<string>(() => toDayKey(new Date()));
+  const currentSchoolDay = useMemo(() => getCurrentSchoolDay(parseDayKey(calendarDay)), [calendarDay]);
+  const schoolWeek = useMemo(() => getSchoolWeek(parseDayKey(calendarDay)), [calendarDay]);
+  const schoolWeekIndex = useMemo(() => getSchoolWeekIndex(parseDayKey(calendarDay)), [calendarDay]);
 
-  // Auto-update selectedDayOfWeek to current school day (but allow manual override)
+  const [selectedDayOfWeek, setSelectedDayOfWeek] = useState<DayOfWeekName>(() => getCurrentSchoolDay());
+  const lastSyncedSchoolDayRef = useRef<DayOfWeekName>(getCurrentSchoolDay());
+
+  // Auto-update selectedDayOfWeek to current school day (but allow manual override within the same day).
+  // Se revalida en cada minuto y al volver a la pestaña para que nunca quede anclado a la semana anterior.
   useEffect(() => {
-    if (!isBeforeSchoolStart()) {
-      const currentSchoolDay = getCurrentSchoolDay();
-      setSelectedDayOfWeek(currentSchoolDay);
-    }
+    const syncCalendar = () => {
+      const now = new Date();
+      const todayKey = toDayKey(now);
+      const schoolDay = getCurrentSchoolDay(now);
+      setCalendarDay((prev) => (prev === todayKey ? prev : todayKey));
+      if (lastSyncedSchoolDayRef.current !== schoolDay) {
+        lastSyncedSchoolDayRef.current = schoolDay;
+        setSelectedDayOfWeek(schoolDay);
+      }
+    };
+    syncCalendar();
+    const intervalId = window.setInterval(syncCalendar, 60 * 1000);
+    document.addEventListener('visibilitychange', syncCalendar);
+    window.addEventListener('focus', syncCalendar);
+    return () => {
+      window.clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', syncCalendar);
+      window.removeEventListener('focus', syncCalendar);
+    };
   }, []);
+
   const [activeTab, setActiveTab] = useState<NavigationTab>('home');
   const [navigationHistory, setNavigationHistory] = useState<NavigationTab[]>([]);
   const [activeSubject, setActiveSubject] = useState<Subject | null>(null);
@@ -405,7 +419,16 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   });
 
   const allStudentClasses = classesList.filter((cls) => cls.studentId === currentStudentId);
-  const todayClasses = allStudentClasses.filter((cls) => cls.dayOfWeek === selectedDayOfWeek).sort((a, b) => (a.scheduleTime?.slice(0, 5) || '00:00').localeCompare(b.scheduleTime?.slice(0, 5) || '00:00'));
+  const classesOfSelectedDay = allStudentClasses.filter((cls) => cls.dayOfWeek === selectedDayOfWeek);
+  // Las clases se eligen por la semana escolar en curso: así el tema y la guía didáctica de cada día
+  // corresponden a la semana actual y no a la anterior. Si el plan solo tiene una semana de contenido,
+  // se conserva la clase semanal del día seleccionado para no dejar la materia vacía.
+  const currentWeekDates = new Set(schoolWeek.map((info) => toDayKey(info.date)));
+  const classesOfCurrentWeek = classesOfSelectedDay.filter(
+    (cls) => cls.date && currentWeekDates.has(normalizeDayKey(cls.date)),
+  );
+  const todayClasses = (classesOfCurrentWeek.length > 0 ? classesOfCurrentWeek : classesOfSelectedDay)
+    .sort((a, b) => (a.scheduleTime?.slice(0, 5) || '00:00').localeCompare(b.scheduleTime?.slice(0, 5) || '00:00'));
   const studentSchedule = allSchedules.filter((sch) => sch.studentId === currentStudentId);
   const todaySchedule = studentSchedule.filter((sch) => sch.dayOfWeek === selectedDayOfWeek);
 
@@ -414,7 +437,7 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setActiveClass(matchingClass);
     if (matchingClass) setActiveSubject(studentSubjects.find((s) => s.id === matchingClass.subjectId) || null);
     else setActiveSubject(studentSubjects[0] || null);
-  }, [currentStudentId, selectedDayOfWeek]);
+  }, [currentStudentId, selectedDayOfWeek, calendarDay]);
 
   const addSubmission = (subData: Omit<StudentSubmission, 'id' | 'submittedAt'>): StudentSubmission => {
     const newSub: StudentSubmission = { ...subData, id: `sub-${Date.now()}`, submittedAt: new Date().toISOString().replace('T', ' ').slice(0, 16) };
@@ -496,6 +519,9 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         lastSavedAt,
         studentSchedule, 
         todaySchedule, 
+        currentSchoolDay,
+        schoolWeek,
+        schoolWeekIndex,
         classesList, 
         customAvatars, 
         updateStudentAvatar, 

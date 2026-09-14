@@ -33,18 +33,13 @@ export const ScheduleView: React.FC = () => {
     setSelectedDayOfWeek,
     setActiveSubject,
     studentSubjects,
+    schoolWeek,
   } = useSchool();
 
   const [activeSubTab, setActiveSubTab] = useState<'horario' | 'cronograma' | 'proyectos'>('horario');
   const [selectedDay, setSelectedDay] = useState<'Todos' | 'Lunes' | 'Martes' | 'Miércoles' | 'Jueves' | 'Viernes'>('Todos');
 
-const scheduleDays: { day: 'Lunes' | 'Martes' | 'Miércoles' | 'Jueves' | 'Viernes'; date: string; isRepaso?: boolean; isStart?: boolean }[] = [
-     { day: 'Lunes', date: '07 Sep', isStart: true },
-     { day: 'Martes', date: '08 Sep', isRepaso: false },
-     { day: 'Miércoles', date: '09 Sep', isRepaso: false },
-     { day: 'Jueves', date: '10 Sep', isRepaso: false },
-     { day: 'Viernes', date: '11 Sep', isRepaso: false },
-   ];
+  const selectedDayInfo = schoolWeek.find((info) => info.day === selectedDay);
 
   const plan = currentStudent.academicPlan;
   const scheduleSlots = currentStudent.id === 'avril' ? AVRIL_SCHEDULE_SLOTS : GAEL_SCHEDULE_SLOTS;
@@ -202,7 +197,7 @@ const scheduleDays: { day: 'Lunes' | 'Martes' | 'Miércoles' | 'Jueves' | 'Viern
               >
                 Tabla Completa
               </button>
-              {scheduleDays.map(({ day, date, isRepaso, isStart }) => (
+              {schoolWeek.map(({ day, dateLabel, isToday, isFirstSchoolDay }) => (
                 <button
                   key={day}
                   onClick={() => setSelectedDay(day)}
@@ -213,9 +208,9 @@ const scheduleDays: { day: 'Lunes' | 'Martes' | 'Miércoles' | 'Jueves' | 'Viern
                   }`}
                 >
                   <span>{day}</span>
-                  <span className="text-[10px] font-mono opacity-80">{date}</span>
-                  {isStart && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />}
-                  {isRepaso && <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />}
+                  <span className="text-[10px] font-mono opacity-80">{dateLabel}</span>
+                  {isFirstSchoolDay && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" title="Primer día de clases" />}
+                  {!isFirstSchoolDay && isToday && <span className="w-1.5 h-1.5 rounded-full bg-amber-400" title="Día de hoy" />}
                 </button>
               ))}
             </div>
@@ -228,31 +223,29 @@ const scheduleDays: { day: 'Lunes' | 'Martes' | 'Miércoles' | 'Jueves' | 'Viern
                     <thead>
                       <tr className="bg-slate-800/90 border-b border-slate-700 text-xs font-extrabold uppercase text-slate-300">
                         <th className="py-3.5 px-4 text-slate-400 w-32 border-r border-slate-700/60">Hora</th>
-<th className="py-3.5 px-4 border-r border-slate-700/60">
-                           <div className="flex items-center gap-1 text-indigo-300">
-                             <span>Lunes</span>
-                             <span className="text-[9px] px-1 rounded bg-emerald-500/20 text-emerald-300 font-bold">PRIMER DÍA</span>
-                           </div>
-                           <div className="text-[10px] text-indigo-200 font-normal font-mono normal-case">07 Sep 2026</div>
-                         </th>
-                         <th className="py-3.5 px-4 border-r border-slate-700/60">
-                           <div>Martes</div>
-                           <div className="text-[10px] text-slate-400 font-normal font-mono normal-case">08 Sep</div>
-                         </th>
-                         <th className="py-3.5 px-4 border-r border-slate-700/60">
-                           <div>Miércoles</div>
-                           <div className="text-[10px] text-slate-400 font-normal font-mono normal-case">09 Sep</div>
-                         </th>
-                         <th className="py-3.5 px-4 border-r border-slate-700/60">
-                           <div>Jueves</div>
-                           <div className="text-[10px] text-slate-400 font-normal font-mono normal-case">10 Sep</div>
-                         </th>
-                         <th className="py-3.5 px-4">
-                           <div className="flex items-center gap-1 text-amber-300">
-                             <span>Viernes</span>
-                           </div>
-                           <div className="text-[10px] text-amber-200 font-normal font-mono normal-case">11 Sep 2026</div>
-                         </th>
+                        {schoolWeek.map(({ day, dateLabelLong, isToday, isFirstSchoolDay }, index) => {
+                          const isMonday = day === 'Lunes';
+                          const isFriday = day === 'Viernes';
+                          return (
+                            <th
+                              key={day}
+                              className={`py-3.5 px-4 ${index < schoolWeek.length - 1 ? 'border-r border-slate-700/60' : ''}`}
+                            >
+                              <div className={`flex items-center gap-1 ${isMonday ? 'text-indigo-300' : isFriday ? 'text-amber-300' : ''}`}>
+                                <span>{day}</span>
+                                {isFirstSchoolDay && (
+                                  <span className="text-[9px] px-1 rounded bg-emerald-500/20 text-emerald-300 font-bold">PRIMER DÍA</span>
+                                )}
+                                {!isFirstSchoolDay && isToday && (
+                                  <span className="text-[9px] px-1 rounded bg-amber-500/20 text-amber-300 font-bold">HOY</span>
+                                )}
+                              </div>
+                              <div className={`text-[10px] font-normal font-mono normal-case ${isMonday ? 'text-indigo-200' : isFriday ? 'text-amber-200' : 'text-slate-400'}`}>
+                                {dateLabelLong}
+                              </div>
+                            </th>
+                          );
+                        })}
                       </tr>
                     </thead>
                 <tbody className="divide-y divide-slate-800 text-xs">
@@ -326,14 +319,17 @@ const scheduleDays: { day: 'Lunes' | 'Martes' | 'Miércoles' | 'Jueves' | 'Viern
                 <div>
                   <span className="text-xs uppercase font-extrabold text-indigo-300 tracking-wider">Horario de</span>
                   <h3 className="text-lg font-bold text-white">{selectedDay}</h3>
+                  {selectedDayInfo && (
+                    <span className="text-[11px] text-slate-400 font-mono">{selectedDayInfo.dateLabelLong}</span>
+                  )}
                 </div>
-{selectedDay === 'Lunes' && (
+{selectedDayInfo?.isFirstSchoolDay && (
                    <span className="text-xs font-bold px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1.5">
                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
                      PRIMER DÍA DE CLASES (07 SEP 2026)
                    </span>
                  )}
-                 {selectedDay === 'Viernes' && (
+                 {selectedDayInfo?.isToday && !selectedDayInfo.isFirstSchoolDay && (
                    <span className="text-xs font-bold px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
                      JORNADA DE HOY
                    </span>
