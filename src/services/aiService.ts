@@ -1,10 +1,17 @@
 import { Student, AITeacher, Subject, DailyClass, WorkAnalysisResult, MicroLessonPlan, MicroLesson } from '../types';
+import { guideDateKey, readGuideContent, writeGuideContent, readGuideForClass } from '../utils/guideStore';
+import type { GuideAiContent } from '../utils/guideGenerator';
 
 export interface ChatMessage {
   id: string;
   role: 'user' | 'model';
   content: string;
   timestamp: string;
+}
+
+export interface TeacherChatGuideContext {
+  explicacion: string;
+  preguntas: { tipo?: string; pregunta: string }[];
 }
 
 export interface TeacherChatRequest {
@@ -14,6 +21,11 @@ export interface TeacherChatRequest {
   dailyClass: DailyClass;
   conversationHistory: { role: 'user' | 'model'; content: string }[];
   message: string;
+  /**
+   * Guía v4 EXACTA del día (mismo string del PDF). `undefined` = no aplica (demo genérica);
+   * `null` = la clase real aún no tiene guía generada (el profesor debe decirlo, no inventar).
+   */
+  guideContext?: TeacherChatGuideContext | null;
 }
 
 export interface AnalyzeWorkRequest {
@@ -152,22 +164,13 @@ export async function requestGuideContent(req: {
   steps?: { title: string; text: string }[];
 }): Promise<import('../utils/guideGenerator').GuideAiContent | null> {
   const preset = (req.steps || []).filter((s) => s && typeof s.title === "string" && typeof s.text === "string" && s.text.trim().length > 25).slice(0, 3);
-  // Caché diaria por clase: la guía buena se reusa sin gastar la cuota gratuita del día.
-  const dateKey = req.dailyClass?.date || new Date().toISOString().slice(0, 10);
-  const cacheKey = `wisdom_guide_v4_${req.student?.id || 'x'}_${req.dailyClass?.id || 'c'}_${dateKey}`;
-  try {
-    const cached = JSON.parse(localStorage.getItem(cacheKey) || 'null');
-    const cl = cached?.content;
-    if (cl && typeof cl.explicacion === 'string' && Array.isArray(cl.preguntas) && cl.preguntas.length >= 2) {
-      return {
-        explicacion: String(cl.explicacion),
-        preguntas: cl.preguntas
-          .filter((q: any) => q && typeof q.pregunta === 'string' && q.pregunta.trim())
-          .map((q: any, i: number) => ({ tipo: q.tipo || (['literal', 'interpretativa', 'aplicacion'][i] || 'interpretativa'), pregunta: String(q.pregunta), pista: q.pista ? String(q.pista) : null })),
-        providerUsed: `${cached.providerUsed || 'IA'} (caché de hoy)`,
-      };
-    }
-  } catch { /* cache corrupta: regenerar */ }
+  // Misma entrada del almacén que usa el PDF: la guía buena se reusa sin gastar la cuota del día
+  // y, sobre todo, el chat y el papel leen EXACTAMENTE el mismo texto.
+  const dateKey = guideDateKey(req.dailyClass);
+  const cachedGuide = readGuideContent(req.student?.id, req.dailyClass?.id, dateKey);
+  if (cachedGuide && cachedGuide.preguntas.length >= 2) {
+    return { ...cachedGuide, providerUsed: `${cachedGuide.providerUsed || 'IA'} (caché de hoy)` };
+  }
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 30000);
   try {
@@ -200,18 +203,21 @@ export async function requestGuideContent(req: {
       preguntas,
       providerUsed: data.providerUsed || 'guía IA v4.0',
     };
-    // Solo cacheamos el camino IA; el fallback determinista local no debe congelarse.
-    try {
-      if (data?.providerUsed && !data.isOfflineSimulation) {
-        localStorage.setItem(cacheKey, JSON.stringify({ content: { explicacion: built.explicacion, preguntas: built.preguntas }, providerUsed: built.providerUsed }));
-      }
-    } catch { /* cuota llena: sin caché, la guía igual se descarga */ }
+    // Persistimos en el almacén compartido; guideGenerator lo re-finaliza y reescribe con el texto impreso exacto.
+    writeGuideContent(req.student?.id, req.dailyClass?.id, dateKey, built);
     return built;
   } catch {
     return null;
   } finally {
     clearTimeout(timeoutId);
   }
+}
+
+// Lee (sin red) la guía v4 EXACTA de la clase: la MISMA entrada que imprime el PDF.
+// Devuelve null si esa clase todavía no tiene guía generada/persistida.
+export function readCachedGuideContent(student: Student, dailyClass: DailyClass): GuideAiContent | null {
+  const stored = readGuideForClass(student?.id, dailyClass);
+  return stored ? { explicacion: stored.explicacion, preguntas: stored.preguntas, providerUsed: stored.providerUsed } : null;
 }
 
 // Lee los pasos de la ruta YA generados para una clase, sin tocar la red (para la descarga por lotes del día).
@@ -471,6 +477,7 @@ async function tryServerTeacherHierarchy(req: TeacherChatRequest): Promise<strin
         dailyClass: req.dailyClass,
         conversationHistory: req.conversationHistory,
         message: req.message,
+        guideContext: req.guideContext,
       }),
     });
     if (!res.ok) return null;
@@ -509,6 +516,21 @@ const systemInstruction = `
     Eres ${req.teacher.name}, el Director de la Clase de ${req.subject.name}. Actúas como el profesor guía principal de esta sesión magistral privada para ${req.student.name}.
     Contexto de la clase actual: "${req.dailyClass?.theme}".
     Objetivo: ${req.dailyClass?.objective}.
+    ${req.guideContext && typeof req.guideContext.explicacion === 'string' && req.guideContext.explicacion.trim()
+      ? `
+    La guía impresa de hoy para este estudiante dice exactamente esto:
+
+    EXPLICACIÓN:
+    ${req.guideContext.explicacion}
+
+    PREGUNTAS DE LA GUÍA:
+    ${(req.guideContext.preguntas || []).map((p, i) => `${i + 1}. (${p.tipo || 'pregunta'}) ${p.pregunta}`).join('\n')}
+
+    Si el estudiante te pregunta sobre cualquiera de estas preguntas, o te pide ayuda para responderlas, guíalo con el método socrático para que llegue a la respuesta él mismo usando la EXPLICACIÓN de arriba — NUNCA le dictes la respuesta completa de una vez. Si te copia o lee una de estas preguntas, reconócela como parte de su guía de hoy (puedes decir algo como "Esa es la pregunta N de tu guía") y ayúdalo a pensarla, no a copiarla.`
+      : req.guideContext === null
+      ? `
+    Este estudiante TODAVÍA NO tiene la guía impresa de hoy generada. Si te pregunta por "su guía", díselo con claridad (por ejemplo: "Tu guía de hoy todavía no está lista, pero puedo explicarte el tema igual") y NO inventes preguntas ni contenido de guía.`
+      : ''}
 
     METODOLOGÍA OBLIGATORIA DEL DIRECTOR DE CLASE — RUTA DE APRENDIZAJE ACTIVO:
 

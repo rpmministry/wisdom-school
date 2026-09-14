@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useSchool } from '../../context/SchoolContext';
+import { useSchool, useTeacherContext } from '../../context/SchoolContext';
 import { askAITeacher, ChatMessage, renderMarkdownToHtml } from '../../services/aiService';
 import { ttsService } from '../../services/ttsService';
 import { Bot, Send, Loader2, Volume2, VolumeX, Play, Pause, StopCircle, MessageSquare, ArrowRight, Target, GraduationCap, Square } from 'lucide-react';
@@ -47,6 +47,10 @@ export const ClassTeacherChat: React.FC<ClassTeacherChatProps> = ({ className = 
     studentSubjects,
     todayClasses,
   } = useSchool();
+
+  // Guía v4 EXACTA del día (mismo string del PDF). Se relee del contexto en cada envío,
+  // por lo que si cambia la clase activa el profesor usa la nueva guía en el siguiente mensaje.
+  const { guiaDelDia } = useTeacherContext();
 
   const subject = activeSubject || studentSubjects[0];
   const dailyClass = activeClass || todayClasses[0];
@@ -148,6 +152,7 @@ export const ClassTeacherChat: React.FC<ClassTeacherChatProps> = ({ className = 
         student: currentStudent, teacher, subject, dailyClass: fallbackClass,
         conversationHistory: updatedMessages.map((m) => ({ role: m.role, content: m.content })),
         message: textToSend,
+        guideContext: guiaDelDia,
       });
 
       const replyId = `msg-model-${Date.now()}`;

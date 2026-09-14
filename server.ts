@@ -841,11 +841,31 @@ app.post('/api/ai/teacher-chat', async (req: Request, res: Response) => {
       dailyClass,
       conversationHistory,
       message,
+      guideContext,
     } = req.body;
 
     if (!message || typeof message !== 'string' || !message.trim()) {
       return res.status(400).json({ error: 'El mensaje del estudiante es obligatorio.' });
     }
+
+    // Bloque LITERAL de la guía v4 (mismo string que el PDF). null = clase sin guía generada todavía.
+    const guiaBlock = (() => {
+      const preguntas: any[] = Array.isArray(guideContext?.preguntas) ? guideContext.preguntas : [];
+      if (guideContext && typeof guideContext.explicacion === 'string' && guideContext.explicacion.trim()) {
+        return `
+LA GUÍA IMPRESA DE HOY PARA ESTE ESTUDIANTE DICE EXACTAMENTE ESTO:
+EXPLICACIÓN:
+${guideContext.explicacion}
+PREGUNTAS DE LA GUÍA:
+${preguntas.map((p, i) => `${i + 1}. (${p?.tipo || 'pregunta'}) ${p?.pregunta || ''}`).join('\n')}
+Si el estudiante te pregunta sobre cualquiera de estas preguntas, o te pide ayuda para responderlas, guíalo con el método socrático para que llegue a la respuesta él mismo usando la EXPLICACIÓN de arriba — NUNCA le dictes la respuesta completa de una vez. Si te copia o lee una de estas preguntas, reconócela como parte de su guía de hoy (puedes decir algo como "Esa es la pregunta N de tu guía") y ayúdalo a pensarla, no a copiarla.`;
+      }
+      if (guideContext === null) {
+        return `
+El estudiante TODAVÍA NO tiene la guía impresa de hoy generada. Si te pregunta por "su guía", díselo con claridad (por ejemplo: "Tu guía de hoy todavía no está lista, pero puedo explicarte el tema igual") y NO inventes preguntas ni contenido de guía.`;
+      }
+      return '';
+    })();
 
     const systemPrompt = `
 Eres el Profesor Virtual "${teacher?.name || 'Profesor de Wisdom School'}", especialista en ${teacher?.specialty || subject?.name || 'Educación'}.
@@ -860,6 +880,7 @@ CONTEXTO ACADÉMICO OBLIGATORIO Y ESTRICTO:
 - Objetivo de aprendizaje: ${dailyClass?.objective || 'Comprender los conceptos clave del día'}
 - Contenido / Lectura del día: ${dailyClass?.introduction || ''} ${dailyClass?.reading || ''}
 - Actividades del día: ${JSON.stringify(dailyClass?.activities || [])}
+${guiaBlock}
 
 REGLAS PEDAGÓGICAS ESTRICTAS (MÉTODO SOCRÁTICO):
 1. RESTRICCIÓN DE CONTEXTO: SOLO puedes hablar sobre el tema académico de esta clase ("${dailyClass?.theme || subject?.name}"). Si el estudiante pregunta sobre cosas ajenas a la clase o temas no relacionados, redirígelo con amabilidad y calidez hacia el tema de hoy.

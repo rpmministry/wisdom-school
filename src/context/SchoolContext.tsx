@@ -30,6 +30,15 @@ import {
   buildSyntheticMicroClass,
   resolveMicroTheme,
 } from '../utils/microcurriculumSchedule';
+import { readCachedGuideContent } from '../services/aiService';
+import type { GuideAiContent } from '../utils/guideGenerator';
+
+/** Contexto único del profesor IA: materia + clase del día + la guía v4 EXACTA (o null si aún no existe). */
+export interface TeacherContextValue {
+  subject: Subject | null;
+  dailyClass: DailyClass | null;
+  guiaDelDia: GuideAiContent | null;
+}
 
 export type DayOfWeekName = 'Lunes' | 'Martes' | 'Miércoles' | 'Jueves' | 'Viernes';
 
@@ -70,7 +79,9 @@ interface SchoolContextType {
   updateSubmission: (id: string, updates: Partial<StudentSubmission>) => void;
   isTeacherDrawerOpen: boolean;
   setIsTeacherDrawerOpen: (open: boolean) => void;
-  openTeacherDrawerWithContext: (subject?: Subject, dailyClass?: DailyClass) => void;
+  openTeacherDrawerWithContext: (subject?: Subject, dailyClass?: DailyClass, guide?: GuideAiContent | null) => void;
+  /** Contexto siempre resuelto del profesor IA (clase activa o la primera del día + su guía exacta). */
+  teacherContext: TeacherContextValue;
   toggleActivityCompletion: (classId: string, activityId: string) => void;
   completeClass: (classId: string) => void;
   /** Progreso de la ruta de micro-lecciones por clase: índices superados (0..N-1). */
@@ -196,6 +207,9 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [navigationHistory, setNavigationHistory] = useState<NavigationTab[]>([]);
   const [activeSubject, setActiveSubject] = useState<Subject | null>(null);
   const [activeClass, setActiveClass] = useState<DailyClass | null>(null);
+  // Guía v4 explícita inyectada al abrir el chat (p. ej. desde una pregunta de la guía). Si es null,
+  // teacherContext lee la guía EXACTA persistida para la clase activa.
+  const [teacherGuide, setTeacherGuide] = useState<{ classId: string; content: GuideAiContent } | null>(null);
   const [isTeacherDrawerOpen, setIsTeacherDrawerOpen] = useState<boolean>(false);
   const [isDemoLockOpen, setIsDemoLockOpen] = useState<boolean>(false);
 
@@ -453,6 +467,16 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     .filter((cls): cls is DailyClass => Boolean(cls))
     .sort((a, b) => (a.scheduleTime?.slice(0, 5) || '00:00').localeCompare(b.scheduleTime?.slice(0, 5) || '00:00'));
 
+  // Fuente única del contexto del profesor IA. Nunca queda vacío si hay clase del día: cae a todayClasses[0].
+  // La guía se lee del MISMO almacén que usa el PDF (readCachedGuideContent), no de un resumen aparte.
+  const teacherContext = useMemo<TeacherContextValue>(() => {
+    const subject = activeSubject || studentSubjects[0] || null;
+    const dailyClass = activeClass || todayClasses[0] || null;
+    const cachedGuide = dailyClass ? readCachedGuideContent(currentStudent, dailyClass) : null;
+    const guiaDelDia = teacherGuide && teacherGuide.classId === dailyClass?.id ? teacherGuide.content : cachedGuide;
+    return { subject, dailyClass, guiaDelDia };
+  }, [activeSubject, activeClass, todayClasses, studentSubjects, currentStudent, teacherGuide]);
+
   useEffect(() => {
     const matchingClass = todayClasses[0] || allStudentClasses.find((c) => c.dayOfWeek === selectedDayOfWeek) || allStudentClasses[0] || null;
     setActiveClass(matchingClass);
@@ -467,7 +491,12 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   const updateSubmission = (id: string, updates: Partial<StudentSubmission>) => { setSubmissions((prev) => prev.map((sub) => (sub.id === id ? { ...sub, ...updates } : sub))); };
-  const openTeacherDrawerWithContext = (subject?: Subject, dailyClass?: DailyClass) => { if (subject) setActiveSubject(subject); if (dailyClass) setActiveClass(dailyClass); setIsTeacherDrawerOpen(true); };
+  const openTeacherDrawerWithContext = (subject?: Subject, dailyClass?: DailyClass, guide?: GuideAiContent | null) => {
+    if (subject) setActiveSubject(subject);
+    if (dailyClass) setActiveClass(dailyClass);
+    setTeacherGuide(guide && dailyClass ? { classId: dailyClass.id, content: guide } : null);
+    setIsTeacherDrawerOpen(true);
+  };
   
   // Fuente única de verdad para la regla de "clase completada": se deriva siempre
   // de que todas las actividades estén completas, sin importar quién actualice.
@@ -533,6 +562,7 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         isTeacherDrawerOpen, 
         setIsTeacherDrawerOpen, 
         openTeacherDrawerWithContext, 
+        teacherContext,
         toggleActivityCompletion,
     completeClass,
         microRouteProgress,
@@ -568,4 +598,12 @@ export function useSchool() {
   const context = useContext(SchoolContext);
   if (!context) throw new Error('useSchool debe usarse dentro de un SchoolProvider');
   return context;
+}
+
+/**
+ * Contexto del profesor IA, siempre resuelto: materia + clase del día + guía v4 EXACTA.
+ * `guiaDelDia` es el mismo string que se imprime en el PDF; null si esa clase aún no tiene guía.
+ */
+export function useTeacherContext(): TeacherContextValue {
+  return useSchool().teacherContext;
 }

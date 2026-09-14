@@ -1,4 +1,5 @@
 import { DailyClass, Subject } from "../types";
+import { readGuideForClass, writeGuideForClass } from "./guideStore";
 
 // ============================================================================
 // Guías Didácticas v4.0
@@ -196,6 +197,29 @@ const buildQuestionsHtml = (preguntas: GuideQuestion[], level: EgbLevel): string
     </div>`).join('');
 };
 
+const isUsableGuide = (c?: GuideAiContent | null): c is GuideAiContent =>
+  !!c && typeof c.explicacion === 'string' && c.explicacion.trim().length > 0 && Array.isArray(c.preguntas) && c.preguntas.length >= 2;
+
+/**
+ * Resuelve el contenido EXACTO de la guía y lo persiste en el almacén por clase.
+ * Prioridad: IA recién generada → guía ya almacenada (mismo string que un PDF previo) → síntesis local.
+ * El texto final (ya recortado al tope de palabras y con las preguntas del nivel) es el que se
+ * guarda, de modo que el chat del profesor cite literalmente lo impreso.
+ */
+const resolveGuideContent = (currentClass: DailyClass, level: EgbLevel, ai?: GuideAiContent | null): GuideAiContent => {
+  const raw: GuideAiContent = isUsableGuide(ai)
+    ? ai
+    : (readGuideForClass(currentClass.studentId, currentClass) as GuideAiContent | null) || buildFromReading(currentClass, level);
+
+  const finalContent: GuideAiContent = {
+    explicacion: truncateWords(clean(raw.explicacion, 3000), wordCapForLevel(level)),
+    preguntas: (raw.preguntas || []).filter((q) => q && q.pregunta).slice(0, level === 'Elemental' ? 2 : 3),
+    providerUsed: raw.providerUsed,
+  };
+  writeGuideForClass(currentClass.studentId, currentClass, finalContent);
+  return finalContent;
+};
+
 const buildGuidePage = (
   currentClass: DailyClass,
   subject: Subject | undefined,
@@ -204,12 +228,9 @@ const buildGuidePage = (
   ai?: GuideAiContent | null,
 ): string => {
   const level = resolveEgbLevel(studentGrade, currentClass.studentId);
-  const content: GuideAiContent =
-    ai && typeof ai.explicacion === 'string' && ai.explicacion.trim() && Array.isArray(ai.preguntas) && ai.preguntas.length >= 2
-      ? ai
-      : buildFromReading(currentClass, level);
-  const explicacion = truncateWords(clean(content.explicacion, 3000), wordCapForLevel(level));
-  const preguntas = content.preguntas.filter((q) => q && q.pregunta).slice(0, level === 'Elemental' ? 2 : 3);
+  const content = resolveGuideContent(currentClass, level, ai);
+  const explicacion = content.explicacion;
+  const preguntas = content.preguntas;
   const subjectName = subject?.name || 'Materia';
   const teacherName = subject?.teacher?.name || 'Docente IA';
   const dateStr = currentClass.date || new Date().toLocaleDateString('es-EC');
