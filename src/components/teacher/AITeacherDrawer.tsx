@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useSchool, useTeacherContext } from '../../context/SchoolContext';
 import { askAITeacher, ChatMessage, renderMarkdownToHtml } from '../../services/aiService';
 import { ttsService } from '../../services/ttsService';
+import { useTouchTablet } from '../../hooks/useTouchTablet';
 import { Bot, X, Send, Loader2, Volume2, Play, Pause, StopCircle, Square } from 'lucide-react';
 
 /**
@@ -13,27 +14,6 @@ const MarkdownMessage = React.memo(({ content }: { content: string }) => (
   <div className="markdown-body" dangerouslySetInnerHTML={{ __html: renderMarkdownToHtml(content) }} />
 ));
 MarkdownMessage.displayName = 'MarkdownMessage';
-
-/** Media query reactiva (para distinguir tablet táctil de escritorio sin romper Windows). */
-function useMediaQuery(query: string): boolean {
-  const [matches, setMatches] = useState<boolean>(() =>
-    typeof window !== 'undefined' && typeof window.matchMedia === 'function' ? window.matchMedia(query).matches : false,
-  );
-  useEffect(() => {
-    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
-    const mql = window.matchMedia(query);
-    const onChange = () => setMatches(mql.matches);
-    onChange();
-    // Safari/iOS antiguos solo exponen addListener/removeListener en MediaQueryList.
-    if (typeof mql.addEventListener === 'function') {
-      mql.addEventListener('change', onChange);
-      return () => mql.removeEventListener('change', onChange);
-    }
-    mql.addListener(onChange);
-    return () => mql.removeListener(onChange);
-  }, [query]);
-  return matches;
-}
 
 export const AITeacherDrawer: React.FC = () => {
   const {
@@ -61,10 +41,10 @@ export const AITeacherDrawer: React.FC = () => {
     return { ...base, chip: '#1f2937', textStrong: '#f8fafc', label: 'Original' };
   })();
 
-  // Tablet táctil (iPad, Android, etc.), incluso con trackpad conectado: el panel lateral angosto
-  // se desborda en horizontal. En estos dispositivos usamos una hoja inferior a todo el ancho.
-  // `any-pointer: coarse` cubre iPad con teclado/trackpad; Windows de escritorio mantiene el panel lateral.
-  const isTouchTablet = useMediaQuery('(min-width: 768px) and (any-pointer: coarse)');
+  // Tablet táctil (iPad, Android…), en cualquier orientación y ancho, incluso con teclado/trackpad:
+  // el panel lateral angosto se desborda. En estos dispositivos usamos una hoja inferior a todo el ancho;
+  // Windows de escritorio mantiene el panel lateral.
+  const isTouchTablet = useTouchTablet();
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState('');

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useSchool } from '../../context/SchoolContext';
 import { useScrollToTopOnChange } from '../../hooks/useScrollToTopOnChange';
+import { useTouchTablet } from '../../hooks/useTouchTablet';
 import { scrollAppToTop } from '../../utils/scrollToTop';
 import { DailyClass, ClassActivity } from '../../types';
 import { formatYouTubeEmbedUrl, getYouTubeWatchUrl, getYouTubeSearchUrl } from '../../utils/youtube';
@@ -59,6 +60,10 @@ export const DailyClassView: React.FC = () => {
     toggleActivityCompletion, currentStudent, schoolWeek,
     microRouteProgress, markMicroCleared, resetMicroRoute,
   } = useSchool();
+
+  // En tablet horizontal (cualquier ancho, incluidas las de 12.9" que superan xl) el chat NO debe
+  // quedar en una columna angosta a la derecha: se apila a todo el ancho debajo de la clase.
+  const isTouchTablet = useTouchTablet();
 
   const [activeSubTab, setActiveSubTab] = useState<ActiveSubTab>('content');
   const [viewMode, setViewMode] = useState<'focus' | 'all-classes'>('focus');
@@ -285,11 +290,11 @@ export const DailyClassView: React.FC = () => {
                 </div>
               </div>
 
-              {/* En tablet horizontal (1024-1279px) NO se parte en dos columnas: el chat quedaría
-                  angosto a la derecha y el texto se desborda. Solo se divide en pantallas xl+. */}
-              <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
+              {/* En tablet táctil (iPad/Android, cualquier ancho) NO se parte en dos columnas: el chat
+                  quedaría angosto a la derecha. Solo el escritorio (puntero fino) usa 2 columnas en xl+. */}
+              <div className={`grid grid-cols-1 gap-6 items-start ${isTouchTablet ? '' : 'xl:grid-cols-12'}`}>
                 {/* COLUMNA CENTRAL: RUTA DE MICRO-LECCIONES DIRIGIDA POR TU PROFESOR */}
-                <div className="xl:col-span-8">
+                <div className={isTouchTablet ? '' : 'xl:col-span-8'}>
                   <MicroLessonPlayer
                     dailyClass={currentClass}
                     subject={subject}
@@ -304,7 +309,7 @@ export const DailyClassView: React.FC = () => {
                 </div>
 
                 {/* COLUMNA LATERAL: COMPAÑERO IA + RECURSOS */}
-                <aside className="xl:col-span-4 space-y-6">
+                <aside className={`space-y-6 ${isTouchTablet ? '' : 'xl:col-span-4'}`}>
                   <ClassTeacherChat compact />
                   <div className="rounded-3xl bg-slate-800/80 border border-slate-700/80 shadow-xl overflow-hidden">
                     <button
