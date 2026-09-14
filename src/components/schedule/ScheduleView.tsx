@@ -31,9 +31,11 @@ export const ScheduleView: React.FC = () => {
     allStudentClasses,
     classesList,
     setSelectedDayOfWeek,
+    selectedDayOfWeek,
     setActiveSubject,
     studentSubjects,
     schoolWeek,
+    getClassForSubjectOnDay,
   } = useSchool();
 
   const [activeSubTab, setActiveSubTab] = useState<'horario' | 'cronograma' | 'proyectos'>('horario');
@@ -45,22 +47,20 @@ export const ScheduleView: React.FC = () => {
   const scheduleSlots = currentStudent.id === 'avril' ? AVRIL_SCHEDULE_SLOTS : GAEL_SCHEDULE_SLOTS;
 
   const handleOpenClass = (classId?: string, subjectId?: string) => {
-    if (classId) {
-      const cls = allStudentClasses.find((c) => c.id === classId) || classesList.find((c) => c.id === classId);
-      if (cls) {
-        setSelectedDayOfWeek(cls.dayOfWeek as DayOfWeekName);
-        setActiveClass(cls);
-        const sub = studentSubjects.find((s) => s.id === cls.subjectId);
-        if (sub) setActiveSubject(sub);
-      }
-    } else if (subjectId) {
-      const sub = studentSubjects.find((s) => s.id === subjectId);
+    // Los classId del horario no siempre coinciden con las DailyClass: resolvemos por materia
+    // y abrimos la clase re-tematizada con el microcurrículo de la semana en curso.
+    const resolvedSubjectId =
+      subjectId ||
+      (classId ? allStudentClasses.find((c) => c.id === classId)?.subjectId : undefined) ||
+      (classId ? classesList.find((c) => c.id === classId)?.subjectId : undefined);
+
+    if (resolvedSubjectId) {
+      const targetDay = (selectedDay !== 'Todos' ? selectedDay : selectedDayOfWeek) as DayOfWeekName;
+      const sub = studentSubjects.find((s) => s.id === resolvedSubjectId);
       if (sub) setActiveSubject(sub);
-      const firstSubCls = allStudentClasses.find((c) => c.subjectId === subjectId);
-      if (firstSubCls) {
-        setSelectedDayOfWeek(firstSubCls.dayOfWeek as DayOfWeekName);
-        setActiveClass(firstSubCls);
-      }
+      setSelectedDayOfWeek(targetDay);
+      const cls = getClassForSubjectOnDay(resolvedSubjectId, targetDay);
+      if (cls) setActiveClass(cls);
     }
     setActiveTab('classes');
   };

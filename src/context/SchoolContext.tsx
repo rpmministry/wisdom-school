@@ -21,11 +21,15 @@ import {
   getCurrentSchoolDay,
   getSchoolWeek,
   getSchoolWeekIndex,
-  normalizeDayKey,
   parseDayKey,
   toDayKey,
   type SchoolDayInfo,
 } from '../utils/schoolCalendar';
+import {
+  applyMicroTheme,
+  buildSyntheticMicroClass,
+  resolveMicroTheme,
+} from '../utils/microcurriculumSchedule';
 
 export type DayOfWeekName = 'Lunes' | 'Martes' | 'Miércoles' | 'Jueves' | 'Viernes';
 
@@ -56,6 +60,8 @@ interface SchoolContextType {
   activeSubject: Subject | null;
   setActiveSubject: (subject: Subject | null) => void;
   todayClasses: DailyClass[];
+  /** Clase de una materia para un día concreto, ya re-tematizada con el microcurrículo de la semana en curso. */
+  getClassForSubjectOnDay: (subjectId: string, day: DayOfWeekName) => DailyClass | null;
   allStudentClasses: DailyClass[];
   activeClass: DailyClass | null;
   setActiveClass: (cls: DailyClass | null) => void;
@@ -420,17 +426,32 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const allStudentClasses = classesList.filter((cls) => cls.studentId === currentStudentId);
   const classesOfSelectedDay = allStudentClasses.filter((cls) => cls.dayOfWeek === selectedDayOfWeek);
-  // Las clases se eligen por la semana escolar en curso: así el tema y la guía didáctica de cada día
-  // corresponden a la semana actual y no a la anterior. Si el plan solo tiene una semana de contenido,
-  // se conserva la clase semanal del día seleccionado para no dejar la materia vacía.
-  const currentWeekDates = new Set(schoolWeek.map((info) => toDayKey(info.date)));
-  const classesOfCurrentWeek = classesOfSelectedDay.filter(
-    (cls) => cls.date && currentWeekDates.has(normalizeDayKey(cls.date)),
-  );
-  const todayClasses = (classesOfCurrentWeek.length > 0 ? classesOfCurrentWeek : classesOfSelectedDay)
-    .sort((a, b) => (a.scheduleTime?.slice(0, 5) || '00:00').localeCompare(b.scheduleTime?.slice(0, 5) || '00:00'));
   const studentSchedule = allSchedules.filter((sch) => sch.studentId === currentStudentId);
   const todaySchedule = studentSchedule.filter((sch) => sch.dayOfWeek === selectedDayOfWeek);
+
+  // Fuente única de la clase del día: la DailyClass base (con su contenido rico) se re-tematiza con el
+  // microcurrículo de la semana escolar en curso. Así el temario avanza semana a semana y las guías
+  // didácticas presentan el tema correcto, en vez de repetir siempre la clase de la semana 1.
+  const getClassForSubjectOnDay = (subjectId: string, day: DayOfWeekName): DailyClass | null => {
+    const subject = studentSubjects.find((s) => s.id === subjectId);
+    if (!subject) return null;
+    const dateKey = toDayKey(schoolWeek.find((info) => info.day === day)?.date || new Date());
+    const theme = resolveMicroTheme(subject, schoolWeekIndex, day);
+    const template =
+      allStudentClasses.find((cls) => cls.subjectId === subjectId && cls.dayOfWeek === day) ||
+      allStudentClasses.find((cls) => cls.subjectId === subjectId) ||
+      null;
+    const base = template || buildSyntheticMicroClass(subject, theme, day, dateKey);
+    return applyMicroTheme(base, subject, theme, day, dateKey);
+  };
+
+  // El horario del día manda: una clase por materia programada, con el temario de la semana en curso.
+  const scheduledSubjectIds = Array.from(new Set(todaySchedule.map((entry) => entry.subjectId).filter(Boolean) as string[]));
+  const fallbackSubjectIds = Array.from(new Set(classesOfSelectedDay.map((cls) => cls.subjectId)));
+  const todayClasses = (scheduledSubjectIds.length > 0 ? scheduledSubjectIds : fallbackSubjectIds)
+    .map((subjectId) => getClassForSubjectOnDay(subjectId, selectedDayOfWeek))
+    .filter((cls): cls is DailyClass => Boolean(cls))
+    .sort((a, b) => (a.scheduleTime?.slice(0, 5) || '00:00').localeCompare(b.scheduleTime?.slice(0, 5) || '00:00'));
 
   useEffect(() => {
     const matchingClass = todayClasses[0] || allStudentClasses.find((c) => c.dayOfWeek === selectedDayOfWeek) || allStudentClasses[0] || null;
@@ -502,6 +523,7 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         activeSubject, 
         setActiveSubject, 
         todayClasses, 
+        getClassForSubjectOnDay,
         allStudentClasses, 
         activeClass, 
         setActiveClass, 

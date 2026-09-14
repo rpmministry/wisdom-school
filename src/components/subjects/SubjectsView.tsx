@@ -1,5 +1,5 @@
 import React from 'react';
-import { useSchool } from '../../context/SchoolContext';
+import { useSchool, DayOfWeekName } from '../../context/SchoolContext';
 import { DailyClass } from '../../types';
 import { PageHeader } from '../layout/PageHeader';
 import {
@@ -20,9 +20,9 @@ export const SubjectsView: React.FC = () => {
     setActiveSubject,
     setActiveTab,
     setActiveClass,
-    todayClasses,
-    allStudentClasses,
     selectedDayOfWeek,
+    setSelectedDayOfWeek,
+    getClassForSubjectOnDay,
   } = useSchool();
 
   // Si la materia no tiene clase el día seleccionado, buscamos en todo el plan y,
@@ -46,11 +46,11 @@ export const SubjectsView: React.FC = () => {
   });
 
   const handleOpenSubject = (subject: typeof studentSubjects[0]) => {
-    const cls =
-      todayClasses.find((c: any) => c.subjectId === subject.id) ||
-      allStudentClasses.find((c: any) => c.subjectId === subject.id) ||
-      buildSyntheticClass(subject);
+    // Abrimos siempre la clase del día asignado con el temario de la semana en curso.
+    const targetDay = ((subject.daysOfWeek && subject.daysOfWeek[0]) || selectedDayOfWeek) as DayOfWeekName;
+    const cls = getClassForSubjectOnDay(subject.id, targetDay) || buildSyntheticClass(subject);
     setActiveSubject(subject);
+    setSelectedDayOfWeek(targetDay);
     setActiveClass(cls);
     setActiveTab('classes');
   };
