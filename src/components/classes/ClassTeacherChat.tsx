@@ -234,7 +234,7 @@ export const ClassTeacherChat: React.FC<ClassTeacherChatProps> = ({ className = 
         onTouchStart={() => { isTouchingRef.current = true; }}
         onTouchEnd={() => { isTouchingRef.current = false; }}
         onTouchCancel={() => { isTouchingRef.current = false; }}
-        className={`shrink-0 overflow-y-auto touch-pan-y [overflow-anchor:none] p-4 sm:p-6 space-y-5 ${compact ? 'h-[340px] sm:h-[420px] xl:h-[520px]' : 'h-[420px] sm:h-[520px] lg:h-[560px] xl:h-[620px]'}`}
+        className={`shrink-0 min-h-0 overflow-y-auto touch-pan-y [overflow-anchor:none] p-4 sm:p-6 space-y-5 ${compact ? 'h-[min(46dvh,420px)]' : 'h-[min(60dvh,620px)]'}`}
         style={{ scrollbarWidth: 'thin', scrollbarColor: studentTheme.accent }}
       >
         {messages.length === 0 && (
@@ -251,14 +251,14 @@ export const ClassTeacherChat: React.FC<ClassTeacherChatProps> = ({ className = 
             <div key={msg.id} className={`flex gap-3 ${isUser ? 'justify-end' : 'justify-start'}`}>
               {!isUser && <img src={teacher?.avatar} alt={teacher?.name} className="w-9 h-9 rounded-xl object-cover mt-1 shadow-md shrink-0" />}
 
-              <div className={`flex flex-col max-w-[92%] sm:max-w-[85%] ${isUser ? 'items-end' : 'items-start'}`}>
+              <div className={`flex flex-col min-w-0 max-w-[85%] ${isUser ? 'items-end' : 'items-start'}`}>
                 {!isUser && <span className="text-[9px] font-black uppercase tracking-wider text-slate-500 mb-1 pl-1">{teacher?.name} explica</span>}
-                <div className="p-4 rounded-2xl text-sm sm:text-[15px] leading-relaxed shadow-lg" style={isUser ? { background: `linear-gradient(135deg, ${studentTheme.accent}, ${studentTheme.accent}cc)`, color: '#fff', borderBottomRightRadius: 0 } : { background: 'rgba(15, 23, 42, 0.95)', border: `1px solid ${isActiveSpeech && !isPaused ? '#10b981' : studentTheme.accent + '55'}`, color: '#e2e8f0', borderBottomLeftRadius: 0 }}>
-                  {isUser ? <div className="whitespace-pre-line"><span className="text-[9px] uppercase font-black opacity-70 block mb-0.5">Tu respuesta</span>{msg.content}</div> : <MarkdownMessage content={msg.content} />}
+                <div className="p-4 rounded-2xl text-[15px] leading-relaxed shadow-lg break-words [overflow-wrap:anywhere]" style={isUser ? { background: `linear-gradient(135deg, ${studentTheme.accent}, ${studentTheme.accent}cc)`, color: '#fff', borderBottomRightRadius: 0 } : { background: 'rgba(15, 23, 42, 0.95)', border: `1px solid ${isActiveSpeech && !isPaused ? '#10b981' : studentTheme.accent + '55'}`, color: '#e2e8f0', borderBottomLeftRadius: 0 }}>
+                  {isUser ? <div className="whitespace-pre-wrap [overflow-wrap:anywhere]"><span className="text-[9px] uppercase font-black opacity-70 block mb-0.5">Tu respuesta</span>{msg.content}</div> : <MarkdownMessage content={msg.content} />}
                 </div>
 
                 {!isUser && (
-                  <div className="mt-2 w-full max-w-sm p-2.5 rounded-xl bg-slate-950 border border-slate-800 flex flex-col gap-2 shadow-inner">
+                  <div className="mt-2 w-full min-w-0 max-w-sm p-2.5 rounded-xl bg-slate-950 border border-slate-800 flex flex-col gap-2 shadow-inner">
                     <div className="flex items-center justify-between border-b border-slate-800/60 pb-1.5 px-1">
                       <span className="text-[10px] font-bold text-slate-400 tracking-wide uppercase">Controles de Audio</span>
                       <div className="flex items-center gap-1.5">
@@ -279,7 +279,7 @@ export const ClassTeacherChat: React.FC<ClassTeacherChatProps> = ({ className = 
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex flex-wrap items-center gap-1.5">
                       <button
                         onClick={() => {
                           if (isActiveSpeech && isPaused) {
@@ -289,7 +289,7 @@ export const ClassTeacherChat: React.FC<ClassTeacherChatProps> = ({ className = 
                             handlePlayVoice(msg.content, msg.id);
                           }
                         }}
-                        className={`flex-1 flex items-center justify-center gap-1 px-2.5 py-2 min-h-[38px] rounded-lg font-bold text-[10px] sm:text-xs transition-all active:scale-95 ${isActiveSpeech && !isPaused ? 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700/30' : 'bg-emerald-600 text-white hover:bg-emerald-500 shadow-md border border-emerald-500/20'}`}
+                        className={`flex-1 flex items-center justify-center gap-1 px-2.5 py-2 min-h-[38px] rounded-lg font-bold text-[11px] sm:text-xs transition-all active:scale-95 ${isActiveSpeech && !isPaused ? 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700/30' : 'bg-emerald-600 text-white hover:bg-emerald-500 shadow-md border border-emerald-500/20'}`}
                         disabled={isActiveSpeech && !isPaused}
                         title={isActiveSpeech && isPaused ? 'Reanudar audio' : 'Reproducir audio'}
                       >
@@ -299,7 +299,7 @@ export const ClassTeacherChat: React.FC<ClassTeacherChatProps> = ({ className = 
 
                       <button
                         onClick={handlePauseVoice}
-                        className={`flex-1 flex items-center justify-center gap-1 px-2.5 py-2 min-h-[38px] rounded-lg font-bold text-[10px] sm:text-xs transition-all active:scale-95 ${isActiveSpeech && !isPaused ? 'bg-amber-600 text-white hover:bg-amber-500 shadow-md border border-amber-500/20' : 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700/30'}`}
+                        className={`flex-1 flex items-center justify-center gap-1 px-2.5 py-2 min-h-[38px] rounded-lg font-bold text-[11px] sm:text-xs transition-all active:scale-95 ${isActiveSpeech && !isPaused ? 'bg-amber-600 text-white hover:bg-amber-500 shadow-md border border-amber-500/20' : 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700/30'}`}
                         disabled={!isActiveSpeech || isPaused}
                         title="Pausar audio"
                       >
@@ -309,7 +309,7 @@ export const ClassTeacherChat: React.FC<ClassTeacherChatProps> = ({ className = 
 
                       <button
                         onClick={handleStopVoice}
-                        className={`flex-1 flex items-center justify-center gap-1 px-2.5 py-2 min-h-[38px] rounded-lg font-bold text-[10px] sm:text-xs transition-all active:scale-95 ${isActiveSpeech ? 'bg-rose-600 text-white hover:bg-rose-500 shadow-md border border-rose-500/20' : 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700/30'}`}
+                        className={`flex-1 flex items-center justify-center gap-1 px-2.5 py-2 min-h-[38px] rounded-lg font-bold text-[11px] sm:text-xs transition-all active:scale-95 ${isActiveSpeech ? 'bg-rose-600 text-white hover:bg-rose-500 shadow-md border border-rose-500/20' : 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700/30'}`}
                         disabled={!isActiveSpeech}
                         title="Detener audio"
                       >

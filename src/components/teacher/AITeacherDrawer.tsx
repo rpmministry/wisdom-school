@@ -14,6 +14,27 @@ const MarkdownMessage = React.memo(({ content }: { content: string }) => (
 ));
 MarkdownMessage.displayName = 'MarkdownMessage';
 
+/** Media query reactiva (para distinguir tablet táctil de escritorio sin romper Windows). */
+function useMediaQuery(query: string): boolean {
+  const [matches, setMatches] = useState<boolean>(() =>
+    typeof window !== 'undefined' && typeof window.matchMedia === 'function' ? window.matchMedia(query).matches : false,
+  );
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
+    const mql = window.matchMedia(query);
+    const onChange = () => setMatches(mql.matches);
+    onChange();
+    // Safari/iOS antiguos solo exponen addListener/removeListener en MediaQueryList.
+    if (typeof mql.addEventListener === 'function') {
+      mql.addEventListener('change', onChange);
+      return () => mql.removeEventListener('change', onChange);
+    }
+    mql.addListener(onChange);
+    return () => mql.removeListener(onChange);
+  }, [query]);
+  return matches;
+}
+
 export const AITeacherDrawer: React.FC = () => {
   const {
     isTeacherDrawerOpen,
@@ -39,6 +60,11 @@ export const AITeacherDrawer: React.FC = () => {
     if (currentStudent?.id === 'gael') return { ...base, accent: '#e11d48', chip: '#fef3c7', textStrong: '#111827', label: 'Super Mario Bros' };
     return { ...base, chip: '#1f2937', textStrong: '#f8fafc', label: 'Original' };
   })();
+
+  // Tablet táctil (iPad, Android, etc.), incluso con trackpad conectado: el panel lateral angosto
+  // se desborda en horizontal. En estos dispositivos usamos una hoja inferior a todo el ancho.
+  // `any-pointer: coarse` cubre iPad con teclado/trackpad; Windows de escritorio mantiene el panel lateral.
+  const isTouchTablet = useMediaQuery('(min-width: 768px) and (any-pointer: coarse)');
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState('');
@@ -178,26 +204,40 @@ export const AITeacherDrawer: React.FC = () => {
       role="dialog"
       aria-modal="false"
       aria-label={`Chat con ${teacher.name}`}
-      className="fixed top-0 right-0 bottom-0 z-[100] w-full max-w-lg pointer-events-auto flex flex-col h-[100dvh] max-h-[100dvh] border-l shadow-2xl bg-slate-900 [contain:content]"
+      className={`fixed z-[100] w-full pointer-events-auto flex flex-col shadow-2xl bg-slate-900 [contain:content] ${
+        isTouchTablet
+          ? 'inset-x-0 bottom-0 h-[min(82dvh,100dvh)] rounded-t-3xl border-t max-h-[100dvh]'
+          : 'top-0 right-0 bottom-0 max-w-lg h-[100dvh] max-h-[100dvh] border-l'
+      }`}
       style={{ background: 'linear-gradient(180deg, rgba(15,23,42,0.98), rgba(15,23,42,0.94))', borderColor: `${studentTheme.accent}55` }}
     >
 
-        <div className="p-4 sm:p-5 border-b flex items-center justify-between shadow-md" style={{ background: `linear-gradient(135deg, ${studentTheme.accent}22, rgba(15,23,42,0.92) 60%, rgba(2,6,23,0.96))` }}>
-          <div className="flex items-center gap-3">
-            <div className="relative">
+        {isTouchTablet && (
+          <button
+            onClick={() => setIsTeacherDrawerOpen(false)}
+            aria-label="Cerrar tutor"
+            className="w-full pt-2.5 pb-1 flex items-center justify-center text-slate-500 hover:text-white shrink-0"
+          >
+            <span className="w-12 h-1.5 rounded-full bg-slate-600" />
+          </button>
+        )}
+
+        <div className="p-4 sm:p-5 border-b flex items-center justify-between gap-3 shadow-md shrink-0" style={{ background: `linear-gradient(135deg, ${studentTheme.accent}22, rgba(15,23,42,0.92) 60%, rgba(2,6,23,0.96))` }}>
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="relative shrink-0">
               <img src={teacher.avatar} alt={teacher.name} className="w-12 h-12 rounded-2xl object-cover ring-2 shadow" style={{ boxShadow: `0 0 0 2px ${studentTheme.accent}55` }} />
               <span className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-emerald-500 border-2 border-slate-900" title="Activo" />
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-sm font-bold text-white">{teacher.name}</h3>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="text-sm font-bold text-white truncate">{teacher.name}</h3>
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">Voz manual</span>
               </div>
-              <p className="text-xs font-medium mt-1" style={{ color: studentTheme.accent }}>{subject.name}</p>
+              <p className="text-xs font-medium mt-1 truncate" style={{ color: studentTheme.accent }}>{subject.name}</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
             <button onClick={() => setIsTeacherDrawerOpen(false)} aria-label="Cerrar tutor" className="relative p-2.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors after:absolute after:-inset-1.5 after:content-['']"><X className="w-5 h-5" /></button>
           </div>
         </div>
@@ -221,14 +261,14 @@ export const AITeacherDrawer: React.FC = () => {
               <div key={msg.id} className={`flex gap-3 ${isUser ? 'justify-end' : 'justify-start'}`}>
                 {!isUser && <img src={teacher.avatar} alt={teacher.name} className="w-8 h-8 rounded-lg object-cover mt-1 shadow-md" />}
 
-                <div className={`flex flex-col max-w-[90%] ${isUser ? 'items-end' : 'items-start'}`}>
+                <div className={`flex flex-col min-w-0 max-w-[85%] ${isUser ? 'items-end' : 'items-start'}`}>
 
-                  <div className="p-4 rounded-2xl text-xs sm:text-sm leading-relaxed shadow-lg" style={isUser ? { background: `linear-gradient(135deg, ${studentTheme.accent}, ${studentTheme.accent}cc)`, color: '#fff', borderBottomRightRadius: 0 } : { background: 'rgba(15, 23, 42, 0.95)', border: `1px solid ${isActiveSpeech && !isPaused ? '#10b981' : studentTheme.accent + '55'}`, color: '#e2e8f0', borderBottomLeftRadius: 0 }}>
-                    {isUser ? <div className="whitespace-pre-line font-medium">{msg.content}</div> : <MarkdownMessage content={msg.content} />}
+                  <div className="p-4 rounded-2xl text-[15px] leading-relaxed shadow-lg break-words [overflow-wrap:anywhere]" style={isUser ? { background: `linear-gradient(135deg, ${studentTheme.accent}, ${studentTheme.accent}cc)`, color: '#fff', borderBottomRightRadius: 0 } : { background: 'rgba(15, 23, 42, 0.95)', border: `1px solid ${isActiveSpeech && !isPaused ? '#10b981' : studentTheme.accent + '55'}`, color: '#e2e8f0', borderBottomLeftRadius: 0 }}>
+                    {isUser ? <div className="whitespace-pre-wrap [overflow-wrap:anywhere] font-medium">{msg.content}</div> : <MarkdownMessage content={msg.content} />}
                   </div>
 
                   {!isUser && (
-                    <div className="mt-2 w-full max-w-sm p-2.5 rounded-xl bg-slate-950 border border-slate-800 flex flex-col gap-2 shadow-inner">
+                    <div className="mt-2 w-full min-w-0 max-w-sm p-2.5 rounded-xl bg-slate-950 border border-slate-800 flex flex-col gap-2 shadow-inner">
                       <div className="flex items-center justify-between border-b border-slate-800/60 pb-1.5 px-1">
                         <span className="text-[10px] font-bold text-slate-400 tracking-wide uppercase">Controles de Audio</span>
                         <div className="flex items-center gap-1.5">
@@ -249,7 +289,7 @@ export const AITeacherDrawer: React.FC = () => {
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex flex-wrap items-center gap-1.5">
                         {/* Botón Reproducir / Reanudar */}
                         <button
                           onClick={() => {
@@ -260,7 +300,7 @@ export const AITeacherDrawer: React.FC = () => {
                               handlePlayVoice(msg.content, msg.id);
                             }
                           }}
-                          className={`flex-1 flex items-center justify-center gap-1 px-2.5 py-2 min-h-[38px] rounded-lg font-bold text-[10px] sm:text-xs transition-all active:scale-95 ${
+                          className={`flex-1 flex items-center justify-center gap-1 px-2.5 py-2 min-h-[38px] rounded-lg font-bold text-[11px] sm:text-xs transition-all active:scale-95 ${
                             isActiveSpeech && !isPaused
                               ? 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700/30'
                               : 'bg-emerald-600 text-white hover:bg-emerald-500 shadow-md border border-emerald-500/20'
@@ -275,7 +315,7 @@ export const AITeacherDrawer: React.FC = () => {
                         {/* Botón Pausar */}
                         <button
                           onClick={handlePauseVoice}
-                          className={`flex-1 flex items-center justify-center gap-1 px-2.5 py-2 min-h-[38px] rounded-lg font-bold text-[10px] sm:text-xs transition-all active:scale-95 ${
+                          className={`flex-1 flex items-center justify-center gap-1 px-2.5 py-2 min-h-[38px] rounded-lg font-bold text-[11px] sm:text-xs transition-all active:scale-95 ${
                             isActiveSpeech && !isPaused
                               ? 'bg-amber-600 text-white hover:bg-amber-500 shadow-md border border-amber-500/20'
                               : 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700/30'
@@ -290,7 +330,7 @@ export const AITeacherDrawer: React.FC = () => {
                         {/* Botón Detener */}
                         <button
                           onClick={handleStopVoice}
-                          className={`flex-1 flex items-center justify-center gap-1 px-2.5 py-2 min-h-[38px] rounded-lg font-bold text-[10px] sm:text-xs transition-all active:scale-95 ${
+                          className={`flex-1 flex items-center justify-center gap-1 px-2.5 py-2 min-h-[38px] rounded-lg font-bold text-[11px] sm:text-xs transition-all active:scale-95 ${
                             isActiveSpeech
                               ? 'bg-rose-600 text-white hover:bg-rose-500 shadow-md border border-rose-500/20'
                               : 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700/30'

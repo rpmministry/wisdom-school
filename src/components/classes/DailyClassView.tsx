@@ -285,9 +285,11 @@ export const DailyClassView: React.FC = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+              {/* En tablet horizontal (1024-1279px) NO se parte en dos columnas: el chat quedaría
+                  angosto a la derecha y el texto se desborda. Solo se divide en pantallas xl+. */}
+              <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
                 {/* COLUMNA CENTRAL: RUTA DE MICRO-LECCIONES DIRIGIDA POR TU PROFESOR */}
-                <div className="lg:col-span-8">
+                <div className="xl:col-span-8">
                   <MicroLessonPlayer
                     dailyClass={currentClass}
                     subject={subject}
@@ -302,7 +304,7 @@ export const DailyClassView: React.FC = () => {
                 </div>
 
                 {/* COLUMNA LATERAL: COMPAÑERO IA + RECURSOS */}
-                <aside className="lg:col-span-4 space-y-6">
+                <aside className="xl:col-span-4 space-y-6">
                   <ClassTeacherChat compact />
                   <div className="rounded-3xl bg-slate-800/80 border border-slate-700/80 shadow-xl overflow-hidden">
                     <button
