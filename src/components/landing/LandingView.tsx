@@ -37,8 +37,8 @@ export const LandingView: React.FC = () => {
   const {
     studentsList,
     authenticatedStudentId,
-    setAuthenticatedStudentId,
-    setCurrentStudentId,
+    isAuthenticated,
+    authenticateStudent,
     openAuthModal,
     setActiveTab,
     loginAsTestStudent,
@@ -91,11 +91,7 @@ export const LandingView: React.FC = () => {
         return;
       }
 
-      setAuthenticatedStudentId(found.id);
-      setCurrentStudentId(found.id);
-      setTimeout(() => {
-        setActiveTab('space');
-      }, 150);
+      authenticateStudent(found.id);
     } catch (e) {
       console.error('Error en Google Sign-In:', e);
     }
@@ -277,7 +273,7 @@ export const LandingView: React.FC = () => {
             </div>
 
             <div className="lg:w-[400px] lg:flex-shrink-0 w-full">
-              {authenticatedStudentId && !isDemoStudent ? <ActiveSessionBanner /> : <InactiveSessionBanner />}
+              {isAuthenticated && !isDemoStudent ? <ActiveSessionBanner /> : <InactiveSessionBanner />}
             </div>
           </div>
 

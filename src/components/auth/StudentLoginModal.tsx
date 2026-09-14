@@ -8,7 +8,6 @@ import {
   Lock,
   KeyRound,
   Mail,
-  CheckCircle,
   AlertCircle,
   X,
   UserCheck,
@@ -33,10 +32,7 @@ const {
   studentsList,
   loginStudent,
   currentStudentId,
-  setCurrentStudentId,
-  setActiveTab,
-  authenticatedStudentId,
-  setAuthenticatedStudentId,
+  authenticateStudent,
 } = useSchool();
 
   const initialTarget = targetStudentId || currentStudentId || 'avril';
@@ -45,7 +41,6 @@ const {
   const [identifier, setIdentifier] = useState<string>(targetStudent?.email || '');
   const [password, setPassword] = useState<string>('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [googleReady, setGoogleReady] = useState(false);
   const [restrictedEmail, setRestrictedEmail] = useState<string | null>(null);
   const googleButtonRef = useRef<HTMLDivElement>(null);
@@ -56,7 +51,6 @@ const {
       setIdentifier('');
       setPassword('');
       setErrorMsg(null);
-      setSuccessMsg(null);
       setRestrictedEmail(null);
     }
   }, [isOpen]);
@@ -101,12 +95,9 @@ const {
         return;
       }
 
-      setAuthenticatedStudentId(found.id);
-      setCurrentStudentId(found.id);
-      setTimeout(() => {
-        setActiveTab('space');
-        onClose();
-      }, 150);
+      // Sesión aplicada de forma síncrona; se cierra el modal y el landing muestra el banner verde.
+      authenticateStudent(found.id);
+      onClose();
     } catch (e) {
       console.error('Error en Google Sign-In:', e);
       setErrorMsg('Falló la comunicación con el servidor de Google.');
@@ -171,7 +162,6 @@ try {
   const handleLoginSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
-    setSuccessMsg(null);
 
     if (!identifier.trim() || !password.trim()) {
       setErrorMsg('Por favor ingresa tu correo electrónico y contraseña.');
@@ -183,24 +173,15 @@ try {
       // Clear form fields immediately on successful login
       setIdentifier('');
       setPassword('');
-      // Send PIN code email to the student's email address
-      const sendPinEmail = async () => {
-        try {
-          await fetch('/api/send-pin', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email: result.student.email, pinCode: result.student.pinCode }),
-          });
-        } catch (e) {
-          console.warn('Failed to send PIN email', e);
-        }
-      };
-      sendPinEmail();
-      setSuccessMsg(`¡Bienvenido de nuevo, ${result.student.name}! Accediendo al aula...`);
-      setTimeout(() => {
-        setActiveTab('space');
-        onClose();
-      }, 700);
+      // El correo del PIN es un efecto secundario independiente: fire-and-forget, nunca bloquea
+      // ni revierte la sesión (loginStudent ya aplicó el estado de forma síncrona).
+      fetch('/api/send-pin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: result.student.email, pinCode: result.student.pinCode }),
+      }).catch(() => { /* si falla el correo, la sesión ya quedó iniciada */ });
+      // Cerrar el modal en el MISMO tick: el landing refleja la sesión con el banner verde.
+      onClose();
     } else {
       setErrorMsg(result.error || 'Credenciales incorrectas. Revisa tu correo y contraseña.');
     }
@@ -293,13 +274,6 @@ try {
               <div className="p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-start gap-2.5 animate-shake">
                 <AlertCircle className="w-4 h-4 shrink-0 text-rose-400 mt-0.5" />
                 <span>{errorMsg}</span>
-              </div>
-            )}
-
-            {successMsg && (
-              <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-2.5">
-                <CheckCircle className="w-4 h-4 shrink-0 text-emerald-400" />
-                <span>{successMsg}</span>
               </div>
             )}
 

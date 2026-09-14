@@ -51,6 +51,8 @@ interface SchoolContextType {
   setAuthenticatedStudentId: (id: StudentId | null) => void;
   isAuthenticated: boolean;
   loginStudent: (identifier: string, passOrPin: string) => { success: boolean; student?: Student; error?: string };
+  /** Aplica una sesión ya validada (p. ej. Google) de forma síncrona, sin forzar navegación. */
+  authenticateStudent: (id: StudentId) => void;
   logoutStudent: () => void;
   registerNewStudent: (input: NewStudentInput) => { student: Student; credentials: { email: string; pinCode: string; password?: string } };
   isAuthModalOpen: boolean;
@@ -114,6 +116,11 @@ interface SchoolContextType {
 
 const SchoolContext = createContext<SchoolContextType | undefined>(undefined);
 
+// Persistencia best-effort: en iPad/Safari (modo privado o cuota llena) localStorage.setItem puede
+// lanzar QuotaExceededError. La sesión NUNCA debe depender de que la escritura funcione.
+const safeSetItem = (key: string, value: string) => { try { localStorage.setItem(key, value); } catch { /* seguimos en memoria */ } };
+const safeRemoveItem = (key: string) => { try { localStorage.removeItem(key); } catch { /* no-op */ } };
+
 export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   useEffect(() => {
     try {
@@ -162,6 +169,11 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     } catch { }
     return null;
   });
+
+  // Espejo en ref del estado de auth: evita que el guard de navegación (o un setTimeout) use una
+  // closure obsoleta con authenticatedStudentId = null justo después de iniciar sesión.
+  const authRef = useRef<StudentId | null>(authenticatedStudentId);
+  useEffect(() => { authRef.current = authenticatedStudentId; }, [authenticatedStudentId]);
 
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
   const [targetLoginStudentId, setTargetLoginStudentId] = useState<string | undefined>(undefined);
@@ -226,6 +238,20 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   const navigateToHome = () => { setNavigationHistory([]); setActiveTab('home'); };
+
+  // Único punto que materializa una sesión: estado React + persistencia + (opcional) navegación,
+  // todo SÍNCRONO. `authRef` se actualiza al instante para que cualquier navegación del mismo tick
+  // pase el guard sin depender de un timeout ni del re-render del proveedor.
+  const commitAuthenticatedSession = (id: StudentId, goToSpace = false) => {
+    authRef.current = id;
+    setAuthenticatedStudentId(id);
+    setCurrentStudentId(id);
+    safeSetItem('wisdom_auth_v2026', id);
+    safeSetItem('wisdom_current_v2026', id);
+    if (goToSpace) { setNavigationHistory([]); setActiveTab('space'); }
+  };
+  // Marca la sesión como activa sin navegar: el landing muestra el banner verde y el estudiante entra con su botón.
+  const authenticateStudent = (id: StudentId) => commitAuthenticatedSession(id, false);
 
   const [allSubjects, setAllSubjects] = useState<Subject[]>(() => {
     try {
@@ -298,26 +324,26 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
 
-  useEffect(() => { localStorage.setItem('wisdom_students_v2026', JSON.stringify(studentsList.filter(s => !s.isDemo))); }, [studentsList]);
+  useEffect(() => { safeSetItem('wisdom_students_v2026', JSON.stringify(studentsList.filter(s => !s.isDemo))); }, [studentsList]);
   
   useEffect(() => {
     const student = studentsList.find((s) => s.id === authenticatedStudentId);
-    if (student && !student.isDemo) localStorage.setItem('wisdom_auth_v2026', authenticatedStudentId || 'null');
-    else localStorage.removeItem('wisdom_auth_v2026');
+    if (student && !student.isDemo) safeSetItem('wisdom_auth_v2026', authenticatedStudentId || 'null');
+    else safeRemoveItem('wisdom_auth_v2026');
   }, [authenticatedStudentId, studentsList]);
 
-  useEffect(() => { localStorage.setItem('wisdom_current_v2026', currentStudentId || 'null'); }, [currentStudentId]);
+  useEffect(() => { safeSetItem('wisdom_current_v2026', currentStudentId || 'null'); }, [currentStudentId]);
   
   useEffect(() => {
     if (authenticatedStudentId && currentStudentId !== authenticatedStudentId) setCurrentStudentId(authenticatedStudentId);
     else if (!authenticatedStudentId && currentStudentId) setCurrentStudentId(null);
   }, [authenticatedStudentId]);
 
-  useEffect(() => { localStorage.setItem('wisdom_subjects_v2026', JSON.stringify(allSubjects)); }, [allSubjects]);
-  useEffect(() => { localStorage.setItem('wisdom_schedules_v2026', JSON.stringify(allSchedules)); }, [allSchedules]);
-  useEffect(() => { localStorage.setItem('wisdom_classes_v2026', JSON.stringify(classesList)); }, [classesList]);
-  useEffect(() => { localStorage.setItem('wisdom_submissions_v2026', JSON.stringify(submissions)); }, [submissions]);
-  useEffect(() => { localStorage.setItem('wisdom_micro_route_v2026', JSON.stringify(microRouteProgress)); }, [microRouteProgress]);
+  useEffect(() => { safeSetItem('wisdom_subjects_v2026', JSON.stringify(allSubjects)); }, [allSubjects]);
+  useEffect(() => { safeSetItem('wisdom_schedules_v2026', JSON.stringify(allSchedules)); }, [allSchedules]);
+  useEffect(() => { safeSetItem('wisdom_classes_v2026', JSON.stringify(classesList)); }, [classesList]);
+  useEffect(() => { safeSetItem('wisdom_submissions_v2026', JSON.stringify(submissions)); }, [submissions]);
+  useEffect(() => { safeSetItem('wisdom_micro_route_v2026', JSON.stringify(microRouteProgress)); }, [microRouteProgress]);
 
   // Indicador honesto de guardado: se actualiza solo con cambios REALES de progreso,
   // nunca en el montaje inicial, para no mostrar "Guardado" sin que el niño haga nada.
@@ -354,7 +380,8 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     if (!found) return { success: false, error: 'Estudiante no encontrado.' };
     
     if ((found.password?.toLowerCase() === cleanSecret) || (found.pinCode?.toLowerCase() === cleanSecret) || (cleanId === found.pinCode?.toLowerCase() || cleanId === found.id.toLowerCase())) {
-      setAuthenticatedStudentId(found.id); setCurrentStudentId(found.id);
+      // Login válido = sesión aplicada de inmediato (no espera a red, timers ni re-render).
+      commitAuthenticatedSession(found.id);
       return { success: true, student: found };
     }
     return { success: false, error: 'Credenciales incorrectas.' };
@@ -379,18 +406,22 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return { success: true };
   };
 
-  const logoutStudent = () => { setAuthenticatedStudentId(null); setCurrentStudentId(null); setActiveTab('home'); };
+  const logoutStudent = () => {
+    authRef.current = null;
+    setAuthenticatedStudentId(null);
+    setCurrentStudentId(null);
+    safeRemoveItem('wisdom_auth_v2026');
+    safeRemoveItem('wisdom_current_v2026');
+    setActiveTab('home');
+  };
 
   const loginAsTestStudent = (testStudentId: StudentId) => {
     const demoStudent = studentsList.find((s) => s.id === testStudentId && s.isDemo);
     if (!demoStudent) return;
     // Bypass de autenticación tradicional: el Modo Demo entra directo con estado global.
-    setAuthenticatedStudentId(testStudentId);
-    setCurrentStudentId(testStudentId);
-    setNavigationHistory([]);
+    commitAuthenticatedSession(testStudentId, true);
     setIsDemoLockOpen(false);
     setSelectedDayOfWeek('Lunes');
-    setActiveTab('space');
   };
 
   const registerNewStudent = (input: NewStudentInput) => {
@@ -399,16 +430,15 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setAllSubjects((prev) => [...created.subjects, ...prev]);
     setClassesList((prev) => [...created.classes, ...prev]);
     setAllSchedules((prev) => [...created.schedules, ...prev]);
-    setAuthenticatedStudentId(created.student.id);
-    setCurrentStudentId(created.student.id);
+    commitAuthenticatedSession(created.student.id, true);
     return { student: created.student, credentials: { email: created.student.email || '', pinCode: created.student.pinCode || '', password: created.student.password || '' } };
   };
 
   const handleSetActiveTab = (tab: NavigationTab) => {
-    if (tab !== 'home' && !authenticatedStudentId) { 
-      // FIX 1: Le decimos a TS que si es null, envíe undefined
-      openAuthModal(currentStudentId || undefined); 
-      return; 
+    // Se lee del ref, no del estado capturado: tras un login en el mismo tick el guard ya ve la sesión.
+    if (tab !== 'home' && !authRef.current) {
+      openAuthModal(authRef.current || currentStudentId || undefined);
+      return;
     }
     setActiveTab((prevTab) => {
       if (prevTab !== tab && prevTab !== 'home') setNavigationHistory((prev) => [...prev, prevTab]);
@@ -537,6 +567,7 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         setAuthenticatedStudentId, 
         isAuthenticated: !!authenticatedStudentId, 
         loginStudent, 
+        authenticateStudent,
         logoutStudent, 
         registerNewStudent, 
         isAuthModalOpen, 
