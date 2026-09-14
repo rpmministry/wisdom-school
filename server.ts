@@ -1008,10 +1008,9 @@ REGLAS: español claro y afectuoso; options SIEMPRE 3, cortas y muy distintas; c
   }
 });
 
-// Paso 15e: DESARROLLA el tema para la Guía Didáctica oficial (plantilla "El Ciclo del Agua").
-// MODO A (preferido): el cliente envía los `steps` ya resueltos por la ruta interactiva → se genera SOLO {intro, questionA, questionB}
-// (JSON chico = rápido y fiable también con free-tier saturado; la guía queda idéntica a lo que el niño estudió).
-// MODO B: sin steps → genera guía completa (intro+3 pasos reales+preguntas). Si nada funciona, el frente usa su fallback con la lectura real.
+// Guías Didácticas v4.0 — genera SOLO { explicacion, preguntas }.
+// Una explicación corrida (sin "Paso 1/Paso 2"), acotada por nivel EGB, y 2-3 preguntas
+// que se responden directamente con esa explicación. El resto (encabezado, firmas) lo arma el frontend.
 app.post('/api/ai/guide-content', async (req: Request, res: Response) => {
   try {
     const { student, subject, dailyClass, steps: presetSteps } = req.body ?? {};
@@ -1019,73 +1018,95 @@ app.post('/api/ai/guide-content', async (req: Request, res: Response) => {
       return res.status(400).json({ content: null, error: 'Falta dailyClass.theme' });
     }
     const preset: Array<{ title: string; text: string }> = (Array.isArray(presetSteps) ? presetSteps : [])
-      .filter((s: any) => s && typeof s.title === 'string' && typeof s.text === 'string' && s.text.trim().length > 25)
+      .filter((s: any) => s && typeof s.text === 'string' && s.text.trim().length > 25)
       .slice(0, 3)
-      .map((s: any) => ({ title: String(s.title).replace(/\s+/g, ' ').trim().slice(0, 70), text: String(s.text).replace(/\s+/g, ' ').trim().slice(0, 300) }));
+      .map((s: any) => ({ title: String(s.title || '').replace(/\s+/g, ' ').trim().slice(0, 70), text: String(s.text).replace(/\s+/g, ' ').trim().slice(0, 300) }));
 
     const edad = student?.age || 10;
-    // Normalización de campos JSON: SOLO colapsar espacios (cleanReasoningLeak es para prosa larga, no para
-    // strings cortos sin tildes: ahí devolvía null y tiraba respuestas válidas enteras — bug corregido).
+    const gradeText = `${student?.gradeLong || ''} ${student?.grade || ''} ${subject?.teacher?.educationalLevel || ''}`.toLowerCase();
+    const level: 'Elemental' | 'Media' | 'Superior' =
+      /elemental/.test(gradeText) || edad <= 10 ? 'Elemental'
+        : /media/.test(gradeText) ? 'Media'
+          : /superior/.test(gradeText) || edad >= 12 ? 'Superior' : 'Media';
+    const wordRange = level === 'Elemental' ? '90 a 120' : level === 'Media' ? '130 a 160' : '160 a 200';
+    const maxQuestions = level === 'Elemental' ? 2 : 3;
+    const integracionFe = /relaci[oó]n con dios/i.test(subject?.name || '') || /(^|-)rel(-|$)/i.test(subject?.id || '');
+    const mundo = ['avril', 'karen'].includes(student?.id) ? 'snoopy' : 'mario';
+
+    // Normalización de campos JSON: solo colapsar espacios.
     const norm = (s: unknown, max: number) => (typeof s === 'string' ? s : '').replace(/\s+/g, ' ').trim().slice(0, max);
 
-    let systemPrompt: string;
-    let userMessage: string;
-    let budgets: { modelTryMs: number; tierBudgetMs: number; lastTierBudgetMs: number; maxTokens: number };
+    const contenidoBase = [
+      dailyClass.unit ? `Unidad: ${dailyClass.unit}` : '',
+      dailyClass.theme ? `Tema: ${dailyClass.theme}` : '',
+      dailyClass.objective ? `Destreza/objetivo: ${dailyClass.objective}` : (subject?.curriculumOverview ? `Destreza/objetivo: ${subject.curriculumOverview}` : ''),
+      dailyClass.introduction ? `Introducción: ${dailyClass.introduction}` : '',
+      dailyClass.reading ? `Lectura base: ${dailyClass.reading}` : '',
+      preset.length ? `Ya visto en la clase interactiva:\n${preset.map((s, i) => `${i + 1}. ${s.title}: ${s.text}`).join('\n')}` : '',
+      (dailyClass.activities || []).slice(0, 2).map((a: any) => `Actividad: ${a.title} — ${a.description}`).join('\n'),
+    ].filter(Boolean).join('\n');
 
-    if (preset.length >= 2) {
-      const pasosTxt = preset.map((s, i) => `Paso ${i + 1}: ${s.title} — ${s.text}`).join('\n');
-      systemPrompt = `
-Eres el autor de las Guías Didácticas de Wisdom School (escuela cristiana evangélica). El estudiante YA vio estos pasos del tema "${dailyClass.theme}" en su clase interactiva:
-${pasosTxt}
+    const systemPrompt = `
+Eres el diseñador pedagógico de Wisdom School, un colegio homeschool evangélico en Ecuador que sigue el currículo del Ministerio de Educación (Actualización y Fortalecimiento Curricular, pedagogía crítica-constructivista, destrezas con criterios de desempeño).
 
-Genera SOLO un objeto JSON (empieza con { y termina }, sin notas internas, sin markdown) con este esquema exacto y nada más:
-{"intro":"párrafo de 50-70 palabras, español cálido y sencillo para un niño de ${edad} años: presenta el tema, por qué importa en la vida real y termina con una frase que conecte su orden y propósito con Dios creador y con nuestra mayordomía (sin citar versículos largos)","questionA":"pregunta de ANÁLISIS encadenando TODOS los pasos de arriba (qué pasa primero, después, al final) y por qué el proceso funciona así y no al revés; máximo 45 palabras, termina con una mini-pregunta de por qué","questionB":"UN escenario concreto de la vida real de un niño de ${edad} años donde una parte del proceso falla o está en riesgo, seguido de 2 preguntas cortas: ¿qué pasaría…? y ¿cuál es tu responsabilidad para cuidarlo como buen mayordomo de lo que Dios creó?; máximo 55 palabras"}
-PROHIBIDO inventar pasos nuevos o cambiar los nombres de los dados; las preguntas DEBEN poder responderse leyendo solo los pasos de arriba.
-      `.trim();
-      userMessage = `Genera el JSON (intro, questionA, questionB) para "${dailyClass.theme}". Materia: ${subject?.name || 'General'}.`;
-      budgets = { modelTryMs: 10000, tierBudgetMs: 24000, lastTierBudgetMs: 14000, maxTokens: 520 };
-    } else {
-      const base = [
-        dailyClass.objective ? `Objetivo: ${dailyClass.objective}` : '',
-        dailyClass.introduction ? `Introducción del maestro: ${String(dailyClass.introduction).slice(0, 500)}` : '',
-        dailyClass.reading ? `Lectura base de la clase: ${String(dailyClass.reading).slice(0, 800)}` : '',
-        (dailyClass.activities && dailyClass.activities[0]) ? `Actividad clave: ${dailyClass.activities[0].title} — ${dailyClass.activities[0].description}` : '',
-      ].filter(Boolean).join('\n');
-      systemPrompt = `
-Eres el autor de las Guías Didácticas oficiales de Wisdom School (escuela cristiana evangélica, cosmovisión bíblica). Tu trabajo: DESARROLLAR EL TEMA con contenido real y nombres concretos. Estilo de referencia (copia SU ESTILO, no su contenido): Tema "El ciclo del agua" → intro de 4 líneas; "Paso 1: Evaporación (El Ascenso): el sol calienta el agua… sube como vapor"; "Paso 2: Condensación (La Formación): el vapor se enfría y forma nubes"; "Paso 3: Precipitación (El Regreso): cae como lluvia y riega los campos"; después A y B.
-Los pasos DEBEN usar los NOMBRES REALES de cada parte del proceso (términos científicos, episodios, reglas, operaciones...), con apodo evocador entre paréntesis. PROHIBIDO titular pasos "Observa", "Comprende", "Parte 1", "Idea central".
+Tu única tarea es generar el CONTENIDO de una guía didáctica impresa de una sola página para UNA clase de UNA materia. No generes portada, encabezado, firmas ni metadata: eso ya existe.
 
-Tu respuesta COMIENZA con { y TERMINA con }. Sin notas internas ni texto fuera del JSON. ESQUEMA EXACTO:
-{"intro":"50-70 palabras, español sencillo para ${edad} años, cierra conectando orden/propósito con Dios creador","steps":[{"title":"NOMBRE real (Apodo)","text":"explicación SOLO de este paso, 35-48 palabras sin relleno"},{"title":"NOMBRE real del siguiente paso (Apodo)","text":"35-48 palabras"},{"title":"NOMBRE real del último paso (Apodo)","text":"35-48 palabras"}],"questionA":"A. Expresa con tus propias palabras: pregunta de análisis encadenando los 3 pasos + por qué funcionan en ese orden (máx 45 palabras)","questionB":"B. Pensamiento crítico: escenario real donde algo falla o está en riesgo + ¿qué pasaría...? + ¿cuál es tu responsabilidad/mayordomía? (máx 55 palabras)"}
-      `.trim();
-      userMessage = `Tema a desarrollar: "${dailyClass.theme}". Materia: ${subject?.name || 'General'}. Estudiante: ${student?.name || 'tu estudiante'} (${edad} años).\n${base}\nDesarrolla ahora el JSON de la guía.`;
-      budgets = { modelTryMs: 14000, tierBudgetMs: 30000, lastTierBudgetMs: 18000, maxTokens: 1600 };
-    }
+DATOS DE ENTRADA:
+- materia: ${subject?.name || 'General'}
+- tema_unidad: ${dailyClass.theme}
+- destreza_curricular: ${dailyClass.objective || subject?.curriculumOverview || dailyClass.theme}
+- estudiante: ${student?.name || 'Estudiante'}, ${edad} años, ${student?.gradeLong || student?.grade || 'EGB'} (nivel_egb: ${level})
+- docente_ia: ${subject?.teacher?.name || 'Docente IA'} (${subject?.teacher?.personality || 'socrático'})
+- mundo_tematico: ${mundo} (úsalo solo como un detalle de tono, nunca como distracción del contenido)
+- contenido_curricular_base: ${contenidoBase || dailyClass.theme}
+- integracion_fe: ${integracionFe} → si es true (materia "Relación con Dios"), cierra con UNA frase breve de fe; si es false, NO menciones a Dios ni temas religiosos.
+
+REGLAS DE CONTENIDO (no negociables):
+
+1. EXPLICACIÓN (campo "explicacion"):
+   - Texto corrido, sin subtítulos ni "Paso 1/Paso 2". Una sola idea desarrollada de principio a fin.
+   - Debe responder, en este orden implícito: qué es el tema → por qué importa o para qué sirve → un ejemplo concreto y cotidiano para la edad del estudiante.
+   ${integracionFe ? '- Cierra con UNA frase breve (máx. 20 palabras) que conecte el tema con un principio de fe, sin sermón.' : '- No incluyas referencias religiosas.'}
+   - TOPE DE PALABRAS OBLIGATORIO PARA NIVEL ${level.toUpperCase()}: ${wordRange} palabras. Cuenta las palabras antes de responder; si te pasas, RECORTA. Es preferible quedarse corto y completo que largo y cortado.
+   - ${level === 'Elemental' ? 'Oraciones cortas (máx. 15 palabras). Vocabulario cotidiano, cero tecnicismos sin explicar.' : level === 'Media' ? 'Oraciones de hasta 20 palabras.' : 'Puede usar un término técnico por explicación, siempre definido en la misma frase.'}
+
+2. PREGUNTAS (campo "preguntas", arreglo):
+   - ${level === 'Elemental' ? 'Exactamente 2 preguntas: 1 literal + 1 interpretativa.' : 'Exactamente 3 preguntas: 1 literal + 1 interpretativa + 1 de aplicación breve.'}
+   - Cada pregunta (salvo la de aplicación) se responde SOLO con la información de "explicacion".
+   - Una sola pregunta por objeto, nunca dos preguntas unidas con "y" ni "¿...? ¿...?".
+   - Redacción breve (resoluble en 1-3 renglones), no un ensayo.
+   - Pista opcional de máximo 12 palabras, simple, sin símbolos.
+
+FORMATO DE SALIDA — responde SOLO este JSON, sin texto antes ni después, sin backticks:
+{"explicacion":"string respetando el tope de palabras del nivel","preguntas":[{"tipo":"literal","pregunta":"string","pista":null},{"tipo":"interpretativa","pregunta":"string","pista":null}${level === 'Elemental' ? '' : ',{"tipo":"aplicacion","pregunta":"string","pista":null}'}]}
+
+AUTOCONTROL (en silencio): cuenta las palabras de "explicacion" y ajústatelas al rango; verifica que cada pregunta se responda con esa explicación y que el JSON sea válido.
+    `.trim();
+    const userMessage = `Genera el JSON v4.0 (explicacion + ${maxQuestions} preguntas) para "${dailyClass.theme}". Materia: ${subject?.name || 'General'}. Estudiante: ${student?.name || 'Estudiante'} (${edad} años, nivel ${level}).`;
 
     const result = await executeResilientAIPipeline(
       { systemPrompt, userMessage, conversationHistory: [] },
-      { modelTryMs: budgets.modelTryMs, tierBudgetMs: budgets.tierBudgetMs, lastTierBudgetMs: budgets.lastTierBudgetMs, gen: { maxTokens: budgets.maxTokens, temperature: 0.35 } }
+      { modelTryMs: 10000, tierBudgetMs: 22000, lastTierBudgetMs: 12000, gen: { maxTokens: 560, temperature: 0.35 } }
     );
 
     const parsed = looseParseJson(extractJsonObject(result.reply));
     res.setHeader('Cache-Control', 'no-store');
-    const intro = norm(parsed?.intro ?? parsed?.introduction, 520);
-    const questionA = norm(parsed?.questionA, 360).replace(/^A\.\s*/i, '').replace(/^Expresa con tus propias palabras\s*[:\-—]\s*/i, '');
-    const questionB = norm(parsed?.questionB, 440).replace(/^B\.\s*/i, '').replace(/^Pensamiento (cr[ií]tico|de an[aá]lisis)\s*[:\-—]\s*/i, '');
+    const explicacion = norm(parsed?.explicacion, 2200);
+    const tipoOrder = ['literal', 'interpretativa', 'aplicacion'];
+    const preguntas = (Array.isArray(parsed?.preguntas) ? parsed.preguntas : [])
+      .filter((q: any) => q && typeof q.pregunta === 'string' && q.pregunta.trim())
+      .slice(0, maxQuestions)
+      .map((q: any, i: number) => ({
+        tipo: tipoOrder.includes(q.tipo) ? q.tipo : tipoOrder[Math.min(i, 2)],
+        pregunta: norm(q.pregunta, 240),
+        pista: q.pista ? norm(q.pista, 90) : null,
+      }));
 
-    let outSteps = preset;
-    if (preset.length < 2) {
-      const rawSteps = Array.isArray(parsed?.steps) ? parsed.steps : [];
-      outSteps = rawSteps
-        .filter((s: any) => s && typeof s.title === 'string' && typeof s.text === 'string' && s.text.trim().length > 25)
-        .slice(0, 3)
-        .map((s: any) => ({ title: norm(s.title, 70).replace(/^Paso\s*\d+\s*[:\-—]\s*/i, ''), text: norm(s.text, 320) }));
-    }
-    if (!intro || outSteps.length < 2 || !questionA || !questionB) {
+    if (!explicacion || preguntas.length < 2) {
       console.warn('[guide-content] incompleto. Snippet:', (result.reply || '').slice(0, 260));
       return res.status(503).json({ content: null, providerUsed: result.providerUsed });
     }
-    return res.json({ content: { intro, steps: outSteps, questionA, questionB }, providerUsed: result.providerUsed });
+    return res.json({ content: { explicacion, preguntas }, providerUsed: result.providerUsed });
   } catch (err: any) {
     console.error('Error en /api/ai/guide-content:', err?.message || err);
     return res.status(503).json({ content: null, isOfflineSimulation: true });

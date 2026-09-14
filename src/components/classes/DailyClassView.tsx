@@ -143,15 +143,17 @@ export const DailyClassView: React.FC = () => {
         let steps = readCachedBiteSteps(currentStudent, cls, 3);
         if (steps.length < 2 && routeStepsForClass.current === cls.id && routeSteps.length >= 2) steps = routeSteps;
         let ai: any = null;
-        if (steps.length >= 2 && subj) {
+        if (subj) {
           try {
-            ai = await requestGuideContent({ student: currentStudent, subject: subj, dailyClass: cls, steps });
+            ai = await requestGuideContent({ student: currentStudent, subject: subj, dailyClass: cls, steps: steps.length >= 2 ? steps : undefined });
           } catch { ai = null; }
-          if (!ai) ai = routeGuideContent(steps as any, { theme: cls.theme, studentName: currentStudent.name, subjectName: subj.name, withSplit: /cienc|mat|natur|hist|bio|quim/i.test(`${subj.id}${subj.name}`) });
+          if (!ai && steps.length >= 2) {
+            ai = routeGuideContent(steps, { theme: cls.theme, studentGrade: currentStudent.grade, studentId: currentStudent.id, subjectName: subj.name });
+          }
         }
         items.push({ currentClass: cls as DailyClass, subject: subj, ai });
       }
-      const filename = downloadDailyGuidesBundle({ studentName: currentStudent.name, studentGrade: currentStudent.grade, dateStr, dayLabel: selectedDayOfWeek, items });
+      const filename = downloadDailyGuidesBundle({ studentName: currentStudent.name, studentGrade: currentStudent.grade, dateStr, dayLabel: selectedDayOfWeek, studentId: currentStudent.id, items });
       setBatchMessage({ kind: 'ok', text: `Diario listo: ${items.length} guía${items.length === 1 ? '' : 's'} (${origenDia}) en un solo documento → ${filename}. Ábrelo y usa «Imprimir / Guardar PDF combinado».` });
       setTimeout(() => setBatchMessage(null), 15000);
     } catch (e: any) {

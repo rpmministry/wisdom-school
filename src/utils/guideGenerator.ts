@@ -1,310 +1,271 @@
 import { DailyClass, Subject } from "../types";
 
-// Tipos del contenido desarrollado por IA (POST /api/ai/guide-content)
-export interface GuideStep { title: string; text: string }
+// ============================================================================
+// Guías Didácticas v4.0
+// Una guía = una materia = una página. Estructura fija:
+//   1) encabezado compacto · 2) explicación corrida · 3) 2-3 preguntas ancladas
+//   al texto · 4) firmas.
+// El contenido lo produce /api/ai/guide-content con el prompt maestro v4.0 y el
+// campo exacto: { explicacion, preguntas }. Si no hay IA, el frontend compone
+// una explicación local a partir del material real de la clase.
+// ============================================================================
+
+export type EgbLevel = 'Elemental' | 'Media' | 'Superior';
+export type GuideQuestionType = 'literal' | 'interpretativa' | 'aplicacion';
+
+export interface GuideQuestion {
+  tipo: GuideQuestionType;
+  pregunta: string;
+  /** Pista corta opcional (máx. 12 palabras), sin símbolos ni capas. */
+  pista?: string | null;
+}
+
 export interface GuideAiContent {
-  intro: string;
-  steps: GuideStep[];        // 2-3 pasos con nombre real del contenido
-  questionA: string;         // A. Expresa con tus propias palabras
-  questionB: string;         // B. Pensamiento crítico (escenario + mayordomía)
+  explicacion: string;
+  preguntas: GuideQuestion[];
   providerUsed?: string;
 }
 
 const clean = (s: string, max = 300): string => (s || "").replace(/\s+/g, " ").trim().slice(0, max).replace(/[,;:\s]+$/g, "");
-const firstSentences = (s: string, n = 3): string => (s || "").split(/(?<=[.!?])\s+/).filter(Boolean).slice(0, n).join(" ");
-const chunkList = <T,>(arr: T[], k: number): T[][] => {
-  const out: T[][] = [];
-  for (let i = 0; i < arr.length; i += k) out.push(arr.slice(i, i + k));
-  return out;
+const esc = (s: string): string => (s || "").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+const countWords = (s: string): number => (s || "").trim().split(/\s+/).filter(Boolean).length;
+const truncateWords = (s: string, max: number): string => {
+  const words = (s || "").trim().split(/\s+/).filter(Boolean);
+  if (words.length <= max) return s.trim();
+  return words.slice(0, max).join(" ").replace(/[,;:\s]+$/g, "") + ".";
 };
 
-// Fallback determinista MULTIFUENTE y honesto: reúne TODOS los fragmentos reales de la clase
-// (lecture, introduction, objective, actividades, socráticas, tarea, reflexión). Nunca deja un
-// único paso raquítico; y si el material semilla es pobre, lo declara para que el alumno vuelva
-// a la Clase Interactiva (donde la IA desarrolla el tema) en lugar de fingir desarrollo.
-const collectFragments = (c: DailyClass): string[] => {
-  const out: string[] = [];
-  const push = (t: unknown) => { const s = clean(typeof t === "string" ? t : "", 300); if (s && s.split(" ").length >= 5 && !out.includes(s)) out.push(s); };
-  push(c.reading); push(c.introduction); push(c.objective);
-  (c.activities || []).slice(0, 3).forEach((a: any) => push(a?.description));
-  (c.socraticQuestions || []).slice(0, 2).forEach((q) => push(q));
-  push(c.homeworkTask && !String(c.homeworkTask).startsWith("Pendiente") ? c.homeworkTask : "");
-  push(c.reflectionPrompt);
-  (c.learningPath || []).slice(0, 2).forEach((s: any) => {
-    const cc = s?.coreConcept;
-    if (cc && typeof cc.summary === "string" && !/concepto central|an[aá]lisis detallado|ejecuci[oó]n pr[aá]ctica|demostraci[oó]n de maestr/i.test(cc.summary)) push(cc.summary);
-  });
-  return out;
-};
+/** Nivel EGB del estudiante a partir del grado (con respaldo por perfil conocido). */
+export function resolveEgbLevel(studentGrade?: string, studentId?: string): EgbLevel {
+  const text = (studentGrade || "").toLowerCase();
+  if (text.includes('elemental') || text.includes('1.º') || text.includes('2.º') || text.includes('3.º') || text.includes('4.º')) return 'Elemental';
+  if (text.includes('media') || text.includes('5.º') || text.includes('6.º') || text.includes('7.º')) return 'Media';
+  if (text.includes('superior') || text.includes('8.º') || text.includes('9.º') || text.includes('10.º')) return 'Superior';
+  if (studentId === 'gael' || studentId === 'mauricio') return 'Elemental';
+  if (studentId === 'avril' || studentId === 'karen') return 'Superior';
+  return 'Media';
+}
 
-const shortName = (s: string): string => clean((s || "").split(" ").slice(0, 6).join(" ").replace(/[.,;:\s]+$/, ""), 48);
+/** Tope duro de palabras de la explicación según nivel (sección 4 del prompt maestro). */
+export const wordCapForLevel = (level: EgbLevel): number =>
+  level === 'Elemental' ? 120 : level === 'Media' ? 160 : 200;
 
-const buildFromReading = (c: DailyClass): GuideAiContent => {
-  const frags = collectFragments(c);
-  const rich = frags.length >= 5;
-  const intro = clean(
-    (frags[0] || `Hoy trabajamos "${clean(c.theme, 60)}".`) + " " +
-    (frags[1] || `Objetivo de la clase: ${clean(c.objective || "comprender el tema con orden y propósito", 220)}`) + " " +
-    "Dios hizo todas las cosas con orden y propósito, y cada idea de esta clase encaja con la siguiente.",
-    480
+/** Cantidad y tipos de pregunta exigidos por nivel. */
+export const questionTypesForLevel = (level: EgbLevel): GuideQuestionType[] =>
+  level === 'Elemental' ? ['literal', 'interpretativa'] : ['literal', 'interpretativa', 'aplicacion'];
+
+export const questionLabel = (tipo: GuideQuestionType): string =>
+  tipo === 'literal' ? 'Literal' : tipo === 'interpretativa' ? 'Interpretativa' : 'Aplicación';
+
+const buildQuestions = (theme: string, level: EgbLevel): GuideQuestion[] => {
+  const literal: GuideQuestion = { tipo: 'literal', pregunta: `¿Qué es "${theme}" según el texto?`, pista: 'Búscalo en la explicación' };
+  const interpretativa: GuideQuestion = { tipo: 'interpretativa', pregunta: `¿Por qué es importante entender "${theme}"?`, pista: 'Conecta dos ideas del texto' };
+  const aplicacion: GuideQuestion = { tipo: 'aplicacion', pregunta: `¿Cómo aplicarías hoy algo de "${theme}" en tu vida diaria?`, pista: 'Menciona un ejemplo tuyo' };
+  return questionTypesForLevel(level).map((tipo) =>
+    tipo === 'literal' ? literal : tipo === 'interpretativa' ? interpretativa : aplicacion,
   );
-  let steps: GuideStep[] = [];
-  if (rich) {
-    const rest = frags.slice(2);
-    const groups = chunkList(rest, Math.max(1, Math.ceil(Math.min(rest.length || 1, 9) / 3))).slice(0, 3);
-    steps = groups.map((g: string[], i: number) => ({ title: `Paso ${i + 1}: ${shortName(g[0] || c.theme)}…`, text: clean(g.join(" "), 280) }));
-  } else {
-    steps = [
-      { title: `El corazón del tema: ${clean(c.theme, 56)}`, text: clean(frags.join(" ") || `Explora "${c.theme}" con tu profesor IA en la Clase Interactiva: ahí encontrarás definiciones, ejemplos y analogías completas.`, 280) },
-      { title: "Lo que explorarás con tu profesor", text: clean((c.socraticQuestions || []).slice(0, 2).join("  ·  ") || `Las preguntas vivas de "${c.theme}" guían el laboratorio y el taller.`, 280) },
-      { title: "Tu misión de hoy", text: clean([(c.activities && c.activities[1] && c.activities[1].description), c.homeworkTask].filter((x) => x && !String(x).startsWith("Pendiente")).join(" ") || "Sube tu evidencia del Taller Práctico y repasa el laboratorio.", 280) },
-    ].filter((s) => s.text.length > 18);
+};
+
+/** Fallback determinista: una explicación corrida con el material real de la clase. */
+const buildFromReading = (c: DailyClass, level: EgbLevel): GuideAiContent => {
+  const cap = wordCapForLevel(level);
+  const theme = clean(c.theme, 80) || "el tema de hoy";
+  const parts = [clean(c.introduction, 300), clean(c.reading, 260), clean(c.objective, 180)]
+    .filter((s) => s && countWords(s) >= 4);
+  let explicacion = parts.length
+    ? parts.join(" ")
+    : `El tema de hoy es "${theme}". Trabajaremos qué es, por qué importa y un ejemplo para tu edad.`;
+  if (countWords(explicacion) < 60) {
+    explicacion += ` Por ejemplo, imagina cómo "${theme}" aparece en una situación de tu día a día: allí se entiende mejor.`;
   }
-  while (steps.length < 3) steps.push({ title: "Para cerrar con orden", text: `Explica "${clean(c.theme, 56)}" con un ejemplo propio y úsalo hoy en tu casa: aprendemos para cuidar lo que Dios creó.` });
   return {
-    intro,
-    steps: steps.slice(0, 3),
-    questionA: clean(rich
-      ? `Expresa con tus propias palabras: ¿cómo se conectan los tres pasos de "${clean(c.theme, 60)}" y qué pasaría si saltaras el primero?`
-      : `Sin mirar la guía: ¿qué entenderías hoy de "${clean(c.theme, 56)}" si tu profesor te lo pidiera con SUS palabras (las de la Clase Interactiva)?`, 320),
-    questionB: clean((c.reflectionPrompt || "¿Qué parte de este tema pondrías en práctica hoy en tu casa y por qué?") + " Cierra: ¿qué reflejo de mayordomía ves aquí?", 380),
-    providerUsed: rich
-      ? "síntesis local del material semilla de la clase (sin IA hoy)"
-      : "semilla local pobre → completa el desarrollo en la Clase Interactiva y vuelve a descargar",
+    explicacion: truncateWords(clean(explicacion, 3000), cap),
+    preguntas: buildQuestions(theme, level),
+    providerUsed: "síntesis local del material de la clase",
   };
 };
 
-const withSplit = (subject?: Subject): boolean => {
-  const blob = `${subject?.id || ""} ${subject?.name || ""} ${subject?.description || ""}`.toLowerCase();
-  return /(cienc|natur|biolog|fisica|física|quimica|química|salud|cuerpo|ecolog|astro|matem|mat-|geo|hist)/.test(blob);
-};
-
-// Composición LOCAL de la guía a partir de los pasos que la ruta interactiva ya resolvió (con sus nombres reales).
-// Cero red, cero plantillas vacías: funciona incluso si todos los proveedores gratuitos caen, y garantiza
-// coherencia perfecta entre lo que el niño estudió y la guía que imprime.
+/**
+ * Compone la explicación a partir de los pasos que la ruta interactiva ya resolvió
+ * (caché local, sin red). Mantiene la coherencia guía == clase, pero en un solo bloque.
+ */
 export function routeGuideContent(
-  routeSteps: GuideStep[],
-  meta: { theme: string; studentName: string; subjectName?: string; withSplit?: boolean }
+  routeSteps: { title: string; text: string }[],
+  meta: { theme: string; studentGrade?: string; studentId?: string; subjectName?: string },
 ): GuideAiContent | null {
   const steps = (routeSteps || [])
-    .filter((s) => s && typeof s.title === "string" && s.title.trim() && typeof s.text === "string" && s.text.trim().length > 30)
-    .slice(0, 3)
-    .map((s) => ({ title: clean(s.title, 80), text: clean(s.text, 300) }));
+    .filter((s) => s && typeof s.text === 'string' && countWords(s.text) >= 6)
+    .slice(0, 3);
   if (steps.length < 2) return null;
-  // "Continuación: X" / "Repaso: X" → quedarse con X para leer natural dentro de una frase.
-  const tema = clean(meta.theme.replace(/^(continuaci[oó]n|repaso|ampliaci[oó]n|conexi[oó]n)\s*[:\-–—]\s*/i, ""), 80);
-  const names = steps.map((s) => `«${clean(s.title.split("(")[0], 42)}»`).join(", ");
-  const ultimoNombre = clean(steps[steps.length - 1].title.split("(")[0], 42);
-  const intro = clean(
-    `En "${tema}" (${meta.subjectName || "tu materia"}) aprendiste una secuencia que no es casualidad: ${names}. Los primeros pasos ponen la base que te permite entender el tema; los últimos lo conectan con lo que ves cada día. Dios, en su sabiduría, puso orden y propósito en todo lo que hizo —y entender ese orden es el primer paso para cuidarlo.`,
-    470
-  );
-  // Sirve para cualquier ruta ordenada (procesos, categorías, historia): se pregunta por EL VINCULO entre pasos, no por un mecanismo inventado.
-  const questionA = clean(
-    `¿Qué aporta cada paso (${names}) para que "${tema}" se entienda completo? Da un ejemplo propio de cada uno y responde: ¿qué quedaría confuso si empezaríamos la lección al revés, desde «${ultimoNombre}» hacia el principio?`,
-    340
-  );
-  const q2 = meta.withSplit
-    ? " Al cerrar, llena dos cajas: 🧪 lo que has observado o puedes comprobar, y 📖 lo que Dios enseña sobre cuidarlo (orden, mayordomía, servicio)."
-    : " Cierra con una decisión concreta: \"Me comprometo a…\".";
-  const questionB = clean(
-    `Lleva el tema a tu vida: ¿qué pasaría con tu día a día si nunca pudieras aplicar «${ultimoNombre}»? ¿Qué parte de lo que Dios puso a tu cuidado se vería afectada, y qué harías tú para protegerlo?${q2}`,
-    430
-  );
-  return { intro, steps, questionA, questionB, providerUsed: "compuesta desde la ruta del estudiante (local)" };
+  const level = resolveEgbLevel(meta.studentGrade, meta.studentId);
+  const cap = wordCapForLevel(level);
+  const theme = clean((meta.theme || '').replace(/^(continuaci[oó]n|repaso|ampliaci[oó]n|conexi[oó]n)\s*[:\-–—]\s*/i, ''), 80);
+  const body = steps.map((s) => clean(s.text, 320)).join(' ');
+  const explicacion = truncateWords(clean(`Hoy estudiamos "${theme}". ${body}`, 3000), cap);
+  return {
+    explicacion,
+    preguntas: buildQuestions(theme, level),
+    providerUsed: "compuesta desde la ruta del estudiante (local)",
+  };
 }
 
-const esc = (s: string): string => (s || "").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+// ----------------------------------------------------------------------------
+// Plantilla HTML (una página A4 por materia)
+// ----------------------------------------------------------------------------
 
-// Logo oficial de Wisdom School embebido en línea (mismo emblema de public/logo.svg).
-// Inline = aparece siempre en el PDF, incluso sin conexión y al abrir el HTML guardado.
 const WISDOM_LOGO_SVG = `<svg class="logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" fill="none" aria-label="Wisdom School"><path d="M 16 56 L 16 24 C 33.67 24 48 38.33 48 56 Z" fill="#78C043"/><path d="M 16 56 H 48 V 88 C 30.33 88 16 73.67 16 56 Z" fill="#E5234A"/><path d="M 48 88 V 56 C 65.67 56 80 70.33 80 88 Z" fill="#F37023"/><path d="M 112 56 H 80 C 80 38.33 94.33 24 112 24 Z" fill="#00AEEF"/><path d="M 80 56 H 112 C 112 73.67 97.67 88 80 88 Z" fill="#583F8C"/></svg>`;
+
+const GUIDE_PAGE_CSS = `
+  @page { size: A4; margin: 0; }
+  * { box-sizing: border-box; orphans: 3; widows: 3; }
+  html, body { margin: 0; padding: 0; }
+  body { font-family: Georgia, 'Times New Roman', serif; color: #1f2937; background: #e2e8f0; }
+  .pagina-guia {
+    width: 210mm; min-height: 297mm; padding: 18mm 16mm 20mm 16mm;
+    background: #fff; margin: 0 auto;
+    display: flex; flex-direction: column;
+    page-break-after: always; page-break-inside: avoid;
+  }
+  .pagina-guia:last-child { page-break-after: auto; }
+  .encabezado { flex: 0 0 auto; max-height: 22mm; border-bottom: 2px solid #1e3a8a; padding-bottom: 2.5mm; }
+  .guia-marca { font: 700 9pt 'Segoe UI', Arial, sans-serif; color: #1e3a8a; letter-spacing: .6px; text-transform: uppercase; }
+  .guia-titulo { font: 800 15pt/1.2 'Segoe UI', Arial, sans-serif; color: #0f172a; margin: 1mm 0 .5mm; }
+  .guia-meta { font: 9.5pt 'Segoe UI', Arial, sans-serif; color: #475569; line-height: 1.35; }
+  .guia-meta strong { color: #0f172a; }
+  .bloque-explicacion { flex: 0 0 auto; max-height: 95mm; overflow: hidden; margin-top: 4mm; }
+  .bloque-titulo { font: 800 11pt 'Segoe UI', Arial, sans-serif; color: #fff; background: #1e3a8a; display: inline-block; padding: 1mm 3mm; border-radius: 1.5mm; margin: 0 0 2.5mm; }
+  .explicacion { font-size: 12pt; line-height: 1.55; margin: 0; text-align: justify; }
+  .bloque-preguntas { flex: 1 1 auto; font-size: 12pt; line-height: 1.6; margin-top: 4mm; }
+  .pregunta { margin-bottom: 3.5mm; }
+  .pregunta-texto { margin: 0; font-size: 12pt; }
+  .pregunta-num { font-weight: 700; color: #1e3a8a; }
+  .pregunta-tipo { font: 700 8pt 'Segoe UI', Arial, sans-serif; text-transform: uppercase; color: #64748b; letter-spacing: .5px; }
+  .pista { font: italic 9.5pt 'Segoe UI', Arial, sans-serif; color: #64748b; margin: 1mm 0 0; }
+  .linea-respuesta { border-bottom: 1px dotted #94a3b8; height: 8mm; margin-top: 2mm; }
+  .pagina-guia.nivel-elemental .linea-respuesta { height: 9mm; }
+  .firma { flex: 0 0 auto; margin-top: auto; padding-top: 10mm; display: flex; gap: 20mm; }
+  .firma div { flex: 1; border-top: 1px solid #64748b; padding-top: 2mm; text-align: center; font: 9pt 'Segoe UI', Arial, sans-serif; color: #475569; }
+  .pie { flex: 0 0 auto; text-align: center; font: 8pt 'Segoe UI', Arial, sans-serif; color: #94a3b8; margin-top: 4mm; }
+
+  @media print {
+    body { background: #fff; }
+    .pagina-guia { margin: 0; box-shadow: none; }
+    .no-print { display: none !important; }
+  }
+`;
+
+const COVER_CSS = `
+  .portada {
+    width: 210mm; min-height: 297mm; padding: 28mm 20mm; background: #fff; margin: 0 auto;
+    display: flex; flex-direction: column; justify-content: flex-start;
+    page-break-after: always; page-break-inside: avoid;
+  }
+  .portada .brand { display: flex; align-items: center; gap: 3mm; border-bottom: 3px double #1e3a8a; padding-bottom: 3mm; }
+  .portada .brand .logo { width: 12mm; height: 12mm; }
+  .portada .brand .ws { font: 800 16pt 'Segoe UI', Arial, sans-serif; color: #1e3a8a; }
+  .portada .brand small { margin-left: auto; font: 9pt 'Segoe UI', Arial, sans-serif; color: #64748b; letter-spacing: 1px; }
+  .portada h1 { font: 800 22pt/1.25 'Segoe UI', Arial, sans-serif; color: #0f172a; margin: 18mm 0 4mm; }
+  .portada .sub { font: 12pt 'Segoe UI', Arial, sans-serif; color: #475569; margin-bottom: 10mm; }
+  .portada .cover-meta { font: 11pt 'Segoe UI', Arial, sans-serif; color: #334155; line-height: 1.9; border: 1.5px solid #cbd5e1; border-radius: 3mm; padding: 6mm 8mm; }
+  .portada .cover-meta strong { color: #0f172a; }
+  .portada .cover-list { font-size: 11pt; color: #1f2937; margin: 8mm 0 0 6mm; padding: 0; }
+  .portada .cover-list li { margin-bottom: 1.5mm; }
+  .portada .nota { font: 10pt 'Segoe UI', Arial, sans-serif; color: #64748b; margin-top: 10mm; }
+  .portada .firma { margin-top: auto; }
+`;
+
+const bannerFor = (studentId: string): string =>
+  studentId === 'avril' || studentId === 'karen'
+    ? `<div style="margin:2mm 0 3mm;background:#7c9cff14;border:1px solid #7c9cff55;border-radius:2mm;padding:2mm 3mm;font:10pt 'Segoe UI',Arial;">🐶 Snoopy confía en tu prosa: el mundo tiene orden porque Dios lo pensó. <em>Guía Peanuts</em></div>`
+    : studentId === 'gael'
+    ? `<div style="margin:2mm 0 3mm;background:#e11d4814;border:1px solid #e11d4855;border-radius:2mm;padding:2mm 3mm;font:10pt 'Segoe UI',Arial;">🍄 ¡Power-up de conocimiento! Mario cuenta contigo para cuidar lo que Dios creó. <em>Guía Super Mario</em></div>`
+    : '';
+
+const buildQuestionsHtml = (preguntas: GuideQuestion[], level: EgbLevel): string => {
+  const lines = level === 'Elemental' ? 3 : 2;
+  return preguntas.map((q, i) => `
+    <div class="pregunta">
+      <p class="pregunta-texto">
+        <span class="pregunta-num">${i + 1}.</span>
+        <span class="pregunta-tipo">${esc(questionLabel(q.tipo))}</span>
+        ${esc(clean(q.pregunta, 240))}
+      </p>
+      ${q.pista ? `<p class="pista">Pista: ${esc(clean(q.pista, 90))}</p>` : ''}
+      ${Array.from({ length: lines }, () => '<div class="linea-respuesta"></div>').join('')}
+    </div>`).join('');
+};
+
+const buildGuidePage = (
+  currentClass: DailyClass,
+  subject: Subject | undefined,
+  studentName: string,
+  studentGrade: string,
+  ai?: GuideAiContent | null,
+): string => {
+  const level = resolveEgbLevel(studentGrade, currentClass.studentId);
+  const content: GuideAiContent =
+    ai && typeof ai.explicacion === 'string' && ai.explicacion.trim() && Array.isArray(ai.preguntas) && ai.preguntas.length >= 2
+      ? ai
+      : buildFromReading(currentClass, level);
+  const explicacion = truncateWords(clean(content.explicacion, 3000), wordCapForLevel(level));
+  const preguntas = content.preguntas.filter((q) => q && q.pregunta).slice(0, level === 'Elemental' ? 2 : 3);
+  const subjectName = subject?.name || 'Materia';
+  const teacherName = subject?.teacher?.name || 'Docente IA';
+  const dateStr = currentClass.date || new Date().toLocaleDateString('es-EC');
+  const unit = currentClass.unit || 'Unidad curricular';
+  const origin = content.providerUsed ? `<div class="guia-meta">Origen del contenido: ${esc(clean(content.providerUsed, 90))}</div>` : '';
+
+  return `
+  <section class="pagina-guia ${level === 'Elemental' ? 'nivel-elemental' : ''}">
+    <header class="encabezado">
+      <div class="guia-marca">Wisdom School · Guía Didáctica v4.0</div>
+      <div class="guia-titulo">${esc(subjectName)} — ${esc(clean(currentClass.theme, 90))}</div>
+      <div class="guia-meta"><strong>Unidad:</strong> ${esc(clean(unit, 110))}</div>
+      <div class="guia-meta"><strong>Estudiante:</strong> ${esc(studentName)} · ${esc(studentGrade)} · <strong>Docente IA:</strong> ${esc(teacherName)} · <strong>Fecha:</strong> ${esc(dateStr)}</div>
+      ${origin}
+    </header>
+
+    <div class="bloque-explicacion">
+      <h2 class="bloque-titulo">1. Explicación del tema</h2>
+      <p class="explicacion">${esc(explicacion)}</p>
+    </div>
+
+    <div class="bloque-preguntas">
+      <h2 class="bloque-titulo">2. Preguntas sobre el texto</h2>
+      ${buildQuestionsHtml(preguntas, level)}
+    </div>
+
+    <div class="firma">
+      <div>Firma del estudiante</div>
+      <div>Firma del representante / docente guía</div>
+    </div>
+    <div class="pie">Wisdom School · Guía Didáctica v4.0 · ${esc(subjectName)} · ${esc(dateStr)}</div>
+  </section>`;
+};
 
 export function generateClassGuideHTML(
   currentClass: DailyClass,
   subject?: Subject,
   studentName: string = "Estudiante",
   studentGrade: string = "Educación General Básica",
-  ai?: GuideAiContent | null
+  ai?: GuideAiContent | null,
 ): string {
-  const dateStr = currentClass.date || new Date().toLocaleDateString("es-EC");
-  const now = new Date();
-  const stampStr = `${now.toLocaleDateString('es-EC')} ${now.toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit' })}`;
-  const fileStamp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`;
-  const subjectName = subject?.name || "Materia General";
-  const teacherName = subject?.teacher?.name || "Docente Asignado";
-  const theme = currentClass.theme;
-  const unit = currentClass.unit || "Unidad Curricular";
-  const docTitle = clean(currentClass.guideTitle?.replace(/\.pdf$/i, "") || `Guía Didáctica — ${theme}`, 90);
-  const content: GuideAiContent = ai && ai.steps && ai.steps.length >= 2 ? ai : buildFromReading(currentClass);
-  const split = withSplit(subject);
-
-  const stepsHtml = content.steps.map((s, i) => `
-    <div class="paso">
-      <span class="paso-n">Paso ${i + 1}</span>
-      <div class="paso-c">
-        <strong>${esc(clean(s.title, 90))}</strong>
-        <p>${esc(clean(s.text, 300))}</p>
-      </div>
-    </div>`).join("");
-
-  const cajon = (pista?: string) => `
-    <div class="caja">
-      <strong style="font-size:10px;color:#1d4ed8;display:block;text-align:center;border-bottom:1px dashed #93c5fd;padding-bottom:2px;margin-bottom:6px;">✍️ CAJÓN DE ESCRITURA</strong>
-      <div class="raya"></div><div class="raya"></div><div class="raya"></div><div class="raya"></div>
-    </div>
-    ${pista ? `<div class="pista">💡 <strong>Pista:</strong> ${pista}</div>` : ""}
-    <div style="height:6px"></div>`;
-
-  const introBase = /[.!?…]$/.test(content.intro.trim()) ? content.intro : `${content.intro}.`;
-  // La frase cosmovisiva se añade SOLO si la fuente no la trajo ya (evita la duplicación "Dios… Dios…").
-  const fullIntro = /Dios|Creador|G[ée]nesis|mayordom/i.test(content.intro)
-    ? introBase
-    : `${introBase} Dios hizo todas las cosas con orden y propósito (Génesis 1:31; Colosenses 1:16-17), y estudiar este tema es descubrir ese diseño para cuidarlo`;
-
-  const banner = currentClass.studentId === "avril" || currentClass.studentId === "karen"
-    ? `<div class="banner" style="background:#7c9cff14;border:1px solid #7c9cff55;" >🐶 Snoopy confía en tu prosa: el mundo tiene orden porque Dios lo pensó. <em>Guía Peanuts</em></div>`
-    : currentClass.studentId === "gael"
-    ? `<div class="banner" style="background:#e11d4814;border:1px solid #e11d4855;">🍄 ¡Power-up de conocimiento! Mario cuenta contigo para cuidar lo que Dios creó. <em>Guía Super Mario</em></div>`
-    : `<div class="banner">🎓 Un aprendizaje con orden refleja al Dios que dio forma a la Tierra. <em>Guía Wisdom</em></div>`;
-
+  const page = buildGuidePage(currentClass, subject, studentName, studentGrade, ai);
+  const printBar = `<div class="no-print" style="position:fixed;top:12px;right:14px;z-index:50;"><button onclick="window.print()" style="background:#2563eb;color:#fff;border:none;padding:8px 16px;border-radius:6px;font:700 13px 'Segoe UI',Arial;cursor:pointer;">🖨️ Imprimir / Guardar PDF</button></div>`;
   return `<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>${esc(docTitle)}</title>
-  <style>
-    @page { size: A4; margin: 12mm 12mm; }
-    * { box-sizing: border-box; }
-    body { font-family: Georgia, 'Times New Roman', serif; color:#1f2937; line-height:1.5; margin:0 auto; padding:26px 30px; background:#fff; max-width:794px; }
-    .print-btn-bar { position:fixed; top:12px; right:14px; z-index:50; }
-    .btn-print { background:#2563eb; color:#fff; border:none; padding:8px 16px; border-radius:6px; font:700 13px 'Segoe UI',Arial; cursor:pointer; }
-    .brand { display:flex; align-items:center; gap:10px; border-bottom:3px double #1e3a8a; padding-bottom:6px; }
-    .brand .logo { width:30px; height:30px; flex:0 0 30px; display:block; }
-    .brand .ws { font-size:14px; font-weight:bold; color:#1e3a8a; }
-    .brand small { margin-left:auto; font-size:9px; color:#64748b; letter-spacing:1px; }
-    h1 { text-align:center; font: bold 17px/1.3 'Segoe UI',Arial,sans-serif; color:#0f172a; margin:12px 0 3px; }
-    .sub { text-align:center; font:600 10.5px 'Segoe UI',Arial,sans-serif; color:#475569; margin-bottom:9px; }
-    .tema { font-size:12.5px; margin:7px 0 4px; } .tema strong{ color:#1e3a8a; }
-    .meta { display:flex; flex-wrap:wrap; gap:12px; font:10.5px 'Segoe UI', Arial; color:#475569; border-bottom:1px solid #cbd5e1; padding-bottom:7px; margin-bottom:11px;}
-    .banner { font:11px 'Segoe UI',Arial; padding:7px 12px; border-radius:7px; margin-bottom:11px; }
-    h2 { font:bold 13px 'Segoe UI',Arial; color:#fff; background:#1e3a8a; display:inline-block; padding:3px 12px; border-radius:4px; margin:12px 0 7px; }
-    .intro { font-size:12.3px; margin:0 0 9px; text-align:justify; }
-    .paso { display:flex; gap:10px; margin:5px 0 7px; font-size:11.8px; }
-    .paso-n { flex:0 0 62px; font:bold 10px/1.8 'Segoe UI'; color:#1e3a8a; background:#e0e7ff; border-radius:4px; text-align:center; height:fit-content; padding:1px 4px; margin-top:2px; }
-    .paso-c strong { display:block; font:700 12px 'Segoe UI'; color:#0f172a; margin-bottom:1px; }
-    .paso-c p { margin:0; }
-    .cons { font-size:12.3px; margin:10px 0 5px; }
-    .cons em { color:#1e3a8a; }
-    .caja { border:1.5px dashed #94a3b8; border-radius:6px; padding:9px 13px; margin-bottom:4px; background:#fcfdff; }
-    .raya { border-bottom:1px solid #cbd5e1; height:22px; }
-    .pista { font-size:10.4px; color:#475569; background:#dbeafe; border:1px solid #93c5fd; border-radius:5px; padding:5px 9px; }
-    .fin { display:flex; justify-content:space-between; gap:20px; margin-top:22px; font:10px 'Segoe UI'; color:#475569; }
-    .firma { flex:1; border-top:1px solid #64748b; padding-top:5px; text-align:center; }
-
-    /* ==== REGLA ESTRICTA: 1 HOJA = 1 CLASE ==== */
-    .cover { page-break-after: always; break-after: page; }
-    section.guia { page-break-after: always; break-after: page; }
-    section.guia:last-child { page-break-after: auto; break-after: auto; }
-    .brand, h1, h2, .tema, .banner, .paso, .cons, .caja, .pista, .fin { break-inside: avoid; page-break-inside: avoid; }
-
-    @media print {
-      .print-btn-bar { display:none !important; }
-      body { padding:0; max-width:none; }
-      section.guia { max-height: 262mm; overflow: hidden; }   /* cabe en una A4 con márgenes de 12mm */
-      .brand { padding-bottom:4px; }
-      .brand .logo { width:25px; height:25px; flex-basis:25px; }
-      .brand .ws { font-size:12.5px; }
-      .brand small { font-size:8.5px; }
-      h1 { font-size:15px; margin:8px 0 2px; }
-      .sub { font-size:9.4px; margin-bottom:5px; }
-      .tema { font-size:10.8px; margin:4px 0 2px; }
-      .meta { gap:9px; font-size:9.2px; padding-bottom:4px; margin-bottom:7px; }
-      .banner { font-size:9.8px; padding:4px 9px; margin-bottom:7px; }
-      h2 { font-size:11.2px; padding:2px 10px; margin:8px 0 5px; }
-      .intro { font-size:10.6px; line-height:1.38; margin-bottom:6px; }
-      .paso { font-size:10.2px; margin:3px 0 5px; gap:8px; }
-      .paso-n { flex-basis:56px; font-size:8.8px; }
-      .paso-c strong { font-size:10.2px; }
-      .cons { font-size:10.6px; margin:7px 0 3px; }
-      .caja { padding:5px 9px; }
-      .raya { height:17px; }
-      .pista { font-size:9.2px; padding:4px 7px; }
-      .fin { margin-top:10px; font-size:8.6px; }
-    }
-  </style>
+  <title>${esc(clean(currentClass.guideTitle || `Guía Didáctica — ${currentClass.theme}`, 90))}</title>
+  <style>${GUIDE_PAGE_CSS}</style>
 </head>
 <body>
-  <div class="print-btn-bar"><button class="btn-print" onclick="window.print()">🖨️ Imprimir / Guardar PDF</button></div>
-
-  <div class="brand">
-    ${WISDOM_LOGO_SVG}
-    <span class="ws">WISDOM SCHOOL</span>
-    <small>ECUADOR · 2026-2027 · CONFESIÓN EVANGÉLICA</small>
-  </div>
-  <div style="margin:8px 0 2px;background:#065f46;color:#ecfdf5;border-radius:6px;padding:4px 10px;font:700 9.5px 'Segoe UI',Arial;text-align:center;letter-spacing:.4px;">FORMATO NUEVO v3.0 · una página por asignatura · impresa el ${esc(stampStr)}</div>
-
-  <h1>Guía Didáctica y Taller Práctico <span style="color:#64748b">|</span> Tiempo estimado: 45 minutos</h1>
-  <div class="sub">Guía del estudiante · enfoque Montessori-Charlotte Mason</div>
-  <div class="tema"><strong>Tema:</strong> ${esc(theme)} — <span style="color:#475569">${esc(unit)}</span></div>
-  <div class="meta">
-    <span><b>Alumno:</b> ${esc(studentName)}</span>
-    <span><b>Grado:</b> ${esc(studentGrade)}</span>
-    <span><b>Materia:</b> ${esc(subjectName)}</span>
-    <span><b>Docente asignado:</b> ${esc(teacherName)}</span>
-    <span><b>Fecha:</b> ${esc(dateStr)}</span>
-    <span><b>Formato:</b> v3.0 · ${esc(stampStr)}</span>
-    ${content.providerUsed ? `<span><b>Origen contenido:</b> ${esc(content.providerUsed)}</span>` : ""}
-  </div>
-
-  ${banner}
-
-  <h2>1. Desarrollo del Tema (Texto Base)</h2>
-  <p class="intro">${esc(fullIntro)}</p>
-  ${stepsHtml}
-
-  <h2>2. Taller Práctico (Análisis y Síntesis)</h2>
-  <div class="cons"><em>A. Expresa con tus propias palabras:</em> ${esc(content.questionA)}<br><span style="font:10.5px 'Segoe UI'; color:#64748b;">Escribe aquí tu análisis detallado basándote en la lectura:</span></div>
-  ${cajon("Ordena tu idea con conectores: \"Primero…\", \"Luego… (Paso N)…\", \"por eso…\". Si dudas, vuelve al paso correspondiente del Texto Base.")}
-  <div class="cons"><em>B. Pensamiento crítico:</em> ${esc(content.questionB)}<br><span style="font:10.5px 'Segoe UI'; color:#64748b;">Escribe aquí tu conclusión:</span></div>
-  ${cajon(withSplit ? "Distingue: primero lo que la evidencia muestra (🧪 se observa/Comprueba) y luego lo que enseña la Biblia (📖 principio, carácter de Dios). Cierra con \"Me comprometo a…\"." : "Marca el principio bíblico que ves (📖 orden, paciencia, fidelidad, servicio) y termina con tu decisión concreta: \"Me comprometo a…\".")}
-
-  <div class="fin">
-    <div class="firma">Firma del estudiante</div>
-    <div class="firma">Firma del representante / docente guía</div>
-  </div>
-  <div style="text-align:center;color:#94a3b8;font-size:9px;margin-top:14px;">Wisdom School · Guía Didáctica y Taller Práctico · v3.0 · ${esc(dateStr)} · generada el ${esc(stampStr)}</div>
+  ${printBar}
+  ${page}
 </body>
 </html>`;
 }
-
-export function downloadClassGuide(
-  currentClass: DailyClass,
-  subject?: Subject,
-  studentName: string = "Estudiante",
-  studentGrade: string = "Educación General Básica",
-  ai?: GuideAiContent | null
-): void {
-  const html = generateClassGuideHTML(currentClass, subject, studentName, studentGrade, ai ?? null);
-  // Nombre único con fecha+hora: imposible confundir la guía nueva con una descarga antigua.
-  const n = new Date();
-  const stamp = `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}_${String(n.getHours()).padStart(2, '0')}${String(n.getMinutes()).padStart(2, '0')}`;
-  const base = `Guia_Didactica_${subject?.code || 'GEN'}_${currentClass.id || 'clase'}`;
-  downloadHTML(html, `${base}_${stamp}.html`);
-}
-
-// ============================================================
-// DESCARGA POR LOTES: un único PDF combinado con TODAS las guías
-// didácticas del día (una página por asignatura + portada).
-// Reutiliza el MISMO diseño de la guía individual extrayendo su
-// <style> y su <body> generados por nosotros (contrato estable).
-// Reconstruye el diseño de una guía individual extrayendo su CSS y su cuerpo.
-const extractGuideParts = (html: string): { css: string; body: string } => {
-  const css = html.match(/<style>([\s\S]*?)<\/style>/i)?.[1] || "";
-  let body = html.split(/<body[^>]*>/i)[1]?.split(/<\/body>/i)[0] || html;
-  body = body.replace(/<div class="print-btn-bar">[\s\S]*?<\/div>/i, ""); // una sola barra de impresión: en la portada
-  return { css, body: body.trim() };
-};
 
 const downloadHTML = (html: string, filename: string): void => {
   const blob = new Blob([html], { type: "text/html;charset=utf-8" });
@@ -322,85 +283,76 @@ const downloadHTML = (html: string, filename: string): void => {
   } catch { /* bloqueado: la descarga ya ocurrió */ }
 };
 
+export function downloadClassGuide(
+  currentClass: DailyClass,
+  subject?: Subject,
+  studentName: string = "Estudiante",
+  studentGrade: string = "Educación General Básica",
+  ai?: GuideAiContent | null,
+): void {
+  const html = generateClassGuideHTML(currentClass, subject, studentName, studentGrade, ai ?? null);
+  const n = new Date();
+  const stamp = `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}_${String(n.getHours()).padStart(2, '0')}${String(n.getMinutes()).padStart(2, '0')}`;
+  downloadHTML(html, `Guia_Didactica_${subject?.code || 'GEN'}_${currentClass.id || 'clase'}_${stamp}.html`);
+}
+
 export interface DailyGuideBundleItem {
   currentClass: DailyClass;
   subject?: Subject;
   ai?: GuideAiContent | null;
 }
 
-// Un solo documento imprimible = un solo PDF combinado al usar Imprimir → Guardar como PDF.
+/** Portada (logo + mundo temático) + una página por materia programada del día. */
 export function generateDailyGuidesBundleHTML(opts: {
   studentName: string;
   studentGrade: string;
   dateStr: string;
   dayLabel?: string;
+  studentId?: string;
   items: DailyGuideBundleItem[];
 }): string {
-  const { studentName, studentGrade, dateStr, dayLabel } = opts;
-  const bNow = new Date();
-  const bundleStamp = `${bNow.toLocaleDateString('es-EC')} ${bNow.toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit' })}`;
+  const { studentName, studentGrade, dateStr, dayLabel, studentId } = opts;
   const items = (opts.items || []).filter((it) => it && it.currentClass);
-  const parts = items.map((it) => extractGuideParts(generateClassGuideHTML(it.currentClass, it.subject, studentName, studentGrade, it.ai ?? null)));
-  const css = parts[0]?.css || "";
-  const printBar = `<div class="print-btn-bar"><button class="btn-print" onclick="window.print()">🖨️ Imprimir / Guardar PDF combinado</button></div>`;
+  const pages = items.map((it) => buildGuidePage(it.currentClass, it.subject, studentName, studentGrade, it.ai ?? null));
+  const printBar = `<div class="no-print" style="position:fixed;top:12px;right:14px;z-index:50;"><button onclick="window.print()" style="background:#2563eb;color:#fff;border:none;padding:8px 16px;border-radius:6px;font:700 13px 'Segoe UI',Arial;cursor:pointer;">🖨️ Imprimir / Guardar PDF combinado</button></div>`;
 
   const cover = `
-  <section class="cover">
+  <section class="portada">
     <div class="brand">
       ${WISDOM_LOGO_SVG}
       <span class="ws">WISDOM SCHOOL</span>
       <small>ECUADOR · 2026-2027 · CONFESIÓN EVANGÉLICA</small>
     </div>
-    <h1>Guías Didácticas del Día <span style="color:#64748b">|</span> PDF combinado</h1>
+    <h1>Guías Didácticas del Día<br><span style="color:#1e3a8a;">Formato v4.0</span></h1>
     <div class="sub">${items.length} asignatura${items.length === 1 ? "" : "s"} programada${items.length === 1 ? "" : "s"} en el horario escolar</div>
-    <div style="margin:8px 0 2px;background:#065f46;color:#ecfdf5;border-radius:6px;padding:4px 10px;font:700 9.5px 'Segoe UI',Arial;text-align:center;letter-spacing:.4px;">FORMATO NUEVO v3.0 · paquete diario · generado el ${esc(bundleStamp)}</div>
+    ${bannerFor(studentId || '')}
     <div class="cover-meta">
-      <span><b>Alumno:</b> ${esc(studentName)}</span>
-      <span><b>Grado:</b> ${esc(studentGrade)}</span>
-      <span><b>Fecha:</b> ${esc(dateStr)}</span>
-      ${dayLabel ? `<span><b>Día escolar:</b> ${esc(dayLabel)}</span>` : ""}
+      <div><strong>Alumno:</strong> ${esc(studentName)}</div>
+      <div><strong>Grado:</strong> ${esc(studentGrade)}</div>
+      <div><strong>Fecha:</strong> ${esc(dateStr)}</div>
+      ${dayLabel ? `<div><strong>Día escolar:</strong> ${esc(dayLabel)}</div>` : ''}
     </div>
-    <div class="cover-box">
-      <strong style="font:700 12px 'Segoe UI'; color:#1e3a8a;">Contenido de este documento</strong>
-      <ol class="cover-list">
-        ${items.map((it) => `<li><b>${esc(it.subject?.name || "Materia")}</b> — ${esc(it.currentClass.theme)} <span style="color:#64748b">(Paso a paso + Taller A/B)</span></li>`).join("")}
-      </ol>
+    <ol class="cover-list">
+      ${items.map((it) => `<li><b>${esc(it.subject?.name || "Materia")}</b> — ${esc(clean(it.currentClass.theme, 70))}</li>`).join("")}
+    </ol>
+    <p class="nota">Una página por asignatura. Usa «Imprimir / Guardar PDF combinado» y elige «Guardar como PDF».</p>
+    <div class="firma">
+      <div>Firma del estudiante</div>
+      <div>Firma del representante / docente guía</div>
     </div>
-    <p style="font-size:11px;color:#475569;text-align:justify;">Cada asignatura ocupa su propia página al imprimir: usa <b>Imprimir / Guardar PDF combinado</b> y elige «Guardar como PDF» para obtener un único archivo con todas las guías del día, listas para trabajar y firmar.</p>
-    <div class="fin">
-      <div class="firma">Firma del estudiante</div>
-      <div class="firma">Firma del representante / docente guía</div>
-    </div>
-    <div style="text-align:center;color:#94a3b8;font-size:9px;margin-top:14px;">Wisdom School · Paquete diario de guías didácticas · v3.0 · ${esc(dateStr)} · generado el ${esc(bundleStamp)}</div>
   </section>`;
-
-  const sections = parts
-    .map((p, i) => `<section class="guia" data-index="${i + 1}">${p.body}</section>`)
-    .join("\n");
 
   return `<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
   <title>Guías Didácticas del Día — ${esc(dateStr)}</title>
-  <style>${css}
-    .cover { page-break-after: always; break-after: page; }
-    .cover h1 { margin-top: 10px; }
-    .cover-meta { display:flex; flex-wrap:wrap; gap:14px; font:10.5px 'Segoe UI',Arial; color:#475569; border-bottom:1px solid #cbd5e1; padding-bottom:8px; margin-bottom:12px; }
-    .cover-box { border:1.5px solid #cbd5e1; border-radius:8px; padding:10px 16px; margin:10px 0; }
-    .cover-list { font:12px 'Segoe UI',Arial; color:#1f2937; margin:6px 0 2px 18px; padding:0; }
-    .cover-list li { margin-bottom:4px; }
-    @media print {
-      .cover { max-height: 262mm; overflow: hidden; }
-      .cover-meta { font-size:9.2px; padding-bottom:5px; margin-bottom:8px; }
-      .cover-list { font-size:10.6px; }
-    }
-  </style>
+  <style>${GUIDE_PAGE_CSS}${COVER_CSS}</style>
 </head>
 <body>
   ${printBar}
   ${cover}
-  ${sections}
+  ${pages.join("\n")}
 </body>
 </html>`;
 }
@@ -410,6 +362,7 @@ export function downloadDailyGuidesBundle(opts: {
   studentGrade: string;
   dateStr: string;
   dayLabel?: string;
+  studentId?: string;
   items: DailyGuideBundleItem[];
 }): string {
   const html = generateDailyGuidesBundleHTML(opts);
@@ -417,7 +370,7 @@ export function downloadDailyGuidesBundle(opts: {
   const hhmm = `${String(n.getHours()).padStart(2, '0')}${String(n.getMinutes()).padStart(2, '0')}`;
   const safeDate = (opts.dateStr || "dia").replace(/[^\w\-]+/g, "_");
   const safeStudent = (opts.studentName || "estudiante").split(" ")[0].replace(/[^\w\-]+/g, "");
-  const filename = `Guias_Didacticas_${safeDate}_${safeStudent}_${hhmm}.html`;
+  const filename = `Guias_Didacticas_v4_${safeDate}_${safeStudent}_${hhmm}.html`;
   downloadHTML(html, filename);
   return filename;
 }

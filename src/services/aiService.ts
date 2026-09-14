@@ -141,10 +141,10 @@ async function fetchWithTimeout(resource: string, options: RequestInit, timeoutM
 // ==========================================
 // PLAN DE MICRO-LECCIONES (ruta paginada + quizzes) — servido por la jerarquía gratuita del servidor
 // ==========================================
-// Contenido DESARROLLADO de la Guía Didáctica (plantilla oficial: intro + PASOS REALES + A/B).
-// DISEÑO: si el caller pasa `steps` (los que la Clase Interactiva ya resolvió, cacheados y coherentes con lo que el niño vio),
-// el server genera SOLO {intro, questionA, questionB} = JSON pequeño y confiable hasta en free-tier saturado (guía == clase).
-// Sin steps, cae a modo completo (intro+pasos+preguntas); null => generador usa su fallback determinista (lectura real).
+// Contenido de la Guía Didáctica v4.0: { explicacion, preguntas }.
+// El server recibe el material de la clase (y, si existen, los pasos que la Clase Interactiva ya resolvió
+// como contexto) y devuelve una explicación corrida acotada por nivel + 2-3 preguntas ancladas al texto.
+// `null` => el generador usa su fallback determinista (síntesis local del material de la clase).
 export async function requestGuideContent(req: {
   student: Student;
   subject: Subject;
@@ -152,19 +152,24 @@ export async function requestGuideContent(req: {
   steps?: { title: string; text: string }[];
 }): Promise<import('../utils/guideGenerator').GuideAiContent | null> {
   const preset = (req.steps || []).filter((s) => s && typeof s.title === "string" && typeof s.text === "string" && s.text.trim().length > 25).slice(0, 3);
-  const wantsFull = preset.length < 2;
   // Caché diaria por clase: la guía buena se reusa sin gastar la cuota gratuita del día.
   const dateKey = req.dailyClass?.date || new Date().toISOString().slice(0, 10);
-  const cacheKey = `wisdom_guide_v3_${req.student?.id || 'x'}_${req.dailyClass?.id || 'c'}_${dateKey}`;
+  const cacheKey = `wisdom_guide_v4_${req.student?.id || 'x'}_${req.dailyClass?.id || 'c'}_${dateKey}`;
   try {
     const cached = JSON.parse(localStorage.getItem(cacheKey) || 'null');
     const cl = cached?.content;
-    if (cl && typeof cl.intro === 'string' && Array.isArray(cl.steps) && cl.steps.length >= 2 && cl.questionA && cl.questionB) {
-      return { intro: String(cl.intro), steps: cl.steps.map((s: any) => ({ title: String(s.title), text: String(s.text) })), questionA: String(cl.questionA), questionB: String(cl.questionB), providerUsed: `${cached.providerUsed || 'IA'} (caché de hoy)` };
+    if (cl && typeof cl.explicacion === 'string' && Array.isArray(cl.preguntas) && cl.preguntas.length >= 2) {
+      return {
+        explicacion: String(cl.explicacion),
+        preguntas: cl.preguntas
+          .filter((q: any) => q && typeof q.pregunta === 'string' && q.pregunta.trim())
+          .map((q: any, i: number) => ({ tipo: q.tipo || (['literal', 'interpretativa', 'aplicacion'][i] || 'interpretativa'), pregunta: String(q.pregunta), pista: q.pista ? String(q.pista) : null })),
+        providerUsed: `${cached.providerUsed || 'IA'} (caché de hoy)`,
+      };
     }
   } catch { /* cache corrupta: regenerar */ }
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), wantsFull ? 55000 : 35000);
+  const timeoutId = setTimeout(() => controller.abort(), 30000);
   try {
     const res = await fetch('/api/ai/guide-content', {
       method: 'POST',
@@ -172,37 +177,36 @@ export async function requestGuideContent(req: {
       signal: controller.signal,
       body: JSON.stringify({
         student: req.student, subject: req.subject, dailyClass: req.dailyClass,
-        ...(wantsFull ? {} : { steps: preset }),
+        ...(preset.length ? { steps: preset } : {}),
       }),
     });
     if (!res.ok) return null;
     const data = await res.json().catch(() => null);
     const c = data?.content;
-    if (!c || typeof c.intro !== 'string') return null;
+    if (!c || typeof c.explicacion !== 'string' || !c.explicacion.trim() || !Array.isArray(c.preguntas)) return null;
 
-    const finalSteps = wantsFull
-      ? (Array.isArray(c.steps) ? c.steps : [])
-          .filter((s: any) => s && typeof s.title === 'string' && typeof s.text === 'string' && s.text.trim().length > 20)
-          .slice(0, 3)
-          .map((s: any) => ({ title: String(s.title), text: String(s.text) }))
-      : preset;
-    const requireModelSteps = wantsFull && finalSteps.length < 2 ? null : finalSteps;
-    if (!requireModelSteps) return null;
-    if (!(c.questionA && c.questionB)) return null;
+    const preguntas = c.preguntas
+      .filter((q: any) => q && typeof q.pregunta === 'string' && q.pregunta.trim())
+      .slice(0, 3)
+      .map((q: any, i: number) => ({
+        tipo: ['literal', 'interpretativa', 'aplicacion'].includes(q.tipo) ? q.tipo : (['literal', 'interpretativa', 'aplicacion'][i] || 'interpretativa'),
+        pregunta: String(q.pregunta),
+        pista: q.pista ? String(q.pista) : null,
+      }));
+    if (preguntas.length < 2) return null;
+
     const built = {
-      intro: String(c.intro),
-      steps: requireModelSteps,
-      questionA: String(c.questionA),
-      questionB: String(c.questionB),
-      providerUsed: data.providerUsed || (wantsFull ? 'guía IA completa' : 'guía IA sobre la ruta del estudiante'),
-  };
-  // Solo cacheamos el camino IA (MODO A/B); el fallback determinista local no debe congelarse.
-  try {
-    if (data?.providerUsed && !data.isOfflineSimulation && built.steps.length >= 2) {
-      localStorage.setItem(cacheKey, JSON.stringify({ content: { intro: built.intro, steps: built.steps, questionA: built.questionA, questionB: built.questionB }, providerUsed: built.providerUsed }));
-    }
-  } catch { /* cuota llena: sin caché, la guía igual se descarga */ }
-  return built;
+      explicacion: String(c.explicacion),
+      preguntas,
+      providerUsed: data.providerUsed || 'guía IA v4.0',
+    };
+    // Solo cacheamos el camino IA; el fallback determinista local no debe congelarse.
+    try {
+      if (data?.providerUsed && !data.isOfflineSimulation) {
+        localStorage.setItem(cacheKey, JSON.stringify({ content: { explicacion: built.explicacion, preguntas: built.preguntas }, providerUsed: built.providerUsed }));
+      }
+    } catch { /* cuota llena: sin caché, la guía igual se descarga */ }
+    return built;
   } catch {
     return null;
   } finally {
